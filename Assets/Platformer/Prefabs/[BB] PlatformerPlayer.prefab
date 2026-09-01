@@ -27,6 +27,8 @@ GameObject:
   - component: {fileID: 1390870495292615358}
   - component: {fileID: 6726926906507702785}
   - component: {fileID: 581227787481236728}
+  - component: {fileID: 746723410958106507}
+  - component: {fileID: 1610473253553796827}
   m_Layer: 3
   m_Name: '[BB] PlatformerPlayer'
   m_TagString: Player
@@ -523,6 +525,64 @@ MonoBehaviour:
   minOpacity: 0.118
   heightForMinSize: 3
   textureResolution: 64
+--- !u!114 &746723410958106507
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4416926081852918481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b58d43060956cc54f9bc38fbd9ed343e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.WallSlideAbility
+  ShowTopMostFoldoutHeaderGroup: 1
+  wallLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  wallCheckDistance: 0.6
+  wallCheckRadius: 0.15
+  maxWallSurfaceAngle: 20
+  minPressInto: 0.4
+  minAirTimeBeforeSlide: 0.1
+  slideSpeed: 2
+  slideDamping: 12
+  wallJumpHeight: 2.2
+  wallJumpPushForce: 7
+  wallJumpBufferTime: 0.15
+  regrabCooldown: 0.25
+  wallJumpStaminaCost: 0
+  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+--- !u!114 &1610473253553796827
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4416926081852918481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df5fd59c59b42e144981367795f14109, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.BalanceBeamAbility
+  ShowTopMostFoldoutHeaderGroup: 1
+  beamCarefulSpeed: 1.5
+  tippingStrength: 0.5
+  minGustInterval: 0.4
+  maxGustInterval: 0.9
+  balanceControlRate: 1.4
+  jumpSquatDuration: 0.45
+  beamJumpHeightMultiplier: 0.5
+  fallOffPushForce: 3
+  fallOffHop: 2
+  barWorldWidth: 1.2
+  barWorldHeight: 0.14
+  indicatorWorldWidth: 0.06
+  headHeightOffset: 2.2
+  barBackgroundColor: {r: 0, g: 0, b: 0, a: 0.55}
+  indicatorSafeColor: {r: 1, g: 1, b: 1, a: 1}
+  indicatorDangerColor: {r: 1, g: 0.25, b: 0.2, a: 1}
 --- !u!1 &8338988566280778634
 GameObject:
   m_ObjectHideFlags: 0
