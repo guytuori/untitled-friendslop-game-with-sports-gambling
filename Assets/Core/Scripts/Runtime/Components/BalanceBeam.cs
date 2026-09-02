@@ -6,16 +6,22 @@ namespace Blocks.Gameplay.Core
     /// Marks a piece of level geometry as a balance beam that <see cref="BalanceBeamAbility"/> can
     /// snap the player onto. Put this on the beam's GameObject, alongside its collider.
     ///
-    /// Beam dimensions are read from a <see cref="BoxCollider"/> on the same object when one exists
-    /// (the beam's local +Z is treated as "along the beam" and local +X as "across the beam" - build
-    /// beam geometry unrotated relative to its own length axis, i.e. a box scaled thin in X, thin in
-    /// Y, long in Z). If there's no BoxCollider, the fallback fields below are used instead - useful
-    /// for a beam built from a non-box mesh, as long as you size the fallbacks to match it by hand.
+    /// Beam dimensions are read from whichever collider is present on the same object, preferring a
+    /// <see cref="CapsuleCollider"/> (the standard shape now - see BalanceBeamCourseBuilder) with its
+    /// <c>direction</c> set to Z (2), falling back to a <see cref="BoxCollider"/> for backward
+    /// compatibility. Either way, the beam's local +Z is treated as "along the beam" and local +X as
+    /// "across the beam" - build beam geometry unrotated relative to its own length axis. A capsule's
+    /// round cross-section is the point: without BalanceBeamAbility actively locking a player to the
+    /// centerline (e.g. during its re-entry cooldown), there's no flat spot to stand on and gravity
+    /// plus the curved surface just slide them off, the same way a real balance beam's edges would if
+    /// you weren't actively balancing. If neither collider exists, the fallback fields below are used
+    /// instead - useful for a beam built from a custom mesh, as long as you size the fallbacks to
+    /// match it by hand.
     /// </summary>
     public class BalanceBeam : MonoBehaviour
     {
         [Header("Fallback Dimensions")]
-        [Tooltip("Used only when this object has no BoxCollider to read dimensions from.")]
+        [Tooltip("Used only when this object has no CapsuleCollider or BoxCollider to read dimensions from.")]
         [SerializeField] private float fallbackHalfLength = 5f;
         [SerializeField] private float fallbackHalfWidth = 0.15f;
         [SerializeField] private float fallbackTopSurfaceLocalY = 0.15f;
@@ -45,22 +51,34 @@ namespace Blocks.Gameplay.Core
 
         private void ComputeDimensions()
         {
-            var box = GetComponent<BoxCollider>();
-            if (box != null)
+            var capsule = GetComponent<CapsuleCollider>();
+            if (capsule != null)
             {
                 // Everything here is in the beam's own local (unscaled) space - Transform.TransformPoint
                 // applies lossyScale/rotation/position for us in GetSnapPosition, so these must NOT be
-                // pre-multiplied by scale.
+                // pre-multiplied by scale. CapsuleCollider.height already runs along whichever local
+                // axis `direction` names - the course builder sets direction = 2 (Z), the same "along
+                // beam" axis everything else here assumes, so height can be used directly without
+                // caring about the capsule's rotation. Height includes the two rounded end caps, so
+                // half of it is exactly the walkable half-length from the beam's center.
+                HalfLengthLocal = capsule.height * 0.5f + Mathf.Abs(capsule.center.z);
+                HalfWidthLocal = capsule.radius;
+                TopSurfaceLocalY = capsule.center.y + capsule.radius;
+                return;
+            }
+
+            var box = GetComponent<BoxCollider>();
+            if (box != null)
+            {
                 HalfLengthLocal = box.size.z * 0.5f + Mathf.Abs(box.center.z);
                 HalfWidthLocal = box.size.x * 0.5f;
                 TopSurfaceLocalY = box.center.y + box.size.y * 0.5f;
+                return;
             }
-            else
-            {
-                HalfLengthLocal = fallbackHalfLength;
-                HalfWidthLocal = fallbackHalfWidth;
-                TopSurfaceLocalY = fallbackTopSurfaceLocalY;
-            }
+
+            HalfLengthLocal = fallbackHalfLength;
+            HalfWidthLocal = fallbackHalfWidth;
+            TopSurfaceLocalY = fallbackTopSurfaceLocalY;
         }
 
         /// <summary>

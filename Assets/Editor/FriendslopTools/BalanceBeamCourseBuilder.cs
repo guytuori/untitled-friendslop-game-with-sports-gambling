@@ -7,16 +7,21 @@ namespace Friendslop.EditorTools
 {
     /// <summary>
     /// Editor utility that builds a balance-beam test area into the currently open scene: a flat
-    /// start, then two beams spanning a pit (with a short jumpable gap between them, to exercise
-    /// snapping onto a beam mid-jump rather than only by walking onto one), ending on a safe landing
-    /// platform.
+    /// start, then one continuous beam spanning a pit, ending with its far end extended out over the
+    /// landing platform's footprint rather than stopping short of it - so a clean walk-off transitions
+    /// straight onto solid ground with no approach gap to fall into. There's deliberately no gap
+    /// partway through the beam anymore: with the beam's rounded top and the ability's long re-entry
+    /// cooldown after any detach, a mid-beam gap would just be a dead stop rather than an interesting
+    /// choice, so the whole span is one uninterrupted beam.
     ///
-    /// Each beam is a thin box with a <see cref="BalanceBeam"/> component - see that class for how
-    /// its dimensions are read from the box. Built parallel to (offset from) both
-    /// ObstacleCourseBuilder's and WallJumpCourseBuilder's courses so re-running any of the three
-    /// tools doesn't disturb the others. Run from the Unity menu: Friendslop > Build Balance Beam
-    /// Test Area. Re-running replaces the previous version. Remove it with Friendslop > Remove
-    /// Balance Beam Test Area.
+    /// Each beam is a <see cref="CapsuleCollider"/> (direction = Z, i.e. along the beam) with a
+    /// matching visual capsule mesh rotated to line up, plus a <see cref="BalanceBeam"/> component -
+    /// see that class for how its dimensions are read from the capsule. The round cross-section is
+    /// the point: without BalanceBeamAbility actively locking the player to the centerline, there's no
+    /// flat spot to stand on. Built parallel to (offset from) both ObstacleCourseBuilder's and
+    /// WallJumpCourseBuilder's courses so re-running any of the three tools doesn't disturb the
+    /// others. Run from the Unity menu: Friendslop > Build Balance Beam Test Area. Re-running replaces
+    /// the previous version. Remove it with Friendslop > Remove Balance Beam Test Area.
     ///
     /// Make sure the player prefab actually has BalanceBeamAbility on it first (Friendslop > Add
     /// Balance Beam To Platformer Player / To Core Player).
@@ -53,43 +58,36 @@ namespace Friendslop.EditorTools
             Material beamMat = MakeMaterial(new Color(0.65f, 0.45f, 0.25f));  // wood-ish brown - beams
             Material goalMat = MakeMaterial(new Color(0.95f, 0.80f, 0.15f));  // gold - finish
 
-            const float beamWidth = 0.3f;
-            const float beamHeight = 0.3f;
+            const float beamRadius = 0.15f;
 
             float cursor = origin.z;
 
             // 00. Start pad.
             cursor = PlacePlatform(root.transform, baseX, groundHeight, cursor, gap: 0f, footprintZ: 6f, footprintX: 6f, mat: startMat, name: "00_Start");
 
-            // 01. Beam one.
-            const float approach1 = 2f;
-            const float beam1Length = 9f;
-            float beam1NearZ = cursor + approach1;
-            float beam1CenterZ = beam1NearZ + beam1Length * 0.5f;
+            // 01. One continuous beam - no mid-span gap (see class summary for why) - with its far end
+            // extended out over the landing platform's footprint instead of stopping short of it.
+            const float approach = 2f;
+            const float beamLength = 18f;
+            const float landingFootprintZ = 6f;
+            const float overlapIntoLanding = 1.5f;
+
+            float beamNearZ = cursor + approach;
+            float beamCenterZ = beamNearZ + beamLength * 0.5f;
             CreateBeam(root.transform,
-                new Vector3(baseX, groundHeight + beamHeight * 0.5f, beam1CenterZ),
-                new Vector3(beamWidth, beamHeight, beam1Length),
+                new Vector3(baseX, groundHeight + beamRadius, beamCenterZ),
+                beamLength, beamRadius,
                 beamMat, "01_Beam");
-            cursor = beam1NearZ + beam1Length;
+            cursor = beamNearZ + beamLength;
 
-            // 02. Short jumpable gap to beam two - exercises snapping onto a beam mid-jump rather
-            // than only by walking onto one, and tests re-entry after a normal (non-beam) jump.
-            const float interBeamGap = 2f;
-            const float beam2Length = 7f;
-            float beam2NearZ = cursor + interBeamGap;
-            float beam2CenterZ = beam2NearZ + beam2Length * 0.5f;
-            CreateBeam(root.transform,
-                new Vector3(baseX, groundHeight + beamHeight * 0.5f, beam2CenterZ),
-                new Vector3(beamWidth, beamHeight, beam2Length),
-                beamMat, "02_Beam");
-            cursor = beam2NearZ + beam2Length;
-
-            // No pit floor - a genuine void below both beams, same convention as ObstacleCourseBuilder
+            // No pit floor - a genuine void below the beam, same convention as ObstacleCourseBuilder
             // and WallJumpCourseBuilder (no fall-recovery trigger either; see the wall jump course's
             // notes for the same caveat).
 
-            // 03. Landing platform.
-            cursor = PlacePlatform(root.transform, baseX, groundHeight, cursor, gap: 2.5f, footprintZ: 6f, footprintX: 8f, mat: goalMat, name: "03_Landing");
+            // 02. Landing platform - its near edge sits *underneath* the beam's already-placed far end
+            // (negative gap = overlap) rather than starting an approach gap after it, so a clean
+            // walk-off the beam lands you on solid ground with nothing to fall into.
+            cursor = PlacePlatform(root.transform, baseX, groundHeight, cursor, gap: -overlapIntoLanding, footprintZ: landingFootprintZ, footprintX: 8f, mat: goalMat, name: "02_Landing");
 
             Undo.CollapseUndoOperations(undoGroup);
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -116,22 +114,44 @@ namespace Friendslop.EditorTools
         }
 
         /// <summary>
-        /// Creates a beam: a thin box with a BalanceBeam component. Built unrotated (local +Z runs
-        /// along the beam's length, matching BalanceBeam's expectations) so it lines up with world Z,
-        /// the same forward axis every other Friendslop test course uses.
+        /// Creates a beam: a root object holding the functional CapsuleCollider (direction = Z, i.e.
+        /// along the beam's length - matching BalanceBeam's "local +Z = along beam" expectations) and
+        /// the BalanceBeam component, plus a child visual-only capsule mesh rotated 90 degrees to line
+        /// up with it. The root itself stays unrotated (Quaternion.identity) so it lines up with world
+        /// Z, the same forward axis every other Friendslop test course uses, and so BalanceBeam's
+        /// Forward/Right properties (which just read transform.forward/right) come out correct -
+        /// CapsuleCollider.direction lets the collider's long axis be Z without needing to rotate the
+        /// transform itself, so only the cosmetic child mesh needs the 90-degree twist.
         /// </summary>
-        private static void CreateBeam(Transform parent, Vector3 center, Vector3 size, Material material, string name)
+        private static void CreateBeam(Transform parent, Vector3 center, float length, float radius, Material material, string name)
         {
-            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = name;
-            Undo.RegisterCreatedObjectUndo(go, UndoName);
-            go.transform.SetParent(parent, true);
-            go.transform.position = center;
-            go.transform.rotation = Quaternion.identity;
-            go.transform.localScale = size;
-            go.GetComponent<Renderer>().sharedMaterial = material;
-            go.isStatic = true;
-            go.AddComponent<BalanceBeam>();
+            GameObject root = new GameObject(name);
+            Undo.RegisterCreatedObjectUndo(root, UndoName);
+            root.transform.SetParent(parent, true);
+            root.transform.position = center;
+            root.transform.rotation = Quaternion.identity;
+            root.isStatic = true;
+
+            var capsule = root.AddComponent<CapsuleCollider>();
+            capsule.direction = 2; // Z axis - "along the beam".
+            capsule.radius = radius;
+            capsule.height = length;
+
+            // Visual only, built from CreatePrimitive purely for its capsule mesh - its own auto-added
+            // collider is removed since the functional one lives on the root instead. The default
+            // primitive capsule is 2 units tall (along its own local Y) with radius 0.5 at scale 1;
+            // scale it to match, then rotate it so that authored "up" axis points along the root's Z.
+            GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            Undo.RegisterCreatedObjectUndo(visual, UndoName);
+            Object.DestroyImmediate(visual.GetComponent<CapsuleCollider>());
+            visual.name = name + "_Visual";
+            visual.transform.SetParent(root.transform, false);
+            visual.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            visual.transform.localScale = new Vector3(radius / 0.5f, length / 2f, radius / 0.5f);
+            visual.GetComponent<Renderer>().sharedMaterial = material;
+            visual.isStatic = true;
+
+            root.AddComponent<BalanceBeam>();
         }
 
         /// <summary>

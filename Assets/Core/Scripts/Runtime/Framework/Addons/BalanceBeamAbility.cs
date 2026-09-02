@@ -7,8 +7,8 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// Balance-beam traversal: snaps the player onto a <see cref="BalanceBeam"/> when they land (or
     /// walk) on one, locks movement to the beam's length, and drives a small over-the-head balance
-    /// meter that randomly drifts (faster movement = more drift) and has to be corrected with the
-    /// left/right stick or it tips the player off.
+    /// meter that randomly drifts - even while standing still, though moving faster drifts it more on
+    /// top of that - and has to be corrected with the left/right stick or it tips the player off.
     ///
     /// Movement while on a beam:
     /// - Forward/back stick moves along the beam - walk speed while Sprint is held, a slower
@@ -17,22 +17,22 @@ namespace Blocks.Gameplay.Core
     ///   regular walking.
     /// - Left/right stick doesn't move the player sideways at all - it only pushes the balance meter,
     ///   same as the passive random drift does.
-    /// - Jump has a longer wind-up (jumpSquatDuration) and a reduced height (beamJumpHeightMultiplier
-    ///   of the player's normal jump height) with zero carried horizontal momentum, specifically so
-    ///   bunny-hopping across a beam is worse than just walking it, not a shortcut past the balance
-    ///   mechanic.
+    /// - Jump doesn't jump at all while on a beam - it just detaches you into a normal fall (see
+    ///   DetachIntoFall). Combined with the long re-entry cooldown below, this is what stops
+    ///   bunny-hopping across a beam from being a shortcut past the balance mechanic: pressing jump
+    ///   costs you the beam entirely rather than giving you a hop to the next safe spot.
     ///
     /// How this avoids fighting the rest of the movement stack: WalkAbility's own contribution is
     /// zeroed out every frame while on a beam (by feeding it Vector2.zero input before it runs - see
     /// Priority below), and this ability supplies 100% of the horizontal/vertical movement itself
     /// instead. Priority 6 is deliberately between JumpAbility/PlatformerLocomotionAbility (10) and
     /// WalkAbility (0): high enough to react to - and override - a same-frame jump *after* those
-    /// abilities have already applied it (so the squat/reduced-height behavior can cleanly replace a
-    /// normal jump), but still low enough to run before WalkAbility so its input can be zeroed before
-    /// WalkAbility reads it. No FinalMoveCalculationOverride/RotationOverride conflicts with something
-    /// like PlatformerMovingPlatformAbility are expected in practice (you can't be on a moving
-    /// platform and a beam at once), but exiting the beam always restores RotationOverride to null
-    /// either way.
+    /// abilities have already applied it (so a jump press can be turned into a plain detach instead
+    /// of the launch those abilities just gave it), but still low enough to run before WalkAbility so
+    /// its input can be zeroed before WalkAbility reads it. No FinalMoveCalculationOverride/
+    /// RotationOverride conflicts with something like PlatformerMovingPlatformAbility are expected in
+    /// practice (you can't be on a moving platform and a beam at once), but exiting the beam always
+    /// restores RotationOverride to null either way.
     ///
     /// Like WallSlideAbility, this implements both IMovementAbility (added to CoreMovement's per-frame
     /// ability list) and IPlayerAddon (added to CorePlayerManager's addon list, for OnLifeStateChanged
@@ -63,27 +63,23 @@ namespace Blocks.Gameplay.Core
         // speed. A beam caps you at a walk even while sprinting, so there's no separate field for it.
 
         [Header("Balance")]
-        [Tooltip("How fast the balance meter drifts (per second, at max beam speed) toward whichever side the current random gust is pushing.")]
-        [SerializeField] private float tippingStrength = 0.5f;
-        [Tooltip("How often a new random gust direction/strength is rolled.")]
-        [SerializeField] private float minGustInterval = 0.4f;
-        [SerializeField] private float maxGustInterval = 0.9f;
+        [Tooltip("How fast the balance meter drifts (per second, at max beam speed) toward whichever side the current random gust is pushing. Deliberately aggressive - the player should be fighting this almost continuously, not just occasionally correcting a drift.")]
+        [SerializeField] private float tippingStrength = 2.5f;
+        [Tooltip("How often a new random gust direction/strength is rolled. Short and close together so gusts feel close to continuous rather than periodic.")]
+        [SerializeField] private float minGustInterval = 0.15f;
+        [SerializeField] private float maxGustInterval = 0.35f;
+        [Tooltip("Drift strength while completely stationary, as a fraction of full (moving) tippingStrength. Kept well above zero so standing still on the beam still requires managing the bar - moving faster still tips you more (see UpdateBalance), but stopping is never a way to relax.")]
+        [SerializeField, Range(0f, 1f)] private float standingDriftFactor = 0.7f;
         [Tooltip("How fast the left/right stick moves the balance meter (per second). Positive stick input pushes the meter the same direction, so correcting a rightward tip means holding left.")]
-        [SerializeField] private float balanceControlRate = 1.4f;
-
-        [Header("Jump Off")]
-        [Tooltip("How much longer than a normal jump the wind-up takes before actually leaving the beam.")]
-        [SerializeField] private float jumpSquatDuration = 0.45f;
-        [Tooltip("Multiplier applied to the player's normal jumpHeight for a beam jump-off.")]
-        [SerializeField, Range(0.1f, 1f)] private float beamJumpHeightMultiplier = 0.5f;
+        [SerializeField] private float balanceControlRate = 2.2f;
 
         [Header("Falling Off")]
         [Tooltip("Sideways stumble impulse applied when the balance meter maxes out.")]
         [SerializeField] private float fallOffPushForce = 3f;
         [Tooltip("Small upward hop applied on top of the sideways stumble, so it reads as losing footing rather than just sliding off.")]
         [SerializeField] private float fallOffHop = 2f;
-        [Tooltip("How long after falling off (balance maxed out) or jumping off before the beam can snap the player back on. Without this, snapping is precise enough that a fall or a jump lands you right back where you started and you're immediately back on the beam - this is what actually stops that, more than the reduced jump height/momentum alone. Doesn't apply when you simply walk off the far end onto solid ground or the next beam, since that's a successful crossing, not a failure.")]
-        [SerializeField] private float reEntryCooldown = 0.75f;
+        [Tooltip("How long after leaving a beam - by falling off, jumping off (detaching), or walking off either end - before the beam can snap the player back on. Deliberately long: with the beam's rounded top (see BalanceBeam), standing around during this window is precarious on its own, so this is what actually stops both the instant-re-snap-after-falling bug and bunny-hopping across beams, more than any of the movement numbers alone.")]
+        [SerializeField] private float reEntryCooldown = 5f;
 
         [Header("Balance Bar UI")]
         [SerializeField] private float barWorldWidth = 1.2f;
@@ -116,9 +112,6 @@ namespace Blocks.Gameplay.Core
         private float m_Balance;
         private float m_GustDirection;
         private float m_GustTimer;
-
-        private bool m_IsSquatting;
-        private float m_SquatTimer;
 
         private float m_ReEntryCooldownTimer;
 
@@ -177,13 +170,9 @@ namespace Blocks.Gameplay.Core
             Vector2 rawInput = m_Motor.MoveInput;
             m_Motor.SetMoveInput(Vector2.zero);
 
-            if (m_IsSquatting)
+            if (m_Motor.JumpRequested)
             {
-                ProcessJumpSquat(ref modifier);
-            }
-            else if (m_Motor.JumpRequested)
-            {
-                BeginJumpSquat(ref modifier);
+                DetachIntoFall(ref modifier);
             }
             else
             {
@@ -214,7 +203,7 @@ namespace Blocks.Gameplay.Core
         {
             if (IsOwner)
             {
-                ExitBeam();
+                ExitBeam(applyReentryCooldown: false);
             }
         }
 
@@ -224,7 +213,7 @@ namespace Blocks.Gameplay.Core
 
             if (!m_IsActive && IsOwner)
             {
-                ExitBeam();
+                ExitBeam(applyReentryCooldown: false);
             }
         }
 
@@ -258,7 +247,10 @@ namespace Blocks.Gameplay.Core
                 m_GustTimer = Random.Range(minGustInterval, maxGustInterval);
             }
 
-            float speedFactor = Mathf.Clamp01(currentSpeed / Mathf.Max(0.01f, m_Motor.moveSpeed));
+            // Floor of standingDriftFactor rather than a straight 0..1 ratio, so full stop is never a
+            // way to "pause" the balance mechanic - moving faster still tips you more on top of that.
+            float speedRatio = Mathf.Clamp01(currentSpeed / Mathf.Max(0.01f, m_Motor.moveSpeed));
+            float speedFactor = Mathf.Lerp(standingDriftFactor, 1f, speedRatio);
             m_Balance += m_GustDirection * tippingStrength * speedFactor * Time.deltaTime;
             m_Balance += stickX * balanceControlRate * Time.deltaTime;
             m_Balance = Mathf.Clamp(m_Balance, -1f, 1f);
@@ -289,8 +281,6 @@ namespace Blocks.Gameplay.Core
             IsOnBeam = true;
             m_Balance = 0f;
             m_GustTimer = 0f;
-            m_IsSquatting = false;
-            m_SquatTimer = 0f;
 
             Vector3 snapped = beam.GetSnapPosition(m_Motor.transform.position, m_Balance, out _, out _);
             m_Motor.SetPosition(snapped, teleport: false);
@@ -304,18 +294,18 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Leaves the beam. <paramref name="applyReentryCooldown"/> should be true for a *failure*
-        /// exit (falling off, jumping off) so the player can't immediately snap back on - and false
-        /// for successfully walking off either end, so crossing onto solid ground or the next beam
-        /// isn't penalized the same way a mistake is.
+        /// Leaves the beam. <paramref name="applyReentryCooldown"/> defaults to true - every
+        /// gameplay exit (falling off, detaching via jump, walking off either end) now carries the
+        /// long re-entry cooldown, since the beam's rounded top means there's no safe "standing
+        /// around" state to fall back to anyway. Pass false only for lifecycle cleanup (despawn,
+        /// life-state changes) where there's no player around to feel a cooldown.
         /// </summary>
-        private void ExitBeam(bool applyReentryCooldown = false)
+        private void ExitBeam(bool applyReentryCooldown = true)
         {
             if (!IsOnBeam) return;
 
             IsOnBeam = false;
             m_CurrentBeam = null;
-            m_IsSquatting = false;
 
             if (applyReentryCooldown)
             {
@@ -348,44 +338,22 @@ namespace Blocks.Gameplay.Core
 
         #endregion
 
-        #region Jump Off
+        #region Detach
 
-        private void BeginJumpSquat(ref MovementModifier modifier)
+        /// <summary>
+        /// A jump press while on a beam doesn't jump - it just drops you off. A normal grounded jump
+        /// was just requested and CorePlayerManager's own gate is satisfied (standing on a beam counts
+        /// as grounded), so JumpAbility / PlatformerLocomotionAbility - both higher priority, so they
+        /// already ran this frame - will have applied a full-height jump velocity already. Cancel it
+        /// rather than replace it with anything: no upward launch at all, just let gravity take over
+        /// from here like any other fall. The long re-entry cooldown from ExitBeam is what actually
+        /// keeps this from being a viable way to bunny-hop across a beam - pressing jump costs you the
+        /// beam for reEntryCooldown seconds, full stop.
+        /// </summary>
+        private void DetachIntoFall(ref MovementModifier modifier)
         {
-            m_IsSquatting = true;
-            m_SquatTimer = jumpSquatDuration;
-
-            // A normal grounded jump was just requested and CorePlayerManager's own gate is satisfied
-            // (standing on a beam counts as grounded), so JumpAbility / PlatformerLocomotionAbility -
-            // both higher priority, so they already ran this frame - will have applied a full-height
-            // jump velocity already. Cancel it; the squat below replaces it.
             m_Motor.SetVerticalVelocity(0f);
-            modifier.OverrideGravity = true;
             modifier.ArealVelocity = Vector3.zero;
-
-            SnapToBeam();
-        }
-
-        private void ProcessJumpSquat(ref MovementModifier modifier)
-        {
-            // Hold completely still and grounded-feeling for the duration of the squat.
-            m_Motor.SetVerticalVelocity(0f);
-            modifier.OverrideGravity = true;
-            modifier.ArealVelocity = Vector3.zero;
-            SnapToBeam();
-
-            m_SquatTimer -= Time.deltaTime;
-            if (m_SquatTimer > 0f) return;
-
-            float jumpVelocity = Mathf.Sqrt(m_Motor.jumpHeight * beamJumpHeightMultiplier * -2f * m_Motor.gravity);
-            m_Motor.SetVerticalVelocity(jumpVelocity);
-            modifier.OverrideGravity = true;
-            // No carried horizontal momentum - a beam jump-off is a near-vertical hop by design.
-            // Combined with the re-entry cooldown below, landing back on the same spot doesn't
-            // immediately re-snap: for reEntryCooldown seconds you're just a normal grounded character
-            // standing on a ~0.3m wide surface with no centerline lock, which is precarious enough on
-            // its own that repeatedly tapping Jump to "bunny-hop" across is worse than walking it, not
-            // a shortcut past the balance mechanic.
             ExitBeam(applyReentryCooldown: true);
         }
 
