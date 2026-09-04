@@ -40,6 +40,10 @@ namespace Blocks.Gameplay.Core
         [Tooltip("If true, the character keeps their momentum when jumping, especially from a sprint.")]
         [SerializeField] private bool conserveMomentum = true;
 
+        [Header("Ice / Low-Grip Turning")]
+        [Tooltip("On low-grip ground (e.g. ice), direction changes ease in at speedChangeRate scaled by GroundGrip instead of snapping instantly, so momentum from the old direction carries through a turn. GroundGrip can be as low as 0.03 (near-frictionless), which would make a full reversal take absurdly long - this is the floor GroundGrip is clamped to specifically for that direction-change rate, so even the iciest surface still lets a turn complete in a few seconds. Raise it for a shorter, snappier slide; lower it for a longer one. Does not affect normal-grip ground, which still turns instantly as before.")]
+        [SerializeField] private float minIceTurnGrip = 0.2f;
+
         #endregion
 
         #region Public Methods
@@ -91,6 +95,12 @@ namespace Blocks.Gameplay.Core
             {
                 // Reduce control authority in air based on airControl setting
                 acceleration *= airControl;
+            }
+            else
+            {
+                // Low-grip ground (e.g. ice) scales speed changes down for a sliding feel. Clamped so a
+                // zero-friction surface still lets speed change eventually rather than freezing in place.
+                acceleration *= Mathf.Clamp(m_Motor.GroundGrip, 0.08f, 1f);
             }
 
             if (m_CurrentSpeed < targetSpeed - speedOffset || m_CurrentSpeed > targetSpeed + speedOffset)
@@ -145,15 +155,35 @@ namespace Blocks.Gameplay.Core
             // Calculate target velocity
             Vector3 targetVelocity = targetDirection * m_CurrentSpeed;
 
+            // Let facing/animation respond to input immediately regardless of how fast the actual
+            // translation below eases toward its target. This is what makes turning around on ice
+            // look like the character spinning to face the new direction while the body is still
+            // sliding the old way, instead of the whole body slowly carving a turn.
+            m_Motor.FacingDirectionOverride = inputDirection.sqrMagnitude > 0 ? targetDirection : (Vector3?)null;
+
             // Apply smoothing to the velocity vector itself for better air control feel
             // If grounded, we track perfectly (handled by m_CurrentSpeed lerp above efficiently enough, but let's be consistent)
             // Actually, separating speed and direction logic as before is fine, but for air control we want to steer the vector.
-            
+
             if (m_Motor.IsGrounded)
             {
-                // On ground, instant direction changes are usually preferred for responsiveness
-                // The speed lerp handles the acceleration
-                 m_CurrentVelocity = targetDirection.normalized * m_CurrentSpeed;
+                bool hasFullGrip = m_Motor.GroundGrip >= 0.999f;
+                if (hasFullGrip)
+                {
+                    // Normal traction: instant direction changes are usually preferred for
+                    // responsiveness. The speed lerp above handles the acceleration.
+                    m_CurrentVelocity = targetDirection.normalized * m_CurrentSpeed;
+                }
+                else
+                {
+                    // Low-grip ground (e.g. ice): ease the whole velocity vector - direction included -
+                    // toward the target at a constant rate (not the speed lerp's curve/rate, which is
+                    // tuned for full grip and would be imperceptibly slow scaled this far down). This is
+                    // what lets the character keep sliding in the old direction after facing has already
+                    // snapped to the new input via FacingDirectionOverride above.
+                    float turnRate = m_Motor.speedChangeRate * Mathf.Clamp(m_Motor.GroundGrip, minIceTurnGrip, 1f);
+                    m_CurrentVelocity = Vector3.MoveTowards(m_CurrentVelocity, targetDirection.normalized * m_CurrentSpeed, turnRate * Time.deltaTime);
+                }
             }
             else
             {

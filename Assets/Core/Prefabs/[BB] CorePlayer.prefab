@@ -221,7 +221,7 @@ MonoBehaviour:
   rotationSmoothTime: 0.1
   speedChangeRate: 15
   forceDecayRate: 5
-  gravity: -15
+  gravity: -18
   jumpHeight: 3
   groundedOffset: -0.14
   groundedRadius: 0.28
@@ -280,7 +280,7 @@ MonoBehaviour:
   lookTarget: {fileID: 8338988566280778637}
   initialModeName: FreeLook
   enableLookInput: 1
-  defaultLookSensitivity: 1
+  defaultLookSensitivity: 3
   defaultVerticalLookLimit: 70
   onLookInput: {fileID: 11400000, guid: 8af931367978e4bc9bae53b88856ff5b, type: 2}
 --- !u!114 &8754785922802519086
@@ -335,9 +335,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 08b1147bca1a54974a6f52d1a504f530, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  airControl: 0.5
-  airRotationSpeed: 5
+  airControl: 0.2
+  airRotationSpeed: 2
   conserveMomentum: 1
+  minIceTurnGrip: 0.1
 --- !u!114 &3432624027115298979
 MonoBehaviour:
   m_ObjectHideFlags: 0

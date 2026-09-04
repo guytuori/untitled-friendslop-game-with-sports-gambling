@@ -119,6 +119,26 @@ namespace Blocks.Gameplay.Core
         public bool IsGrounded { get; private set; }
 
         /// <summary>
+        /// Grip multiplier for whatever the character is currently standing on, taken from that
+        /// ground collider's PhysicMaterial.dynamicFriction. 1 = normal grip (default when ungrounded
+        /// or the ground collider has no PhysicMaterial assigned); lower values mean a more slippery
+        /// surface (e.g. ice). Movement abilities can multiply their ground acceleration/deceleration
+        /// by this to get a sliding feel on low-grip surfaces.
+        /// </summary>
+        public float GroundGrip { get; private set; } = 1f;
+
+        /// <summary>
+        /// When set to a non-trivial horizontal direction, ApplyRotation will turn the character to
+        /// face this direction instead of deriving facing from the actual horizontal velocity. This
+        /// lets facing/animation respond instantly to input even while translation is still easing
+        /// toward a new direction (e.g. sliding on ice) - the classic cartoon "legs spinning, body
+        /// still sliding the old way" look. Set back to null to fall back to velocity-based facing.
+        /// Only consulted in the default (Decoupled) rotation mode; ignored while RotationOverride or
+        /// camera-coupled rotation is active.
+        /// </summary>
+        public Vector3? FacingDirectionOverride { get; set; }
+
+        /// <summary>
         /// Gets a value indicating whether the character is currently on a slope.
         /// </summary>
         public bool IsOnSlope { get; private set; }
@@ -648,6 +668,16 @@ namespace Blocks.Gameplay.Core
                 float rotation = Mathf.SmoothDampAngle(targetTransform.eulerAngles.y, TargetRotationY, ref m_RotationVelocity, rotationSmoothTime);
                 targetTransform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
             }
+            else if (FacingDirectionOverride.HasValue && FacingDirectionOverride.Value.sqrMagnitude > 0.01f)
+            {
+                // An ability wants facing driven by something other than the actual velocity (e.g. so
+                // the character turns to face new input immediately while still sliding the old way
+                // on a low-grip surface). Rotate towards that direction instead of horizontalVelocity.
+                Vector3 facing = FacingDirectionOverride.Value;
+                float targetAngle = Mathf.Atan2(facing.x, facing.z) * Mathf.Rad2Deg;
+                float rotation = Mathf.SmoothDampAngle(targetTransform.eulerAngles.y, targetAngle, ref m_RotationVelocity, rotationSmoothTime);
+                targetTransform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
+            }
             else if (horizontalVelocity.magnitude > 0.1f)
             {
                 // Rotate towards the direction of movement
@@ -657,6 +687,9 @@ namespace Blocks.Gameplay.Core
             }
         }
 
+        // Reused each frame by GroundedCheck to avoid allocating a new array every call.
+        private static readonly Collider[] s_GroundedHits = new Collider[8];
+
         /// <summary>
         /// Checks if the character is on the ground and invokes related events.
         /// </summary>
@@ -664,7 +697,22 @@ namespace Blocks.Gameplay.Core
         {
             Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y + groundedOffset, transform.position.z);
             bool wasGrounded = IsGrounded;
-            IsGrounded = Physics.CheckSphere(spherePosition, groundedRadius, groundLayers, QueryTriggerInteraction.Ignore);
+
+            int hitCount = Physics.OverlapSphereNonAlloc(spherePosition, groundedRadius, s_GroundedHits, groundLayers, QueryTriggerInteraction.Ignore);
+            IsGrounded = hitCount > 0;
+
+            // Read grip from whatever we're standing on. Defaults to 1 (normal) if ungrounded or the
+            // ground collider has no PhysicMaterial - so surfaces that were never set up keep behaving
+            // exactly as before.
+            GroundGrip = 1f;
+            if (IsGrounded)
+            {
+                PhysicsMaterial groundMaterial = s_GroundedHits[0].sharedMaterial;
+                if (groundMaterial != null)
+                {
+                    GroundGrip = Mathf.Clamp01(groundMaterial.dynamicFriction);
+                }
+            }
 
             if (IsGrounded)
             {

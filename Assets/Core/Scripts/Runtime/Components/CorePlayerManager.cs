@@ -230,17 +230,7 @@ namespace Blocks.Gameplay.Core
 
             if (!coreMovement.IsGrounded) return;
 
-            if (coreStats == null)
-            {
-                Debug.LogWarning("[CorePlayerManager] coreStats is null in HandleJump");
-                return;
-            }
-
-            float jumpStaminaCost = CoreMovement.GetAbilityStaminaCost<JumpAbility>();
-            if (coreStats.TryConsumeStat(StatKeys.Stamina, jumpStaminaCost, OwnerClientId))
-            {
-                coreMovement.PerformJump();
-            }
+            coreMovement.PerformJump();
         }
 
         private void HandleMoveInput(Vector2 input)

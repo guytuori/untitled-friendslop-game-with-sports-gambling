@@ -84,6 +84,10 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Speed multiplier applied when changing direction for snappier controls.")]
         [SerializeField] private float directionChangeBoost = 1.2f;
 
+        [Header("Ice / Low-Grip Turning")]
+        [Tooltip("On low-grip ground (e.g. ice), direction changes use groundAcceleration/groundDeceleration scaled by GroundGrip, same as speed changes - but grip can go as low as 0.03 (near-frictionless), which would make a full reversal take absurdly long. This is the floor GroundGrip is clamped to specifically for that direction-change rate, so even the iciest surface still lets a turn complete in a few seconds instead of ~15+. Raise it for a shorter, snappier slide; lower it for a longer one. Does not affect how slippery the surface feels for speeding up/slowing down in a straight line (that still uses the 0.08 floor).")]
+        [SerializeField] private float minIceTurnGrip = 0.2f;
+
         [Header("Turn In Place Settings")]
         [Tooltip("Maximum duration (in seconds) for a move input to be considered a 'tap' for turn-in-place.")]
         [SerializeField] private float tapThreshold = 0.2f;
@@ -100,6 +104,7 @@ namespace Blocks.Gameplay.Core
 
         private CoreMovement m_Motor;
         private float m_CurrentSpeed;
+        private Vector3 m_CurrentVelocity;
         private Vector2 m_LastMoveInput;
         private float m_TimeLeftGround;
         private float m_JumpBufferTimer;
@@ -344,6 +349,8 @@ namespace Blocks.Gameplay.Core
             if (m_TurnInPlaceTriggered)
             {
                 modifier.ArealVelocity = Vector3.zero;
+                m_CurrentVelocity = Vector3.zero;
+                m_Motor.FacingDirectionOverride = null;
                 return;
             }
 
@@ -370,7 +377,33 @@ namespace Blocks.Gameplay.Core
             Vector3 inputDirection = new Vector3(m_Motor.MoveInput.x, 0.0f, m_Motor.MoveInput.y).normalized;
             Vector3 targetDirection = TransformInputDirection(inputDirection);
 
-            modifier.ArealVelocity = targetDirection * m_CurrentSpeed;
+            // Let facing/animation respond to input immediately, independent of how fast the actual
+            // translation below eases toward its target. This is what makes turning around on ice
+            // look like the character spinning to face the new direction (and playing the running
+            // animation, via m_CurrentSpeed above) while the body is still sliding the old way,
+            // instead of the whole body slowly carving a turn.
+            m_Motor.FacingDirectionOverride = hasInput ? targetDirection : (Vector3?)null;
+
+            bool hasFullGrip = !m_Motor.IsGrounded || m_Motor.GroundGrip >= 0.999f;
+            if (hasFullGrip)
+            {
+                // Normal traction (or airborne): direction snaps immediately, exactly like before -
+                // only the scalar speed (m_CurrentSpeed, eased above) ramps up/down.
+                m_CurrentVelocity = targetDirection * m_CurrentSpeed;
+            }
+            else
+            {
+                // Low-grip ground (e.g. ice): ease the whole velocity vector - direction included -
+                // toward the target using the same grip-scaled rate/curve as the scalar speed
+                // transition above. Direction changes are therefore just as sluggish as speed changes
+                // on ice, so momentum from the old direction carries over while the new direction is
+                // fought for, even though FacingDirectionOverride has already snapped the character's
+                // visual facing to the new input.
+                Vector3 targetVelocity = hasInput ? targetDirection * targetSpeed : Vector3.zero;
+                m_CurrentVelocity = CalculateVelocityTransition(m_CurrentVelocity, targetVelocity, hasInput);
+            }
+
+            modifier.ArealVelocity = m_CurrentVelocity;
 
             if (m_JumpPhase == JumpPhase.Rising && hasInput)
             {
@@ -405,15 +438,67 @@ namespace Blocks.Gameplay.Core
         {
             if (Mathf.Abs(current - target) < speedOffset) return target;
 
-            bool isGrounded = m_Motor.IsGrounded;
-            float rate = accelerating ?
-                (isGrounded ? groundAcceleration : airAcceleration) :
-                (isGrounded ? groundDeceleration : airDeceleration);
-
+            float rate = CalculateGroundedRate(accelerating);
             AnimationCurve curve = accelerating ? accelerationCurve : decelerationCurve;
             float t = Time.deltaTime * rate;
 
             return Mathf.Lerp(current, target, curve.Evaluate(Mathf.Clamp01(t)));
+        }
+
+        /// <summary>
+        /// Vector3 counterpart to <see cref="CalculateSpeedTransition"/> - eases an entire velocity
+        /// vector (direction and magnitude together) toward a target. Used on low-grip ground so that
+        /// changing direction is just as sluggish as changing speed, letting old momentum carry the
+        /// character through a turn.
+        ///
+        /// Deliberately NOT curve-based like <see cref="CalculateSpeedTransition"/>: this method feeds
+        /// a per-frame rate (already scaled down toward ~1 by low grip) into accelerationCurve /
+        /// decelerationCurve, and those curves are tuned for the *unscaled*, full-grip rate (18-26 in
+        /// this project). At grip-scaled rates as low as ~1-2, curve.Evaluate() of the resulting tiny
+        /// per-frame t sits in the curve's near-flat regions and returns a per-frame Lerp fraction on
+        /// the order of 0.0005 - which compounds to something that looks completely frozen for the
+        /// first several seconds (and would take on the order of a minute to actually complete), not a
+        /// visible slide. A constant-rate MoveTowards sidesteps that entirely, and is also a closer
+        /// match to how real kinetic friction works (a constant decelerating force, not an exponential
+        /// decay) - the character visibly, steadily arcs into the new direction from the first frame,
+        /// finishing the turn in a predictable number of seconds set by groundAcceleration /
+        /// groundDeceleration and GroundGrip.
+        /// </summary>
+        /// <param name="current">Current velocity.</param>
+        /// <param name="target">Target velocity.</param>
+        /// <param name="accelerating">Whether this transition should use the acceleration or deceleration rate.</param>
+        /// <returns>The velocity vector, moved a fixed distance toward the target this frame.</returns>
+        private Vector3 CalculateVelocityTransition(Vector3 current, Vector3 target, bool accelerating)
+        {
+            // Uses its own, higher grip floor (minIceTurnGrip) than the scalar/animation path below -
+            // GroundGrip on ice can be as low as 0.03, and a turn rate scaled down that far would take
+            // upwards of 15 seconds to complete a full reversal. This keeps the slide dramatic without
+            // making it feel broken or eternal.
+            float rate = CalculateGroundedRate(accelerating, minIceTurnGrip);
+            return Vector3.MoveTowards(current, target, rate * Time.deltaTime);
+        }
+
+        /// <summary>
+        /// Computes the grounded/air acceleration or deceleration rate for this frame, scaling the
+        /// ground rate down on low-grip surfaces (e.g. ice) for a sliding feel. Air rates are untouched
+        /// since they're not affected by the ground.
+        /// </summary>
+        /// <param name="accelerating">Whether the player is accelerating or decelerating.</param>
+        /// <param name="minGrip">
+        /// Floor GroundGrip is clamped to before scaling the rate, so a near-frictionless surface still
+        /// lets the character eventually gain/lose speed (or complete a turn) rather than freezing in
+        /// place or taking unreasonably long. Defaults to 0.08 for the scalar/animation-speed path;
+        /// <see cref="CalculateVelocityTransition"/> passes its own, higher <see cref="minIceTurnGrip"/>.
+        /// </param>
+        /// <returns>The rate to use for this frame's transition.</returns>
+        private float CalculateGroundedRate(bool accelerating, float minGrip = 0.08f)
+        {
+            bool isGrounded = m_Motor.IsGrounded;
+            float groundGrip = isGrounded ? Mathf.Clamp(m_Motor.GroundGrip, minGrip, 1f) : 1f;
+
+            return accelerating ?
+                (isGrounded ? groundAcceleration * groundGrip : airAcceleration) :
+                (isGrounded ? groundDeceleration * groundGrip : airDeceleration);
         }
 
         /// <summary>

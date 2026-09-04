@@ -412,6 +412,7 @@ MonoBehaviour:
   landingCooldown: 0.2
   speedOffset: 0.16
   directionChangeBoost: 1.2
+  minIceTurnGrip: 0.2
   tapThreshold: 0.1
   sprintStartEffect: {fileID: 2222316221539671382, guid: a2e9490e1ce9fdb4798c132ff0e70212, type: 3}
   sprintStopEffect: {fileID: 1152813908919224617, guid: b0623e8089eb06e4fa03dbf0d8a115d9, type: 3}
