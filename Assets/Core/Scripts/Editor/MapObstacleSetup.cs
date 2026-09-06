@@ -7,8 +7,10 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// One-time setup helper that turns specific textured parts of an imported map's combined mesh
     /// into gameplay obstacles: any geometry using a material whose name contains "checker" becomes
-    /// one or more <see cref="BalanceBeam"/>s, and any geometry using a material whose name contains
-    /// "bluecarpet" becomes one or more <see cref="GrindRail"/>s.
+    /// one or more <see cref="BalanceBeam"/>s, any geometry using a material whose name contains
+    /// "bluecarpet" becomes one or more <see cref="GrindRail"/>s, and any geometry using a material
+    /// whose name contains "pillar" becomes one or more <see cref="Pole"/>s (fireman's poles - see
+    /// PoleGrabAbility).
     ///
     /// How it works: the target submesh's triangles are grouped into connected components (two
     /// triangles are considered connected if they share an edge - matched by rounded local-space
@@ -34,37 +36,45 @@ namespace Blocks.Gameplay.Core
     ///   that curves or steps up/down (not just a straight run) still produces a reasonably faithful
     ///   path rather than collapsing to a single straight line between its two ends. A GrindRail
     ///   component is configured with that path - no collider at all, per GrindRail's own design.
+    /// - Poles: same long-axis/cross-section analysis as beams, but oriented so the CapsuleCollider's
+    ///   axis (direction = Y, matching Pole's expectations) points along whatever direction the
+    ///   component's long axis turned out to be - vertical for an upright pillar, but tilted geometry
+    ///   would still work. A CapsuleCollider plus a Pole component are added to a new child object - no
+    ///   visual mesh, since the map's own render geometry already shows the pillar. The collider stays
+    ///   solid (see Pole's class summary for why that's compatible with PoleGrabAbility).
     ///
-    /// Multiple physically separate checker or bluecarpet regions on the map become multiple separate
-    /// beams/rails - for grind rails in particular this is the intended shape of the mechanic, not a
-    /// limitation: see GrindRailCourseBuilder's own two-separate-rails-with-a-jump-gap course design,
-    /// where snapping onto a *different* rail than the one you left is called out as the intended way
-    /// to play.
+    /// Multiple physically separate checker, bluecarpet or pillar regions on the map become multiple
+    /// separate beams/rails/poles - for grind rails in particular this is the intended shape of the
+    /// mechanic, not a limitation: see GrindRailCourseBuilder's own two-separate-rails-with-a-jump-gap
+    /// course design, where snapping onto a *different* rail than the one you left is called out as
+    /// the intended way to play.
     ///
     /// Usage: select the map's GameObject instance in the Hierarchy (the same one MapColliderSetup
-    /// targets) and run Friendslop > Build Balance Beams And Grind Rails From Map. Run
+    /// targets) and run Friendslop > Build Balance Beams And Grind Rails And Poles From Map. Run
     /// MapColliderSetup either before or after this tool - it already knows to skip flat colliders for
-    /// these two materials, in either order. Make sure the player prefab has BalanceBeamAbility /
-    /// GrindRailAbility on it too (Friendslop > Add Balance Beam To .../ Add Grind Rail To ...) or the
-    /// new beams/rails won't do anything.
+    /// these three materials, in either order. Make sure the player prefab has BalanceBeamAbility /
+    /// GrindRailAbility / PoleGrabAbility on it too (Friendslop > Add Balance Beam To .../ Add Grind
+    /// Rail To .../ Add Pole Grab To ...) or the new beams/rails/poles won't do anything.
     ///
-    /// Safe to re-run: the previous run's "MapBalanceBeams"/"MapGrindRails" holder objects are
-    /// destroyed and rebuilt from scratch each time.
+    /// Safe to re-run: the previous run's "MapBalanceBeams"/"MapGrindRails"/"MapPoles" holder objects
+    /// are destroyed and rebuilt from scratch each time.
     /// </summary>
     public static class MapObstacleSetup
     {
         private const string CheckerKeyword = "checker";
         private const string RailKeyword = "bluecarpet";
+        private const string PoleKeyword = "pillar";
         private const string BeamHolderName = "MapBalanceBeams";
         private const string RailHolderName = "MapGrindRails";
+        private const string PoleHolderName = "MapPoles";
         private const string ColliderChildPrefix = "Collider_"; // matches MapColliderSetup's naming
-        private const string UndoName = "Build Map Balance Beams And Grind Rails";
+        private const string UndoName = "Build Map Balance Beams And Grind Rails And Poles";
 
         private const float MinCrossSectionRadius = 0.1f;
         private const float RailWaypointSpacing = 2f;
         private const int MinTrianglesPerComponent = 2;
 
-        [MenuItem("Friendslop/Build Balance Beams And Grind Rails From Map")]
+        [MenuItem("Friendslop/Build Balance Beams And Grind Rails And Poles From Map")]
         public static void Build()
         {
             GameObject selected = Selection.activeGameObject;
@@ -87,10 +97,11 @@ namespace Blocks.Gameplay.Core
 
             int beamSubmesh = FindSubmesh(materials, mesh.subMeshCount, CheckerKeyword);
             int railSubmesh = FindSubmesh(materials, mesh.subMeshCount, RailKeyword);
+            int poleSubmesh = FindSubmesh(materials, mesh.subMeshCount, PoleKeyword);
 
-            if (beamSubmesh < 0 && railSubmesh < 0)
+            if (beamSubmesh < 0 && railSubmesh < 0 && poleSubmesh < 0)
             {
-                Debug.LogError($"[Friendslop] Couldn't find a submesh material containing '{CheckerKeyword}' or '{RailKeyword}' on '{selected.name}'.");
+                Debug.LogError($"[Friendslop] Couldn't find a submesh material containing '{CheckerKeyword}', '{RailKeyword}' or '{PoleKeyword}' on '{selected.name}'.");
                 return;
             }
 
@@ -99,8 +110,10 @@ namespace Blocks.Gameplay.Core
 
             RemoveExisting(selected.transform, BeamHolderName);
             RemoveExisting(selected.transform, RailHolderName);
+            RemoveExisting(selected.transform, PoleHolderName);
             RemoveFlatCollider(selected.transform, CheckerKeyword);
             RemoveFlatCollider(selected.transform, RailKeyword);
+            RemoveFlatCollider(selected.transform, PoleKeyword);
 
             int beamsBuilt = 0;
             if (beamSubmesh >= 0)
@@ -136,14 +149,31 @@ namespace Blocks.Gameplay.Core
                 }
             }
 
+            int polesBuilt = 0;
+            if (poleSubmesh >= 0)
+            {
+                var poleHolder = new GameObject(PoleHolderName);
+                Undo.RegisterCreatedObjectUndo(poleHolder, UndoName);
+                poleHolder.transform.SetParent(selected.transform, false);
+
+                Vector3[] verts = mesh.vertices;
+                int[] subTris = mesh.GetTriangles(poleSubmesh);
+                foreach (List<int> component in FindConnectedComponents(verts, subTris))
+                {
+                    if (component.Count < MinTrianglesPerComponent) continue;
+                    BuildPole(poleHolder.transform, verts, subTris, component, polesBuilt);
+                    polesBuilt++;
+                }
+            }
+
             Undo.CollapseUndoOperations(undoGroup);
             EditorUtility.SetDirty(selected);
 
-            Debug.Log($"[Friendslop] Built {beamsBuilt} balance beam(s) from '{CheckerKeyword}' geometry and {railsBuilt} grind rail(s) from '{RailKeyword}' geometry on '{selected.name}'. " +
-                "Make sure the player prefab has BalanceBeamAbility / GrindRailAbility on it (Friendslop > Add Balance Beam To Platformer/Core Player, Friendslop > Add Grind Rail To Platformer/Core Player). Remember to save the scene.");
+            Debug.Log($"[Friendslop] Built {beamsBuilt} balance beam(s) from '{CheckerKeyword}' geometry, {railsBuilt} grind rail(s) from '{RailKeyword}' geometry, and {polesBuilt} pole(s) from '{PoleKeyword}' geometry on '{selected.name}'. " +
+                "Make sure the player prefab has BalanceBeamAbility / GrindRailAbility / PoleGrabAbility on it (Friendslop > Add Balance Beam To .../ Add Grind Rail To .../ Add Pole Grab To Platformer/Core Player). Remember to save the scene.");
         }
 
-        [MenuItem("Friendslop/Remove Map Balance Beams And Grind Rails")]
+        [MenuItem("Friendslop/Remove Map Balance Beams And Grind Rails And Poles")]
         public static void Remove()
         {
             GameObject selected = Selection.activeGameObject;
@@ -155,8 +185,9 @@ namespace Blocks.Gameplay.Core
 
             RemoveExisting(selected.transform, BeamHolderName);
             RemoveExisting(selected.transform, RailHolderName);
+            RemoveExisting(selected.transform, PoleHolderName);
             EditorUtility.SetDirty(selected);
-            Debug.Log($"[Friendslop] Removed balance beams and grind rails from '{selected.name}'. Re-run Friendslop > Split Selected Map Collider By Material afterward if you want ordinary flat collision back on that geometry.");
+            Debug.Log($"[Friendslop] Removed balance beams, grind rails and poles from '{selected.name}'. Re-run Friendslop > Split Selected Map Collider By Material afterward if you want ordinary flat collision back on that geometry.");
         }
 
         private static int FindSubmesh(Material[] materials, int subMeshCount, string keyword)
@@ -331,6 +362,36 @@ namespace Blocks.Gameplay.Core
 
             GrindRail rail = root.AddComponent<GrindRail>();
             rail.Configure(waypointsWorld, radius);
+        }
+
+        /// <summary>
+        /// Builds one pole from a connected component's triangles: a CapsuleCollider (direction = Y,
+        /// matching Pole's "local +Y = along pole" expectation) sized from the component's own long
+        /// axis and cross-section, plus a Pole component. The root's rotation maps local +Y onto the
+        /// axis found (FromToRotation), so a perfectly vertical pillar produces an upright pole and a
+        /// tilted one is still oriented correctly - not just the vertical-only case this map's pillars
+        /// happen to be. Positioned in `holder`'s local space, same as BuildBeam.
+        /// </summary>
+        private static void BuildPole(Transform holder, Vector3[] verts, int[] subTris, List<int> triIndices, int index)
+        {
+            List<Vector3> points = CollectPoints(verts, subTris, triIndices);
+            FindLongAxis(points, out Vector3 extremeA, out Vector3 extremeB, out float length);
+            Vector3 center = (extremeA + extremeB) * 0.5f;
+            Vector3 axis = length > 0.0001f ? (extremeB - extremeA) / length : Vector3.up;
+            float radius = Mathf.Max(MaxSidewaysDistance(points, center, axis), MinCrossSectionRadius);
+
+            var root = new GameObject($"Pole_{index}");
+            Undo.RegisterCreatedObjectUndo(root, UndoName);
+            root.transform.SetParent(holder, false);
+            root.transform.localPosition = center;
+            root.transform.localRotation = Quaternion.FromToRotation(Vector3.up, axis);
+
+            var capsule = root.AddComponent<CapsuleCollider>();
+            capsule.direction = 1; // Y - "along the pole", matching Pole's expectations.
+            capsule.radius = radius;
+            capsule.height = length;
+
+            root.AddComponent<Pole>();
         }
 
         private static List<Vector3> CollectPoints(Vector3[] verts, int[] subTris, List<int> triIndices)

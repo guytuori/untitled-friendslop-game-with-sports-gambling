@@ -39,6 +39,8 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private GameEvent onJumpReleased;
         [Tooltip("Event raised when sprint state changes.")]
         [SerializeField] private BoolEvent onSprintStateChanged;
+        [Tooltip("Event raised when grab state changes.")]
+        [SerializeField] private BoolEvent onGrabStateChanged;
 
         [Header("Game Events")]
         [Tooltip("Event raised when a player stat is depleted.")]
@@ -218,6 +220,19 @@ namespace Blocks.Gameplay.Core
             coreMovement.SetSprintState(isSprinting);
         }
 
+        private void HandleGrab(bool isHeld)
+        {
+            if (!m_IsMovementInputEnabled) return;
+
+            if (coreMovement == null)
+            {
+                Debug.LogWarning("[CorePlayerManager] coreMovement is null in HandleGrab");
+                return;
+            }
+
+            coreMovement.SetGrabState(isHeld);
+        }
+
         private void HandleJump()
         {
             if (!m_IsMovementInputEnabled) return;
@@ -345,6 +360,11 @@ namespace Blocks.Gameplay.Core
             else
                 onSprintStateChanged.RegisterListener(HandleSprint);
 
+            if (onGrabStateChanged == null)
+                Debug.LogWarning("[CorePlayerManager] onGrabStateChanged is null in RegisterEventListeners");
+            else
+                onGrabStateChanged.RegisterListener(HandleGrab);
+
             if (onStatDepleted == null)
                 Debug.LogWarning("[CorePlayerManager] onStatDepleted is null in RegisterEventListeners");
             else
@@ -367,6 +387,9 @@ namespace Blocks.Gameplay.Core
 
             if (onSprintStateChanged != null)
                 onSprintStateChanged.UnregisterListener(HandleSprint);
+
+            if (onGrabStateChanged != null)
+                onGrabStateChanged.UnregisterListener(HandleGrab);
 
             if (onStatDepleted != null)
                 onStatDepleted.UnregisterListener(HandleStatDepleted);

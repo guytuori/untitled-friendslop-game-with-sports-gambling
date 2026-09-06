@@ -179,6 +179,13 @@ namespace Blocks.Gameplay.Core
         public bool IsSprinting { get; private set; }
 
         /// <summary>
+        /// Gets a value indicating whether the Grab button is currently held. On its own this does
+        /// nothing - see <see cref="PoleGrabAbility"/> and <see cref="WallClimbAbility"/>, which read
+        /// this to decide whether to snap onto a nearby pole/wall (and drain stamina while attached).
+        /// </summary>
+        public bool IsGrabHeld { get; private set; }
+
+        /// <summary>
         /// Gets the target rotation on the Y-axis, usually driven by the camera.
         /// </summary>
         public float TargetRotationY { get; private set; }
@@ -320,6 +327,12 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         /// <param name="isSprinting">True to enable sprinting, false otherwise.</param>
         public void SetSprintState(bool isSprinting) => IsSprinting = isSprinting;
+
+        /// <summary>
+        /// Sets whether the Grab button is currently held.
+        /// </summary>
+        /// <param name="isHeld">True while Grab is held, false otherwise.</param>
+        public void SetGrabState(bool isHeld) => IsGrabHeld = isHeld;
 
         /// <summary>
         /// Sets the target rotation for the character, typically from the camera's horizontal angle.

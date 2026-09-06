@@ -19,13 +19,25 @@ namespace Blocks.Gameplay.Core
     /// with no PhysicMaterial (Unity's project default friction), so non-ice parts of the map behave
     /// exactly as before.
     ///
-    /// Submeshes whose material name contains "checker" or "bluecarpet" are skipped entirely - those
-    /// are balance beams / grind rails (see MapObstacleSetup), and both mechanics deliberately want no
-    /// flat walkable collider there: a balance beam needs a round CapsuleCollider with no flat spot,
-    /// and a grind rail wants no physical collider at all (it's a proximity-snap mechanic). A flat
-    /// MeshCollider generated here would just let the player casually walk across either one, defeating
-    /// the whole point. Run MapObstacleSetup AFTER this tool (or re-run this tool after MapObstacleSetup
+    /// Submeshes whose material name contains "checker", "bluecarpet" or "pillar" are skipped entirely -
+    /// those are balance beams / grind rails / fireman's poles (see MapObstacleSetup), and all three
+    /// mechanics deliberately want no flat walkable collider there: a balance beam needs a round
+    /// CapsuleCollider with no flat spot, a grind rail wants no physical collider at all (it's a
+    /// proximity-snap mechanic), and a pole needs its own vertical CapsuleCollider (see Pole) rather
+    /// than whatever flat shape this tool would otherwise build from the pillar's render mesh. A flat
+    /// MeshCollider generated here would just let the player casually walk across a beam/rail, or give
+    /// a pole a lumpy, non-cylindrical collision shape instead of the clean capsule PoleGrabAbility
+    /// expects. Run MapObstacleSetup AFTER this tool (or re-run this tool after MapObstacleSetup
     /// if you rebuild colliders later - it'll still correctly skip them).
+    ///
+    /// A submesh whose material name contains "brickwall" is treated differently: unlike the three
+    /// above, it's NOT skipped - it still gets an ordinary flat MeshCollider like any other wall, since
+    /// it should keep blocking the player normally. It additionally gets a <see cref="ClimbableWall"/>
+    /// marker component added to its collider GameObject, which is what WallClimbAbility checks to
+    /// decide whether a given wall can be climbed (see that class). This is how climbable surfaces are
+    /// split out as their own thing, the same way checker/bluecarpet/pillar are split into
+    /// beams/rails/poles - just without needing a special collider shape, since a wall's own flat
+    /// collider is already the right shape to climb.
     ///
     /// Usage: select the map's GameObject INSTANCE in the Hierarchy (drag the .gltf asset into the
     /// scene first if it isn't there yet - this won't work run on the asset itself in the Project
@@ -43,8 +55,11 @@ namespace Blocks.Gameplay.Core
         private const string IcePhysicMaterialPath = "Assets/Maps/PM_Ice.physicMaterial";
         private const string ColliderChildPrefix = "Collider_";
 
+        // Keep in sync with WallClimbAbility/ClimbableWall's own expectations.
+        private const string ClimbableKeyword = "brickwall";
+
         // Keep in sync with MapObstacleSetup's own keyword constants.
-        private static readonly string[] NoFlatColliderKeywords = { "checker", "bluecarpet" };
+        private static readonly string[] NoFlatColliderKeywords = { "checker", "bluecarpet", "pillar" };
 
         [MenuItem("Friendslop/Split Selected Map Collider By Material")]
         public static void SplitSelectedMapCollider()
@@ -99,6 +114,7 @@ namespace Blocks.Gameplay.Core
 
             int created = 0;
             int iceSubmeshes = 0;
+            int climbableSubmeshes = 0;
             int skipped = 0;
             for (int sub = 0; sub < sourceMesh.subMeshCount; sub++)
             {
@@ -135,11 +151,19 @@ namespace Blocks.Gameplay.Core
                     iceSubmeshes++;
                 }
 
+                bool isClimbable = matNameLower.Contains(ClimbableKeyword);
+                if (isClimbable)
+                {
+                    colliderObj.AddComponent<ClimbableWall>();
+                    climbableSubmeshes++;
+                }
+
                 created++;
             }
 
             EditorUtility.SetDirty(selected);
-            Debug.Log($"[Friendslop] Split '{selected.name}' into {created} per-material colliders ({iceSubmeshes} using '{icePhysicMaterial.name}', {skipped} skipped as balance-beam/grind-rail material - see MapObstacleSetup). Remember to save the scene.");
+            Debug.Log($"[Friendslop] Split '{selected.name}' into {created} per-material colliders ({iceSubmeshes} using '{icePhysicMaterial.name}', {climbableSubmeshes} tagged '{nameof(ClimbableWall)}' from '{ClimbableKeyword}' material, {skipped} skipped as balance-beam/grind-rail/pole material - see MapObstacleSetup). Remember to save the scene." +
+                (climbableSubmeshes > 0 ? " Make sure the player prefab has WallClimbAbility on it too, and that its wallLayers includes whatever layer these colliders are on." : ""));
         }
 
         /// <summary>

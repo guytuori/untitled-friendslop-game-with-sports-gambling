@@ -24,9 +24,10 @@ GameObject:
   - component: {fileID: 3432624027115298979}
   - component: {fileID: 691561724687605723}
   - component: {fileID: 8293538361845572120}
-  - component: {fileID: 5741594694494256000}
   - component: {fileID: 6179902726917391442}
   - component: {fileID: 6615549535228985987}
+  - component: {fileID: 7901013521677120731}
+  - component: {fileID: 3308432048302639970}
   m_Layer: 3
   m_Name: '[BB] CorePlayer'
   m_TagString: Player
@@ -146,6 +147,7 @@ MonoBehaviour:
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   onJumpReleased: {fileID: 11400000, guid: 4c295680fb10f4080ae6688f6a96a009, type: 2}
   onSprintStateChanged: {fileID: 11400000, guid: c3ec94fe2e7dd47aaadddb5e98e7c375, type: 2}
+  onGrabStateChanged: {fileID: 11400000, guid: 8f025844fa794da8b5eab619f5139e5c, type: 2}
   onStatDepleted: {fileID: 11400000, guid: aced99a6f7f354e5c87c8fab171c4c31, type: 2}
   respawnSFX: {fileID: 11400000, guid: bfec68d58a412fa4fb63e149caa5b3e5, type: 2}
 --- !u!114 &2882169080758904526
@@ -166,6 +168,7 @@ MonoBehaviour:
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   onJumpReleased: {fileID: 11400000, guid: 4c295680fb10f4080ae6688f6a96a009, type: 2}
   onSprintStateChanged: {fileID: 11400000, guid: c3ec94fe2e7dd47aaadddb5e98e7c375, type: 2}
+  onGrabStateChanged: {fileID: 11400000, guid: 8f025844fa794da8b5eab619f5139e5c, type: 2}
   onPrimaryActionPressed: {fileID: 11400000, guid: f48adbe17161042ef8cf65a5a455594a, type: 2}
   onPrimaryActionReleased: {fileID: 11400000, guid: a670f0da4a4d64cea91ff13081e68da8, type: 2}
   onMenuPressed: {fileID: 11400000, guid: 5f76e3427057c467fa2f4de049753b9e, type: 2}
@@ -408,35 +411,6 @@ MonoBehaviour:
   soundDefPlayerEliminated: {fileID: 11400000, guid: f94375e27624be640bcec5f9f675346c, type: 2}
   useRagdollOnElimination: 0
   ragdollRoot: {fileID: 0}
---- !u!114 &5741594694494256000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4416926081852918481}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b58d43060956cc54f9bc38fbd9ed343e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.WallSlideAbility
-  ShowTopMostFoldoutHeaderGroup: 1
-  wallLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  wallCheckDistance: 0.6
-  wallCheckRadius: 0.15
-  maxWallSurfaceAngle: 20
-  minPressInto: 0.4
-  minAirTimeBeforeSlide: 0.1
-  slideSpeed: 2
-  slideDamping: 12
-  wallJumpHeight: 2.2
-  wallJumpPushForce: 7
-  wallJumpBufferTime: 0.15
-  regrabCooldown: 0.25
-  wallJumpStaminaCost: 0
-  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!114 &6179902726917391442
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -505,6 +479,55 @@ MonoBehaviour:
   barBackgroundColor: {r: 0, g: 0, b: 0, a: 0.55}
   indicatorSafeColor: {r: 1, g: 1, b: 1, a: 1}
   indicatorDangerColor: {r: 1, g: 0.25, b: 0.2, a: 1}
+--- !u!114 &7901013521677120731
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4416926081852918481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ab84bcad1277f194ab024c9644366cae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.PoleGrabAbility
+  ShowTopMostFoldoutHeaderGroup: 1
+  grabDetectionRange: 1
+  climbSpeedMultiplier: 0.5
+  shimmySpeedMultiplier: 0.5
+  staminaCostPerSecond: 8
+  jumpOffHeightMultiplier: 1
+  jumpOffPushForce: 6
+  regrabCooldown: 0.25
+  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+--- !u!114 &3308432048302639970
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4416926081852918481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e033ff6cbf40b9a47929b9a864ae42b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.WallClimbAbility
+  ShowTopMostFoldoutHeaderGroup: 1
+  wallLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  wallCheckDistance: 0.6
+  wallCheckRadius: 0.15
+  maxWallSurfaceAngle: 20
+  minPressInto: 0.4
+  climbSpeedMultiplier: 0.5
+  shimmySpeedMultiplier: 0.5
+  staminaCostPerSecond: 10
+  stickForce: 2
+  wallJumpHeight: 2.2
+  wallJumpPushForce: 7
+  regrabCooldown: 0.25
+  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!1 &8338988566280778634
 GameObject:
   m_ObjectHideFlags: 0
