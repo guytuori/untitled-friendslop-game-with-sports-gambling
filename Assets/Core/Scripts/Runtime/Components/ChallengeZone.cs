@@ -31,6 +31,7 @@ namespace Blocks.Gameplay.Core
         private bool m_AttemptInProgress;
         private float m_AttemptStartTime;
         private int m_DeathsDuringAttempt;
+        private bool m_CompletedThisRound;
         private readonly Dictionary<ulong, ChallengeBetChoice> m_Bets = new Dictionary<ulong, ChallengeBetChoice>();
 
         /// <summary>This challenge's parameters (name, points, pars). Never null in normal use.</summary>
@@ -38,6 +39,16 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>Whether anyone currently owns (has claimed) this challenge.</summary>
         public bool HasOwner => m_HasOwner;
+
+        /// <summary>
+        /// Whether this challenge has already been completed once this round - once true, it should never
+        /// be claimable again (see ChallengeManager.TryClaimChallenge) until <see cref="ResetForNewRound"/>
+        /// runs. Deliberately separate from <see cref="HasOwner"/>/ResetToIdle: those exist to clear the
+        /// in-progress attempt bookkeeping between calls, not to say whether the challenge is still "fresh" -
+        /// without this flag, the owner (or anyone else) walking back through the start volume after
+        /// finishing would simply look like a brand new claim.
+        /// </summary>
+        public bool HasCompletedThisRound => m_CompletedThisRound;
 
         /// <summary>The client ID of the current owner. Only meaningful when <see cref="HasOwner"/> is true.</summary>
         public ulong OwnerId => m_OwnerId;
@@ -128,10 +139,19 @@ namespace Blocks.Gameplay.Core
 
             bool underDeathPar = m_DeathsDuringAttempt < parDeaths;
             bool underTimePar = elapsed < parTime;
+
+            // Reaching the finish - whether or not either par was beaten - permanently closes this
+            // challenge for the rest of the round. See HasCompletedThisRound.
+            m_CompletedThisRound = true;
+
             return (underDeathPar, underTimePar);
         }
 
-        /// <summary>Clears ownership and attempt state so the next player can claim this challenge.</summary>
+        /// <summary>
+        /// Clears ownership and in-progress-attempt bookkeeping. Does NOT clear
+        /// <see cref="HasCompletedThisRound"/> - that's the whole point of it (see its doc comment);
+        /// use <see cref="ResetForNewRound"/> when an actual new round begins.
+        /// </summary>
         public void ResetToIdle()
         {
             m_HasOwner = false;
@@ -139,6 +159,18 @@ namespace Blocks.Gameplay.Core
             m_AttemptInProgress = false;
             m_DeathsDuringAttempt = 0;
             m_Bets.Clear();
+        }
+
+        /// <summary>
+        /// Fully reopens this challenge for a new round, including <see cref="HasCompletedThisRound"/>.
+        /// Not called from anywhere yet - there's no round-transition system today (see RoundTimer, which
+        /// currently just stops at 0 with no restart). Wire this up to that system's "new round starting"
+        /// step once it exists, so every ChallengeZone becomes claimable again at the start of each round.
+        /// </summary>
+        public void ResetForNewRound()
+        {
+            ResetToIdle();
+            m_CompletedThisRound = false;
         }
 
         #endregion

@@ -56,6 +56,7 @@ namespace Blocks.Gameplay.Core
 
         // Lifecycle Management
         private Coroutine m_EliminatedCoroutine;
+        private Coroutine m_ScoreboardRefreshCoroutine;
 
         // Constants
         private const int k_MaxNotifications = 3;
@@ -121,7 +122,7 @@ namespace Blocks.Gameplay.Core
 
             NetworkManager.Singleton.OnClientConnectedCallback += HandleScoreboardRosterChanged;
             NetworkManager.Singleton.OnClientDisconnectCallback += HandleScoreboardRosterChanged;
-            RefreshScoreboard();
+            RequestScoreboardRefresh();
 
             if (RoundTimer.Instance != null)
             {
@@ -637,7 +638,54 @@ namespace Blocks.Gameplay.Core
         /// <param name="clientId">The client that connected or disconnected (unused - a full rebuild covers both).</param>
         private void HandleScoreboardRosterChanged(ulong clientId)
         {
-            RefreshScoreboard();
+            RequestScoreboardRefresh();
+        }
+
+        /// <summary>
+        /// Kicks off (or restarts) the retrying scoreboard refresh - see RefreshScoreboardUntilComplete for why
+        /// a single RefreshScoreboard() call isn't reliable right after a connect event.
+        /// </summary>
+        private void RequestScoreboardRefresh()
+        {
+            if (m_ScoreboardRefreshCoroutine != null)
+            {
+                StopCoroutine(m_ScoreboardRefreshCoroutine);
+            }
+            m_ScoreboardRefreshCoroutine = StartCoroutine(RefreshScoreboardUntilComplete());
+        }
+
+        /// <summary>
+        /// A newly-connected client's player object doesn't always exist yet the instant
+        /// OnClientConnectedCallback fires - their scene sync / player-prefab spawn can still be in
+        /// flight for a frame or more. RefreshScoreboard() silently skips any connected client it can't
+        /// find a player object for, and since nothing else re-triggers a rebuild until the NEXT connect
+        /// or disconnect, a client whose object wasn't ready yet could simply never get a row. Retry for
+        /// a few seconds instead of assuming one attempt is enough.
+        /// </summary>
+        private IEnumerator RefreshScoreboardUntilComplete()
+        {
+            const int maxAttempts = 20;
+            const float retryDelaySeconds = 0.25f;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                RefreshScoreboard();
+
+                if (NetworkManager.Singleton == null) yield break;
+
+                bool everyoneHasARow = true;
+                foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+                {
+                    if (!m_ScoreboardRows.ContainsKey(clientId))
+                    {
+                        everyoneHasARow = false;
+                        break;
+                    }
+                }
+
+                if (everyoneHasARow) yield break;
+                yield return new WaitForSeconds(retryDelaySeconds);
+            }
         }
 
         /// <summary>

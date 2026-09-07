@@ -28,7 +28,7 @@ namespace Blocks.Gameplay.Core
     /// <see cref="IsPaused"/> to freeze/unfreeze that player's own movement input.
     /// </summary>
     [RequireComponent(typeof(NetworkObject))]
-    public class ChallengeManager : NetworkBehaviour
+    public class ChallengeManager : NetworkBehaviour, ISceneSingleton
     {
         #region Fields & Properties
 
@@ -177,6 +177,7 @@ namespace Blocks.Gameplay.Core
         {
             if (IsBettingWindowActive.Value) return; // only one betting window globally at a time
             if (zone.HasOwner) return; // first come, first served
+            if (zone.HasCompletedThisRound) return; // once and only once per round - see ChallengeZone.HasCompletedThisRound
             if (m_RunningAttemptsByOwner.ContainsKey(challengerId)) return; // already mid-attempt elsewhere
 
             zone.Claim(challengerId);

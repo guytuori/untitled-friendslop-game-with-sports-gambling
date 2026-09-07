@@ -89,6 +89,17 @@ namespace Blocks.Gameplay.Core
                 return;
             }
 
+            RunOnMapObject(selected);
+        }
+
+        /// <summary>
+        /// The actual per-map-piece logic, callable directly against a known GameObject rather than only
+        /// via the current Hierarchy selection - see SceneRefreshSetup (Friendslop > Refresh Everything
+        /// From Assets), which finds every map piece in the scene structurally and calls this on each one
+        /// without anything needing to be selected first.
+        /// </summary>
+        public static void RunOnMapObject(GameObject selected)
+        {
             var meshFilter = selected.GetComponent<MeshFilter>();
             var meshRenderer = selected.GetComponent<MeshRenderer>();
             if (meshFilter == null || meshFilter.sharedMesh == null || meshRenderer == null)
@@ -268,7 +279,17 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Builds a standalone mesh containing only the given submesh's triangles. Keeps the full
         /// original vertex buffer rather than trimming to just the referenced vertices - simplest and
-        /// always correct, and the extra unused vertices are harmless for a collision-only mesh.
+        /// always correct, and the extra unused vertices are harmless for a collision-only mesh (PhysX
+        /// collides against the triangle data, not the unused vertices sitting alongside it).
+        ///
+        /// The bounds are a different story. Mesh.RecalculateBounds() computes its AABB from every
+        /// vertex in the mesh's vertex array, whether or not any triangle actually references it - so
+        /// with the full original vertex buffer kept above, it would report bounds spanning the ENTIRE
+        /// source mesh (e.g. the whole map) instead of just this submesh's own footprint (e.g. just the
+        /// "start" tile). That's harmless for the MeshCollider itself, but CreateChallengeTrigger reads
+        /// this mesh's bounds to size the challenge start/finish trigger volume around just this
+        /// submesh - so we compute and assign the real, tight bounds explicitly instead, from only the
+        /// vertices this submesh's triangles reference.
         /// </summary>
         private static Mesh ExtractSubMesh(Mesh source, int subMeshIndex)
         {
@@ -279,8 +300,35 @@ namespace Blocks.Gameplay.Core
                 vertices = source.vertices,
                 triangles = source.GetTriangles(subMeshIndex)
             };
-            subMesh.RecalculateBounds();
+            subMesh.bounds = ComputeReferencedVertexBounds(subMesh.vertices, subMesh.triangles);
             return subMesh;
+        }
+
+        /// <summary>
+        /// The bounds of only the vertices actually referenced by <paramref name="triangles"/> - unlike
+        /// Mesh.RecalculateBounds(), which includes every vertex in <paramref name="vertices"/> whether
+        /// or not any triangle uses it (see ExtractSubMesh above for why that matters here).
+        /// </summary>
+        private static Bounds ComputeReferencedVertexBounds(Vector3[] vertices, int[] triangles)
+        {
+            if (triangles.Length == 0 || vertices.Length == 0)
+            {
+                return new Bounds(vertices.Length > 0 ? vertices[0] : Vector3.zero, Vector3.zero);
+            }
+
+            Vector3 min = vertices[triangles[0]];
+            Vector3 max = min;
+
+            for (int i = 1; i < triangles.Length; i++)
+            {
+                Vector3 vertex = vertices[triangles[i]];
+                min = Vector3.Min(min, vertex);
+                max = Vector3.Max(max, vertex);
+            }
+
+            var bounds = new Bounds();
+            bounds.SetMinMax(min, max);
+            return bounds;
         }
     }
 }

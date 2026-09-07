@@ -16,7 +16,7 @@ namespace Blocks.Gameplay.Core
     /// (Everyone read permission) can still see everyone's current score, which is exactly what the scoreboard needs.
     /// </summary>
     [RequireComponent(typeof(NetworkObject))]
-    public class PlayerScore : NetworkBehaviour
+    public class PlayerScore : NetworkBehaviour, IPlayerRequiredComponent
     {
         #region Fields & Properties
 

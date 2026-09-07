@@ -13,7 +13,7 @@ namespace Blocks.Gameplay.Core
     /// scoring rule once rounds have an actual end condition.
     /// </summary>
     [RequireComponent(typeof(NetworkObject))]
-    public class RoundTimer : NetworkBehaviour
+    public class RoundTimer : NetworkBehaviour, ISceneSingleton
     {
         #region Fields & Properties
 

@@ -84,6 +84,17 @@ namespace Blocks.Gameplay.Core
                 return;
             }
 
+            RunOnMapObject(selected);
+        }
+
+        /// <summary>
+        /// The actual per-map-piece logic, callable directly against a known GameObject rather than only
+        /// via the current Hierarchy selection - see SceneRefreshSetup (Friendslop > Refresh Everything
+        /// From Assets), which finds every map piece in the scene structurally and calls this on each one
+        /// without anything needing to be selected first.
+        /// </summary>
+        public static void RunOnMapObject(GameObject selected)
+        {
             var meshFilter = selected.GetComponent<MeshFilter>();
             var meshRenderer = selected.GetComponent<MeshRenderer>();
             if (meshFilter == null || meshFilter.sharedMesh == null || meshRenderer == null)
