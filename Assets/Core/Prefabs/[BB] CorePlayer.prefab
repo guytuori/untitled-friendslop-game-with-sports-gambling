@@ -28,6 +28,8 @@ GameObject:
   - component: {fileID: 6615549535228985987}
   - component: {fileID: 7901013521677120731}
   - component: {fileID: 3308432048302639970}
+  - component: {fileID: 6234546863735232799}
+  - component: {fileID: 3159556637843938307}
   m_Layer: 3
   m_Name: '[BB] CorePlayer'
   m_TagString: Player
@@ -528,6 +530,33 @@ MonoBehaviour:
   wallJumpPushForce: 7
   regrabCooldown: 0.25
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+--- !u!114 &6234546863735232799
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4416926081852918481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2108798162104eba874102138d6a9f62, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.PlayerScore
+  ShowTopMostFoldoutHeaderGroup: 1
+  gameRulesConfig: {fileID: 11400000, guid: c51b3671a65601b4b8e53c9e777cc9cc, type: 2}
+--- !u!114 &3159556637843938307
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4416926081852918481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c666b8cea4d44989305b216e2b9cea7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.ChallengePauseGate
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &8338988566280778634
 GameObject:
   m_ObjectHideFlags: 0

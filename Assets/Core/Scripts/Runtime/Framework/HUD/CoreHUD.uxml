@@ -5,7 +5,23 @@
             <ui:ProgressBar value="63.8" title="my-progress" name="player-health-bar" class="blocks-progress-bar"/>
             <ui:ProgressBar name="player-stamina-bar" low-value="0" high-value="100" value="100" class="blocks-progress-bar"/>
         </ui:VisualElement>
+        <ui:VisualElement name="round-timer-container">
+            <ui:Label name="round-timer-label" text="2:00"/>
+        </ui:VisualElement>
+        <ui:VisualElement name="scoreboard-container"/>
         <ui:VisualElement name="notification-container" class="notification-container"/>
+        <ui:VisualElement name="challenge-overlay" style="display: none;">
+            <ui:Label name="challenge-title-label" text="ChallengeName"/>
+            <ui:Label name="challenge-subtitle-label" text="PlayerX is attempting this challenge"/>
+            <ui:ProgressBar name="challenge-timer-bar" low-value="0" high-value="5" value="5" class="blocks-progress-bar"/>
+            <ui:VisualElement name="challenge-bet-buttons">
+                <ui:Button name="challenge-bet-success-button" text="He succeeds in under both Pars"/>
+                <ui:Button name="challenge-bet-failure-button" text="He fails to achieve both pars"/>
+                <ui:Button name="challenge-bet-decline-button" text="I decline to bet"/>
+            </ui:VisualElement>
+            <ui:Label name="challenge-bet-status-label" text="" style="display: none;"/>
+            <ui:VisualElement name="challenge-bet-announcements"/>
+        </ui:VisualElement>
         <ui:VisualElement name="message-overlay" style="display: none;">
             <ui:Label name="message-label" text="RESPAWN IN"/>
             <ui:VisualElement name="message-divider"/>

@@ -34,9 +34,25 @@ namespace Blocks.Gameplay.Core
         private VisualElement m_PlayerHealthBarFill;
         private VisualElement m_PlayerStaminaBarFill;
         private VisualElement m_NotificationContainer;
+        private VisualElement m_ScoreboardContainer;
+        private Label m_RoundTimerLabel;
+        private VisualElement m_ChallengeOverlay;
+        private Label m_ChallengeTitleLabel;
+        private Label m_ChallengeSubtitleLabel;
+        private ProgressBar m_ChallengeTimerBar;
+        private VisualElement m_ChallengeBetButtons;
+        private Button m_ChallengeBetSuccessButton;
+        private Button m_ChallengeBetFailureButton;
+        private Button m_ChallengeBetDeclineButton;
+        private Label m_ChallengeBetStatusLabel;
+        private VisualElement m_ChallengeBetAnnouncements;
+        private bool m_HasPlacedBetThisWindow;
 
         // Notification System
         private readonly List<NotificationData> m_ActiveNotifications = new List<NotificationData>();
+
+        // Scoreboard System
+        private readonly Dictionary<ulong, ScoreboardRow> m_ScoreboardRows = new Dictionary<ulong, ScoreboardRow>();
 
         // Lifecycle Management
         private Coroutine m_EliminatedCoroutine;
@@ -62,6 +78,25 @@ namespace Blocks.Gameplay.Core
             public string Message;
         }
 
+        /// <summary>
+        /// One displayed row of the scoreboard: its UI element, the score label within it, and the specific
+        /// player's PlayerScore it's bound to (so its NetworkVariable subscription can be cleanly removed later).
+        /// </summary>
+        private class ScoreboardRow
+        {
+            public VisualElement Element;
+            public Label ScoreLabel;
+            public PlayerScore PlayerScoreComponent;
+
+            public void HandleScoreChanged(int previousValue, int newValue)
+            {
+                if (ScoreLabel != null)
+                {
+                    ScoreLabel.text = newValue.ToString();
+                }
+            }
+        }
+
         #endregion
 
         #region Unity & Network Lifecycle
@@ -83,6 +118,24 @@ namespace Blocks.Gameplay.Core
             Initialize();
             RegisterEventListeners();
             StartCoroutine(InitialHUDUpdate());
+
+            NetworkManager.Singleton.OnClientConnectedCallback += HandleScoreboardRosterChanged;
+            NetworkManager.Singleton.OnClientDisconnectCallback += HandleScoreboardRosterChanged;
+            RefreshScoreboard();
+
+            if (RoundTimer.Instance != null)
+            {
+                RoundTimer.Instance.TimeRemaining.OnValueChanged += HandleRoundTimerChanged;
+                UpdateTimerLabel(RoundTimer.Instance.TimeRemaining.Value);
+            }
+
+            if (ChallengeManager.Instance != null)
+            {
+                ChallengeManager.Instance.IsBettingWindowActive.OnValueChanged += HandleBettingWindowActiveChanged;
+                ChallengeManager.Instance.BettingTimeRemaining.OnValueChanged += HandleBettingTimeRemainingChanged;
+                ChallengeManager.Instance.ActiveBettorClientIds.OnListChanged += HandleActiveBettorsChanged;
+                RefreshChallengeOverlay();
+            }
         }
 
         /// <summary>
@@ -102,6 +155,26 @@ namespace Blocks.Gameplay.Core
             {
                 UnregisterEventListeners();
                 ClearAllNotifications();
+
+                if (NetworkManager.Singleton != null)
+                {
+                    NetworkManager.Singleton.OnClientConnectedCallback -= HandleScoreboardRosterChanged;
+                    NetworkManager.Singleton.OnClientDisconnectCallback -= HandleScoreboardRosterChanged;
+                }
+
+                if (RoundTimer.Instance != null)
+                {
+                    RoundTimer.Instance.TimeRemaining.OnValueChanged -= HandleRoundTimerChanged;
+                }
+
+                if (ChallengeManager.Instance != null)
+                {
+                    ChallengeManager.Instance.IsBettingWindowActive.OnValueChanged -= HandleBettingWindowActiveChanged;
+                    ChallengeManager.Instance.BettingTimeRemaining.OnValueChanged -= HandleBettingTimeRemainingChanged;
+                    ChallengeManager.Instance.ActiveBettorClientIds.OnListChanged -= HandleActiveBettorsChanged;
+                }
+
+                ClearScoreboardRows();
             }
         }
 
@@ -261,6 +334,7 @@ namespace Blocks.Gameplay.Core
             var root = m_UIDocument.rootVisualElement;
             CacheUIElements(root);
             ConfigureUIElements();
+            ConfigureChallengeBetButtons();
             QueryHUDElements(root);
             SetHUDDefaults();
         }
@@ -277,6 +351,18 @@ namespace Blocks.Gameplay.Core
             m_PlayerHealthBar = root.Q<ProgressBar>("player-health-bar");
             m_PlayerStaminaBar = root.Q<ProgressBar>("player-stamina-bar");
             m_NotificationContainer = root.Q<VisualElement>("notification-container");
+            m_ScoreboardContainer = root.Q<VisualElement>("scoreboard-container");
+            m_RoundTimerLabel = root.Q<Label>("round-timer-label");
+            m_ChallengeOverlay = root.Q<VisualElement>("challenge-overlay");
+            m_ChallengeTitleLabel = root.Q<Label>("challenge-title-label");
+            m_ChallengeSubtitleLabel = root.Q<Label>("challenge-subtitle-label");
+            m_ChallengeTimerBar = root.Q<ProgressBar>("challenge-timer-bar");
+            m_ChallengeBetButtons = root.Q<VisualElement>("challenge-bet-buttons");
+            m_ChallengeBetSuccessButton = root.Q<Button>("challenge-bet-success-button");
+            m_ChallengeBetFailureButton = root.Q<Button>("challenge-bet-failure-button");
+            m_ChallengeBetDeclineButton = root.Q<Button>("challenge-bet-decline-button");
+            m_ChallengeBetStatusLabel = root.Q<Label>("challenge-bet-status-label");
+            m_ChallengeBetAnnouncements = root.Q<VisualElement>("challenge-bet-announcements");
         }
 
         /// <summary>
@@ -537,6 +623,237 @@ namespace Blocks.Gameplay.Core
                 }
             }
             return $"Player-{playerId}";
+        }
+
+        #endregion
+
+        #region Scoreboard & Round Timer
+
+        /// <summary>
+        /// Called whenever any client connects or disconnects, to keep the scoreboard's rows in sync with who's
+        /// actually in the game. Just rebuilds from scratch rather than tracking the specific client - simplest
+        /// way to stay correct across joins/leaves, and cheap enough given expected player counts.
+        /// </summary>
+        /// <param name="clientId">The client that connected or disconnected (unused - a full rebuild covers both).</param>
+        private void HandleScoreboardRosterChanged(ulong clientId)
+        {
+            RefreshScoreboard();
+        }
+
+        /// <summary>
+        /// Rebuilds the scoreboard against the current connected-clients list: one row per connected player,
+        /// showing their name (see <see cref="GetPlayerName"/>) and their live, server-authoritative score.
+        /// </summary>
+        private void RefreshScoreboard()
+        {
+            if (m_ScoreboardContainer == null || NetworkManager.Singleton == null) return;
+
+            ClearScoreboardRows();
+
+            foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+            {
+                var playerObject = NetworkManager.Singleton.SpawnManager.GetPlayerNetworkObject(clientId);
+                if (playerObject == null || !playerObject.TryGetComponent<PlayerScore>(out var playerScore)) continue;
+
+                var row = new VisualElement();
+                row.AddToClassList("scoreboard-row");
+
+                var nameLabel = new Label(GetPlayerName(clientId));
+                nameLabel.AddToClassList("scoreboard-name");
+                row.Add(nameLabel);
+
+                var scoreLabel = new Label(playerScore.Score.Value.ToString());
+                scoreLabel.AddToClassList("scoreboard-score");
+                row.Add(scoreLabel);
+
+                m_ScoreboardContainer.Add(row);
+
+                var scoreboardRow = new ScoreboardRow
+                {
+                    Element = row,
+                    ScoreLabel = scoreLabel,
+                    PlayerScoreComponent = playerScore
+                };
+                playerScore.Score.OnValueChanged += scoreboardRow.HandleScoreChanged;
+                m_ScoreboardRows[clientId] = scoreboardRow;
+            }
+        }
+
+        /// <summary>
+        /// Unsubscribes and removes every currently-displayed scoreboard row.
+        /// </summary>
+        private void ClearScoreboardRows()
+        {
+            foreach (var row in m_ScoreboardRows.Values)
+            {
+                if (row.PlayerScoreComponent != null)
+                {
+                    row.PlayerScoreComponent.Score.OnValueChanged -= row.HandleScoreChanged;
+                }
+                m_ScoreboardContainer?.Remove(row.Element);
+            }
+            m_ScoreboardRows.Clear();
+        }
+
+        /// <summary>
+        /// Updates the round timer label whenever the server-authoritative countdown changes.
+        /// </summary>
+        private void HandleRoundTimerChanged(float previousValue, float newValue)
+        {
+            UpdateTimerLabel(newValue);
+        }
+
+        /// <summary>
+        /// Formats and applies the given number of seconds remaining to the round timer label, as M:SS.
+        /// </summary>
+        private void UpdateTimerLabel(float secondsRemaining)
+        {
+            if (m_RoundTimerLabel == null) return;
+
+            int totalSeconds = Mathf.Max(0, Mathf.CeilToInt(secondsRemaining));
+            m_RoundTimerLabel.text = $"{totalSeconds / 60}:{totalSeconds % 60:00}";
+        }
+
+        #endregion
+
+        #region Challenge Betting Overlay
+
+        /// <summary>
+        /// Wires the three betting buttons once, at HUD creation - unlike the scoreboard's rows, these are
+        /// static UI elements that just get shown/hidden, never rebuilt.
+        /// </summary>
+        private void ConfigureChallengeBetButtons()
+        {
+            if (m_ChallengeBetSuccessButton != null) m_ChallengeBetSuccessButton.clicked += () => PlaceBet(ChallengeBetChoice.Success);
+            if (m_ChallengeBetFailureButton != null) m_ChallengeBetFailureButton.clicked += () => PlaceBet(ChallengeBetChoice.Failure);
+            if (m_ChallengeBetDeclineButton != null) m_ChallengeBetDeclineButton.clicked += () => PlaceBet(ChallengeBetChoice.Decline);
+        }
+
+        /// <summary>
+        /// Sends this player's bet to the server and updates this client's own view immediately - the
+        /// server is the actual source of truth (see ChallengeManager.PlaceBetRpc), this is just so the
+        /// buttons don't linger after being clicked while waiting for the round trip.
+        /// </summary>
+        private void PlaceBet(ChallengeBetChoice choice)
+        {
+            if (ChallengeManager.Instance == null) return;
+
+            m_HasPlacedBetThisWindow = true;
+            ChallengeManager.Instance.PlaceBetRpc(choice);
+
+            UpdateChallengeBetControlsVisibility();
+            if (m_ChallengeBetStatusLabel != null)
+            {
+                m_ChallengeBetStatusLabel.style.display = DisplayStyle.Flex;
+                m_ChallengeBetStatusLabel.text = choice == ChallengeBetChoice.Decline
+                    ? "You declined to bet."
+                    : $"You bet: {DescribeBetChoice(choice)}";
+            }
+        }
+
+        /// <summary>
+        /// Shows or hides the whole betting overlay when a betting window opens or closes, and refreshes
+        /// its contents (challenge name, challenger, timer, bet controls, announcements) while it's open.
+        /// </summary>
+        private void HandleBettingWindowActiveChanged(bool previousValue, bool isActive)
+        {
+            if (isActive && m_ChallengeBetStatusLabel != null)
+            {
+                m_ChallengeBetStatusLabel.style.display = DisplayStyle.None;
+            }
+
+            RefreshChallengeOverlay();
+        }
+
+        /// <summary>
+        /// Updates the countdown bar as the server ticks it down.
+        /// </summary>
+        private void HandleBettingTimeRemainingChanged(float previousValue, float newValue)
+        {
+            if (m_ChallengeTimerBar != null)
+            {
+                m_ChallengeTimerBar.value = newValue;
+            }
+        }
+
+        /// <summary>
+        /// Rebuilds the "so-and-so has bet" announcements whenever the server's bettor list changes.
+        /// </summary>
+        private void HandleActiveBettorsChanged(NetworkListEvent<ulong> changeEvent)
+        {
+            RefreshBettorAnnouncements();
+        }
+
+        /// <summary>
+        /// Refreshes every part of the betting overlay against ChallengeManager's current state. Safe to
+        /// call at any time - a fresh window resets <see cref="m_HasPlacedBetThisWindow"/> via
+        /// HandleBettingWindowActiveChanged before this runs, so re-entering an already-open window (e.g.
+        /// on late join) won't wrongly show buttons to someone who already bet.
+        /// </summary>
+        private void RefreshChallengeOverlay()
+        {
+            if (m_ChallengeOverlay == null || ChallengeManager.Instance == null) return;
+
+            bool isActive = ChallengeManager.Instance.IsBettingWindowActive.Value;
+            m_ChallengeOverlay.style.display = isActive ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!isActive) return;
+
+            string challengeName = ChallengeManager.Instance.ActiveChallengeName.Value.ToString();
+            ulong challengerId = ChallengeManager.Instance.ActiveChallengerClientId.Value;
+
+            if (m_ChallengeTitleLabel != null) m_ChallengeTitleLabel.text = challengeName;
+            if (m_ChallengeSubtitleLabel != null) m_ChallengeSubtitleLabel.text = $"{GetPlayerName(challengerId)} is attempting this challenge";
+            if (m_ChallengeTimerBar != null)
+            {
+                m_ChallengeTimerBar.highValue = ChallengeManager.Instance.BettingWindowSeconds;
+                m_ChallengeTimerBar.value = ChallengeManager.Instance.BettingTimeRemaining.Value;
+            }
+
+            UpdateChallengeBetControlsVisibility();
+            RefreshBettorAnnouncements();
+        }
+
+        /// <summary>
+        /// The challenging player never sees the betting buttons (only the countdown), and once anyone has
+        /// placed their bet for this window, the buttons hide for them too.
+        /// </summary>
+        private void UpdateChallengeBetControlsVisibility()
+        {
+            if (m_ChallengeBetButtons == null || ChallengeManager.Instance == null) return;
+
+            bool isLocalPlayerTheChallenger = NetworkManager.Singleton != null &&
+                NetworkManager.Singleton.LocalClientId == ChallengeManager.Instance.ActiveChallengerClientId.Value;
+            bool showButtons = !isLocalPlayerTheChallenger && !m_HasPlacedBetThisWindow;
+            m_ChallengeBetButtons.style.display = showButtons ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        /// <summary>
+        /// Rebuilds the "[Player Name] has bet on the outcome of [Challenge Name]" rows. Doesn't reveal
+        /// which of the three options anyone picked - just that they wagered.
+        /// </summary>
+        private void RefreshBettorAnnouncements()
+        {
+            if (m_ChallengeBetAnnouncements == null || ChallengeManager.Instance == null) return;
+
+            m_ChallengeBetAnnouncements.Clear();
+            string challengeName = ChallengeManager.Instance.ActiveChallengeName.Value.ToString();
+
+            foreach (ulong bettorId in ChallengeManager.Instance.ActiveBettorClientIds)
+            {
+                var label = new Label($"{GetPlayerName(bettorId)} has bet on the outcome of {challengeName}");
+                label.AddToClassList("challenge-bet-announcement");
+                m_ChallengeBetAnnouncements.Add(label);
+            }
+        }
+
+        private static string DescribeBetChoice(ChallengeBetChoice choice)
+        {
+            return choice switch
+            {
+                ChallengeBetChoice.Success => "He succeeds in under both Pars",
+                ChallengeBetChoice.Failure => "He fails to achieve both pars",
+                _ => "Declined"
+            };
         }
 
         #endregion

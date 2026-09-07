@@ -7,10 +7,23 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// Handles core player input using Unity's Input System and broadcasts actions via GameEvents.
     /// This component handles core movement inputs (Move, Look, Jump, Sprint).
+    ///
+    /// Local same-PC testing: by default every instance responds to any connected Keyboard/Mouse/Gamepad
+    /// (whatever the "Keyboard&Mouse"/"Gamepad" control schemes bind - see GameplayInputSystem_Actions),
+    /// which is what a normal remote player wants. When testing two clients side by side on one machine,
+    /// that means both windows fight over the same WASD keys and the same gamepad. Launching the second
+    /// window/build with the "-player2input" command-line argument switches ONLY that instance's owned
+    /// player to the "Keyboard_P2" control scheme instead (T/F/G/H to move, R to grab, keyboard+mouse only,
+    /// no gamepad at all) - see AlternateBindingsGroup and the new bindings tagged "Keyboard_P2" in the
+    /// .inputactions asset. Add more command-line-selected schemes here the same way if a third local
+    /// player is ever needed.
     /// </summary>
     public class CoreInputHandler : NetworkBehaviour
     {
         #region Fields
+
+        private const string AlternateBindingsCommandLineArg = "-player2input";
+        private const string AlternateBindingsGroup = "Keyboard_P2";
 
         [Header("Core Game Events")]
         [Tooltip("Raised when the player provides movement input.")]
@@ -47,6 +60,7 @@ namespace Blocks.Gameplay.Core
         {
             if (IsOwner && m_InputActions != null)
             {
+                ApplyAlternateBindingsIfRequested();
                 RegisterInputActions();
                 m_InputActions.Player.Enable();
             }
@@ -59,6 +73,41 @@ namespace Blocks.Gameplay.Core
                 m_InputActions.Player.Disable();
                 UnregisterInputActions();
             }
+        }
+
+        #endregion
+
+        #region Local Testing: Alternate Bindings
+
+        /// <summary>
+        /// If this process was launched with "-player2input" on the command line, restricts this owned
+        /// player's input to the "Keyboard_P2" control scheme (T/F/G/H move, R grab, keyboard+mouse only)
+        /// instead of the default "Keyboard&Mouse"/"Gamepad" schemes. Only ever affects this one local
+        /// instance's owned player - remote players are never touched, since input is only ever wired up
+        /// for the owner (see OnNetworkSpawn above).
+        /// </summary>
+        private void ApplyAlternateBindingsIfRequested()
+        {
+            if (!ShouldUseAlternateBindings()) return;
+
+            m_InputActions.asset.bindingMask = InputBinding.MaskByGroup(AlternateBindingsGroup);
+
+            var devices = new System.Collections.Generic.List<InputDevice>();
+            if (Keyboard.current != null) devices.Add(Keyboard.current);
+            if (Mouse.current != null) devices.Add(Mouse.current);
+            m_InputActions.asset.devices = devices.ToArray();
+        }
+
+        private static bool ShouldUseAlternateBindings()
+        {
+            foreach (var arg in System.Environment.GetCommandLineArgs())
+            {
+                if (string.Equals(arg, AlternateBindingsCommandLineArg, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         #endregion
