@@ -164,15 +164,30 @@ namespace Blocks.Gameplay.Core
 
         #region Input Handlers
 
-        private void HandleMove(InputAction.CallbackContext context) => onMoveInput?.Raise(context.ReadValue<Vector2>());
-        private void HandleLook(InputAction.CallbackContext context) => onLookInput?.Raise(context.ReadValue<Vector2>());
-        private void HandleJumpPressed(InputAction.CallbackContext context) => onJumpPressed?.Raise();
-        private void HandleJumpReleased(InputAction.CallbackContext context) => onJumpReleased?.Raise();
-        private void HandleSprintState(InputAction.CallbackContext context) => onSprintStateChanged?.Raise(context.ReadValueAsButton());
-        private void HandleGrabState(InputAction.CallbackContext context) => onGrabStateChanged?.Raise(context.ReadValueAsButton());
-        private void HandlePrimaryActionPressed(InputAction.CallbackContext context) => onPrimaryActionPressed?.Raise();
-        private void HandlePrimaryActionReleased(InputAction.CallbackContext context) => onPrimaryActionReleased?.Raise();
-        private void HandleMenuPressed(InputAction.CallbackContext context) => onMenuPressed?.Raise();
+        private void HandleMove(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onMoveInput?.Raise(context.ReadValue<Vector2>()); }
+        private void HandleLook(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onLookInput?.Raise(context.ReadValue<Vector2>()); }
+        private void HandleJumpPressed(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onJumpPressed?.Raise(); }
+        private void HandleJumpReleased(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onJumpReleased?.Raise(); }
+        private void HandleSprintState(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onSprintStateChanged?.Raise(context.ReadValueAsButton()); }
+        private void HandleGrabState(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onGrabStateChanged?.Raise(context.ReadValueAsButton()); }
+        private void HandlePrimaryActionPressed(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onPrimaryActionPressed?.Raise(); }
+        private void HandlePrimaryActionReleased(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onPrimaryActionReleased?.Raise(); }
+        private void HandleMenuPressed(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onMenuPressed?.Raise(); }
+
+        /// <summary>
+        /// Local multi-instance testing: each window/process keeps simulating even when it isn't the
+        /// focused one (NetworkManager's Run In Background is on, so a host/client's connection survives
+        /// being alt-tabbed away from), and unlike keyboard/mouse - which the OS only ever delivers to
+        /// whichever window is focused - a physical gamepad's input reaches every running instance
+        /// regardless of which window has focus. Left unchecked, one gamepad drives whichever window last
+        /// read its state, including a window sitting in the background. Only gamepad input is filtered
+        /// here - keyboard/mouse don't need it, since the OS already scopes those correctly, and dropping
+        /// them here too would risk a held key never sending its "release" and leaving movement stuck on.
+        /// </summary>
+        private static bool ShouldIgnoreGamepadWhileUnfocused(InputAction.CallbackContext context)
+        {
+            return !Application.isFocused && context.control.device is Gamepad;
+        }
 
         #endregion
     }

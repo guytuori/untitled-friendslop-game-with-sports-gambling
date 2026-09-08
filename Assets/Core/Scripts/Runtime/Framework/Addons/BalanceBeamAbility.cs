@@ -109,6 +109,17 @@ namespace Blocks.Gameplay.Core
         private BalanceBeam m_CurrentBeam;
         private bool m_IsActive = true;
 
+        /// <summary>
+        /// +1 or -1: which sign to multiply the beam's own authored Forward by so that "forward" stick
+        /// input, and the locked on-beam facing, both match the direction the player was actually
+        /// facing at the moment they got on - not whatever direction FindLongAxis happened to build the
+        /// beam's transform.forward along. Set once in EnterBeam and held for the rest of that beam
+        /// traversal, so a mid-air 180 before landing correctly continues you toward whichever end
+        /// you're now facing rather than snapping you back onto the beam's baked-in direction. Landing
+        /// facing "wrong way" for what you intended is squarely on the player, per design.
+        /// </summary>
+        private float m_DirectionSign = 1f;
+
         private float m_Balance;
         private float m_GustDirection;
         private float m_GustTimer;
@@ -225,7 +236,7 @@ namespace Blocks.Gameplay.Core
         {
             float speed = m_Motor.IsSprinting ? m_Motor.moveSpeed : beamCarefulSpeed;
             float alongAmount = Mathf.Clamp(rawInput.y, -1f, 1f);
-            modifier.ArealVelocity = m_CurrentBeam.Forward * (alongAmount * speed);
+            modifier.ArealVelocity = m_CurrentBeam.Forward * (alongAmount * speed * m_DirectionSign);
 
             UpdateBalance(rawInput.x, Mathf.Abs(alongAmount) * speed);
 
@@ -264,14 +275,42 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void SnapToBeam()
         {
-            Vector3 snapped = m_CurrentBeam.GetSnapPosition(m_Motor.transform.position, m_Balance, out _, out bool withinBeam);
+            Vector3 snapped = m_CurrentBeam.GetSnapPosition(m_Motor.transform.position, m_Balance, out _, out bool withinBeam, out int exitEndSign);
 
             if (!withinBeam)
             {
+                BalanceBeam next = exitEndSign > 0 ? m_CurrentBeam.NextInChain : m_CurrentBeam.PreviousInChain;
+                if (next != null)
+                {
+                    EnterChainedBeam(next);
+                    return;
+                }
+
                 ExitBeam();
                 return;
             }
 
+            m_Motor.SetPosition(snapped, teleport: false);
+        }
+
+        /// <summary>
+        /// Hands off from one segment of a bent/multi-segment beam to the next (see BalanceBeam.NextInChain/
+        /// PreviousInChain and MapObstacleSetup.BuildBeam for why a beam gets split into a chain in the
+        /// first place). Unlike ExitBeam, this keeps IsOnBeam true, preserves the current balance value,
+        /// and never touches the re-entry cooldown - crossing a joint between two segments is meant to
+        /// feel like one continuous walk, not like falling off and waiting out reEntryCooldown.
+        /// </summary>
+        private void EnterChainedBeam(BalanceBeam next)
+        {
+            // Re-derive the travel direction from the OLD beam's own effective forward (beam.Forward
+            // flipped by m_DirectionSign), not the player's current facing - RotationOverride has been
+            // holding facing locked to the old segment's axis this whole frame, so reading facing here
+            // would just read that back rather than whichever way the player actually intended to go.
+            Vector3 travelDirWorld = m_CurrentBeam.Forward * m_DirectionSign;
+            m_CurrentBeam = next;
+            m_DirectionSign = Vector3.Dot(travelDirWorld, next.Forward) >= 0f ? 1f : -1f;
+
+            Vector3 snapped = next.GetSnapPosition(m_Motor.transform.position, m_Balance, out _, out _, out _);
             m_Motor.SetPosition(snapped, teleport: false);
         }
 
@@ -282,12 +321,17 @@ namespace Blocks.Gameplay.Core
             m_Balance = 0f;
             m_GustTimer = 0f;
 
-            Vector3 snapped = beam.GetSnapPosition(m_Motor.transform.position, m_Balance, out _, out _);
+            // Whichever end of the beam the player is currently facing is "forward" for this
+            // traversal - see m_DirectionSign's own doc comment. A dot product of exactly 0 (facing
+            // perfectly perpendicular to the beam) falls back to the beam's own authored direction.
+            m_DirectionSign = Vector3.Dot(m_Motor.transform.forward, beam.Forward) >= 0f ? 1f : -1f;
+
+            Vector3 snapped = beam.GetSnapPosition(m_Motor.transform.position, m_Balance, out _, out _, out _);
             m_Motor.SetPosition(snapped, teleport: false);
             m_Motor.SetVerticalVelocity(0f);
 
             m_Motor.RotationOverride = () => m_CurrentBeam != null
-                ? Quaternion.LookRotation(m_CurrentBeam.Forward, Vector3.up)
+                ? Quaternion.LookRotation(m_CurrentBeam.Forward * m_DirectionSign, Vector3.up)
                 : m_Motor.transform.rotation;
 
             SyncNetworkState();

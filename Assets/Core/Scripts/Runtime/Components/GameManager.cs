@@ -186,62 +186,82 @@ namespace Blocks.Gameplay.Core
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
 
+            StartCoroutine(SetupLocalPlayerWhenReady());
+        }
+
+        /// <summary>
+        /// A newly-connected client's own LocalClient.PlayerObject isn't always populated the instant
+        /// OnClientConnectedCallback fires locally. For the host this reference is normally already set
+        /// (its own player object spawns essentially instantly), but a joining client goes through a real
+        /// network round-trip first, so the reference can still be null for a frame or more right when its
+        /// own "connected" callback fires. The previous code checked once and silently bailed (just a
+        /// warning) if it wasn't ready yet - naming, spawn positioning and health restore all got skipped
+        /// for that client, most visibly as a joining player showing up nameless ("Player-N" fallback) on
+        /// the scoreboard. Retry for a few seconds instead of assuming the first check is enough - mirrors
+        /// CoreHUD.RefreshScoreboardUntilComplete's fix for the same class of race.
+        /// </summary>
+        private IEnumerator SetupLocalPlayerWhenReady()
+        {
+            const int maxAttempts = 20;
+            const float retryDelaySeconds = 0.25f;
+
+            NetworkObject localPlayer = null;
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                if (NetworkManager.Singleton == null || NetworkManager.Singleton.LocalClient == null) yield break;
+
+                localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject;
+                if (localPlayer != null) break;
+
+                yield return new WaitForSeconds(retryDelaySeconds);
+            }
+
+            if (localPlayer == null)
+            {
+                Debug.LogWarning("[GameManager] LocalClient.PlayerObject never became available. Cannot setup player.", this);
+                yield break;
+            }
+
             // Generate and assign player name based on client ID
             string playerPrefix = "Player";
             string playerNumber = NetworkManager.Singleton.LocalClient.ClientId.ToString();
             string playerName = playerPrefix + playerNumber;
 
-            if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient != null &&
-                NetworkManager.Singleton.LocalClient.PlayerObject != null)
+            if (localPlayer.TryGetComponent<CorePlayerState>(out var playerState))
             {
-                var playerState = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<CorePlayerState>();
-                if (playerState != null)
-                {
-                    playerState.SetPlayerName(playerName);
-                }
-                else
-                {
-                    Debug.LogWarning("[GameManager] CorePlayerState component not found on local player. Cannot set player name.", this);
-                }
+                playerState.SetPlayerName(playerName);
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] CorePlayerState component not found on local player. Cannot set player name.", this);
             }
 
-            // Setup player spawn position and health
-            if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient != null)
+            // Set spawn position and rotation based on client ID
+            if (localPlayer.TryGetComponent<CoreMovement>(out var movement))
             {
-                var localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject;
-                if (localPlayer == null)
+                Vector3 spawnPos = GetSpawnPosition(NetworkManager.Singleton.LocalClientId);
+                int index = GetSpawnIndex(NetworkManager.Singleton.LocalClientId);
+                if (index >= 0 && spawnPoints != null && spawnPoints.Count > index)
                 {
-                    Debug.LogWarning("[GameManager] LocalClient.PlayerObject is null. Cannot setup player.", this);
-                    return;
+                    movement.transform.rotation = spawnPoints[index].rotation;
                 }
 
-                // Set spawn position and rotation based on client ID
-                if (localPlayer.TryGetComponent<CoreMovement>(out var movement))
-                {
-                    Vector3 spawnPos = GetSpawnPosition(NetworkManager.Singleton.LocalClientId);
-                    int index = GetSpawnIndex(NetworkManager.Singleton.LocalClientId);
-                    if (index >= 0 && spawnPoints != null && spawnPoints.Count > index)
-                    {
-                        movement.transform.rotation = spawnPoints[index].rotation;
-                    }
+                movement.SetPosition(spawnPos);
+                movement.ResetMovementForces();
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] CoreMovement component not found on local player. Cannot set spawn position.", this);
+            }
 
-                    movement.SetPosition(spawnPos);
-                    movement.ResetMovementForces();
-                }
-                else
-                {
-                    Debug.LogWarning("[GameManager] CoreMovement component not found on local player. Cannot set spawn position.", this);
-                }
-
-                // Restore full health on spawn
-                if (localPlayer.TryGetComponent<CoreStatsHandler>(out var coreStats))
-                {
-                    coreStats.ModifyStat(StatKeys.Health, 100, NetworkManager.Singleton.LocalClientId, ModificationSource.Regeneration);
-                }
-                else
-                {
-                    Debug.LogWarning("[GameManager] CoreStatsHandler component not found on local player. Cannot restore health.", this);
-                }
+            // Restore full health on spawn
+            if (localPlayer.TryGetComponent<CoreStatsHandler>(out var coreStats))
+            {
+                coreStats.ModifyStat(StatKeys.Health, 100, NetworkManager.Singleton.LocalClientId, ModificationSource.Regeneration);
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] CoreStatsHandler component not found on local player. Cannot restore health.", this);
             }
         }
 

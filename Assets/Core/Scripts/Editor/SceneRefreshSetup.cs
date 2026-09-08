@@ -234,8 +234,8 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        // Keep in sync with MapObstacleSetup's own CheckerKeyword/RailKeyword/PoleKeyword constants.
-        private static readonly string[] ObstacleMaterialKeywords = { "checker", "bluecarpet", "pillar" };
+        // Keep in sync with MapObstacleSetup's own BalanceBeamKeyword/GrindRailKeyword/PoleKeyword constants.
+        private static readonly string[] ObstacleMaterialKeywords = { "balance_beam", "grind_rail", "pole" };
 
         private static bool HasObstacleMaterial(MeshRenderer meshRenderer)
         {

@@ -29,6 +29,31 @@ namespace Blocks.Gameplay.Core
         [Tooltip("How far past either end (in local, unscaled units) the player can still be considered 'on' the beam - gives a little grace right at the tips rather than an instant cutoff.")]
         [SerializeField] private float exitMargin = 0.35f;
 
+        [Header("Chain Links (set automatically by MapObstacleSetup for a bent/multi-segment beam)")]
+        [SerializeField] private BalanceBeam nextInChain;
+        [SerializeField] private BalanceBeam previousInChain;
+
+        /// <summary>
+        /// The next segment reached by continuing past this beam's local +Z ("far") end - null for a
+        /// standalone beam or the last segment of a chain. A single straight CapsuleCollider can't hug
+        /// a bent/dogleg run of balance_beam geometry without ballooning its radius to cover however far
+        /// the bend strays from a straight line (see MapObstacleSetup.BuildBeam), so a bent beam is built
+        /// as several straight segments chained together instead - see BalanceBeamAbility.EnterChainedBeam
+        /// for how the player is handed off across a joint without it reading as falling off the beam.
+        /// </summary>
+        public BalanceBeam NextInChain
+        {
+            get => nextInChain;
+            set => nextInChain = value;
+        }
+
+        /// <summary>The previous segment reached by continuing past this beam's local -Z ("near") end - null for a standalone beam or the first segment of a chain. See <see cref="NextInChain"/>.</summary>
+        public BalanceBeam PreviousInChain
+        {
+            get => previousInChain;
+            set => previousInChain = value;
+        }
+
         /// <summary>Half the beam's walkable length, in the beam's own local (unscaled) space.</summary>
         public float HalfLengthLocal { get; private set; }
 
@@ -91,7 +116,8 @@ namespace Blocks.Gameplay.Core
         /// <param name="lateralBalanceNormalized">-1..1 balance value; see <see cref="BalanceBeamAbility"/>.</param>
         /// <param name="progressNormalized">-1..1 position along the beam's length (clamped).</param>
         /// <param name="withinBeam">False once the projected point is past either end (beyond <see cref="exitMargin"/>) - the caller should release the player from the beam when this is false.</param>
-        public Vector3 GetSnapPosition(Vector3 worldPosition, float lateralBalanceNormalized, out float progressNormalized, out bool withinBeam)
+        /// <param name="exitEndSign">0 while withinBeam is true; otherwise +1 if the local +Z ("far") end was exceeded, -1 if the local -Z ("near") end was - tells the caller which of <see cref="NextInChain"/>/<see cref="PreviousInChain"/> to check for a seamless hand-off before giving up and releasing the player.</param>
+        public Vector3 GetSnapPosition(Vector3 worldPosition, float lateralBalanceNormalized, out float progressNormalized, out bool withinBeam, out int exitEndSign)
         {
             if (HalfLengthLocal <= 0f) ComputeDimensions();
 
@@ -99,6 +125,7 @@ namespace Blocks.Gameplay.Core
             float clampedZ = Mathf.Clamp(local.z, -HalfLengthLocal, HalfLengthLocal);
             progressNormalized = HalfLengthLocal > 0.0001f ? clampedZ / HalfLengthLocal : 0f;
             withinBeam = Mathf.Abs(local.z) <= HalfLengthLocal + exitMargin;
+            exitEndSign = withinBeam ? 0 : (local.z > 0f ? 1 : -1);
 
             float lateralX = Mathf.Clamp(lateralBalanceNormalized, -1f, 1f) * HalfWidthLocal * 0.8f;
             Vector3 snapLocal = new Vector3(lateralX, TopSurfaceLocalY, clampedZ);

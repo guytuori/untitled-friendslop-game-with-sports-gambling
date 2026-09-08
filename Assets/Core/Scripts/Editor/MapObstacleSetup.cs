@@ -6,44 +6,54 @@ namespace Blocks.Gameplay.Core
 {
     /// <summary>
     /// One-time setup helper that turns specific textured parts of an imported map's combined mesh
-    /// into gameplay obstacles: any geometry using a material whose name contains "checker" becomes
+    /// into gameplay obstacles: any geometry using a material whose name contains "balance_beam" becomes
     /// one or more <see cref="BalanceBeam"/>s, any geometry using a material whose name contains
-    /// "bluecarpet" becomes one or more <see cref="GrindRail"/>s, and any geometry using a material
-    /// whose name contains "pillar" becomes one or more <see cref="Pole"/>s (fireman's poles - see
+    /// "grind_rail" becomes one or more <see cref="GrindRail"/>s, and any geometry using a material
+    /// whose name contains "pole" becomes one or more <see cref="Pole"/>s (fireman's poles - see
     /// PoleGrabAbility).
     ///
     /// How it works: the target submesh's triangles are grouped into connected components (two
     /// triangles are considered connected if they share an edge - matched by rounded local-space
     /// vertex position, not shared vertex index, since Total Editor 3's export doesn't necessarily weld
     /// vertices between touching pieces of geometry). Each resulting connected component - typically
-    /// one physically contiguous run of the checkered/carpeted geometry, e.g. a chain of touching "bar"
-    /// shapes - becomes its own beam or rail. This mirrors how BalanceBeamCourseBuilder and
+    /// one physically contiguous run of the balance_beam/grind_rail geometry, e.g. a chain of touching
+    /// "bar" shapes - becomes its own beam or rail. This mirrors how BalanceBeamCourseBuilder and
     /// GrindRailCourseBuilder build their hand-authored test courses (see those classes, and
     /// BalanceBeam/GrindRail for the underlying mechanics), except the beam/rail placement, length and
     /// orientation are derived directly from the existing map geometry instead of being hand-authored.
     ///
     /// For each component:
-    /// - Balance beams: the two most-distant points define the beam's length and long axis; the
-    ///   farthest any point strays sideways from that axis defines its cross-section radius. A
-    ///   CapsuleCollider (direction = Z, matching BalanceBeam's expectations) plus a BalanceBeam
-    ///   component are added to a new child object positioned/oriented from that data - no visual mesh,
-    ///   since the map's own render geometry already shows the checkered strip. No flat collider is
-    ///   added or kept for this material (see MapColliderSetup) - the round capsule is the only thing
-    ///   holding the player up, same as the hand-built test course; a flat collider underneath would
-    ///   just let the player casually walk across it.
+    /// - Balance beams: points are bucketed along the component's long axis into a waypoint chain, the
+    ///   same technique used for grind rails just below - a straight beam collapses back to exactly two
+    ///   waypoints (i.e. one segment, same as this tool always built), but a bent/dogleg run of
+    ///   balance_beam geometry produces several. One CapsuleCollider (direction = Z, matching
+    ///   BalanceBeam's expectations) plus a BalanceBeam component are built per consecutive waypoint
+    ///   pair - no visual mesh, since the map's own render geometry already shows the balance_beam
+    ///   strip - sized by a single cross-section radius measured against the whole waypoint chain
+    ///   rather than a single straight line between the beam's two ends (see MaxDistanceToPolyline), so
+    ///   a bend doesn't force every segment into a comically oversized tube just to cover how far the
+    ///   bend strays from that line. Consecutive segments are linked via BalanceBeam.NextInChain/
+    ///   PreviousInChain so BalanceBeamAbility can hand the player off across a joint without it reading
+    ///   as falling off the beam. No flat collider is added or kept for this material (see
+    ///   MapColliderSetup) - the round capsule(s) are the only thing holding the player up, same as the
+    ///   hand-built test course; a flat collider underneath would just let the player casually walk
+    ///   across it.
     /// - Grind rails: points are bucketed along the component's long axis (roughly one waypoint every
     ///   RailWaypointSpacing map units) and averaged per bucket into a waypoint chain, so a component
     ///   that curves or steps up/down (not just a straight run) still produces a reasonably faithful
     ///   path rather than collapsing to a single straight line between its two ends. A GrindRail
-    ///   component is configured with that path - no collider at all, per GrindRail's own design.
+    ///   component is configured with that path and a single cross-section radius measured the same
+    ///   tighter way described above for balance beams (distance to the whole waypoint chain, not to a
+    ///   single straight line between the rail's two ends) - no collider at all, per GrindRail's own
+    ///   design.
     /// - Poles: same long-axis/cross-section analysis as beams, but oriented so the CapsuleCollider's
     ///   axis (direction = Y, matching Pole's expectations) points along whatever direction the
-    ///   component's long axis turned out to be - vertical for an upright pillar, but tilted geometry
+    ///   component's long axis turned out to be - vertical for an upright pole, but tilted geometry
     ///   would still work. A CapsuleCollider plus a Pole component are added to a new child object - no
-    ///   visual mesh, since the map's own render geometry already shows the pillar. The collider stays
+    ///   visual mesh, since the map's own render geometry already shows the pole. The collider stays
     ///   solid (see Pole's class summary for why that's compatible with PoleGrabAbility).
     ///
-    /// Multiple physically separate checker, bluecarpet or pillar regions on the map become multiple
+    /// Multiple physically separate balance_beam, grind_rail or pole regions on the map become multiple
     /// separate beams/rails/poles - for grind rails in particular this is the intended shape of the
     /// mechanic, not a limitation: see GrindRailCourseBuilder's own two-separate-rails-with-a-jump-gap
     /// course design, where snapping onto a *different* rail than the one you left is called out as
@@ -61,9 +71,9 @@ namespace Blocks.Gameplay.Core
     /// </summary>
     public static class MapObstacleSetup
     {
-        private const string CheckerKeyword = "checker";
-        private const string RailKeyword = "bluecarpet";
-        private const string PoleKeyword = "pillar";
+        private const string BalanceBeamKeyword = "balance_beam";
+        private const string GrindRailKeyword = "grind_rail";
+        private const string PoleKeyword = "pole";
         private const string BeamHolderName = "MapBalanceBeams";
         private const string RailHolderName = "MapGrindRails";
         private const string PoleHolderName = "MapPoles";
@@ -106,13 +116,13 @@ namespace Blocks.Gameplay.Core
             Mesh mesh = meshFilter.sharedMesh;
             Material[] materials = meshRenderer.sharedMaterials;
 
-            int beamSubmesh = FindSubmesh(materials, mesh.subMeshCount, CheckerKeyword);
-            int railSubmesh = FindSubmesh(materials, mesh.subMeshCount, RailKeyword);
+            int beamSubmesh = FindSubmesh(materials, mesh.subMeshCount, BalanceBeamKeyword);
+            int railSubmesh = FindSubmesh(materials, mesh.subMeshCount, GrindRailKeyword);
             int poleSubmesh = FindSubmesh(materials, mesh.subMeshCount, PoleKeyword);
 
             if (beamSubmesh < 0 && railSubmesh < 0 && poleSubmesh < 0)
             {
-                Debug.LogError($"[Friendslop] Couldn't find a submesh material containing '{CheckerKeyword}', '{RailKeyword}' or '{PoleKeyword}' on '{selected.name}'.");
+                Debug.LogError($"[Friendslop] Couldn't find a submesh material containing '{BalanceBeamKeyword}', '{GrindRailKeyword}' or '{PoleKeyword}' on '{selected.name}'.");
                 return;
             }
 
@@ -122,8 +132,8 @@ namespace Blocks.Gameplay.Core
             RemoveExisting(selected.transform, BeamHolderName);
             RemoveExisting(selected.transform, RailHolderName);
             RemoveExisting(selected.transform, PoleHolderName);
-            RemoveFlatCollider(selected.transform, CheckerKeyword);
-            RemoveFlatCollider(selected.transform, RailKeyword);
+            RemoveFlatCollider(selected.transform, BalanceBeamKeyword);
+            RemoveFlatCollider(selected.transform, GrindRailKeyword);
             RemoveFlatCollider(selected.transform, PoleKeyword);
 
             int beamsBuilt = 0;
@@ -180,7 +190,7 @@ namespace Blocks.Gameplay.Core
             Undo.CollapseUndoOperations(undoGroup);
             EditorUtility.SetDirty(selected);
 
-            Debug.Log($"[Friendslop] Built {beamsBuilt} balance beam(s) from '{CheckerKeyword}' geometry, {railsBuilt} grind rail(s) from '{RailKeyword}' geometry, and {polesBuilt} pole(s) from '{PoleKeyword}' geometry on '{selected.name}'. " +
+            Debug.Log($"[Friendslop] Built {beamsBuilt} balance beam(s) from '{BalanceBeamKeyword}' geometry, {railsBuilt} grind rail(s) from '{GrindRailKeyword}' geometry, and {polesBuilt} pole(s) from '{PoleKeyword}' geometry on '{selected.name}'. " +
                 "Make sure the player prefab has BalanceBeamAbility / GrindRailAbility / PoleGrabAbility on it (Friendslop > Add Balance Beam To .../ Add Grind Rail To .../ Add Pole Grab To Platformer/Core Player). Remember to save the scene.");
         }
 
@@ -311,33 +321,67 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Builds one balance beam from a connected component's triangles: a CapsuleCollider (direction
-        /// = Z, matching BalanceBeam's "local +Z = along beam" expectation) sized and oriented from the
-        /// component's own geometry, plus a BalanceBeam component. Positioned in `holder`'s local space,
-        /// which has an identity local transform relative to the map object, so local-space math on the
-        /// map mesh's own (untransformed) vertex positions lands in the right place without needing to
-        /// convert to world space at all.
+        /// Builds one balance beam - or, for a bent/dogleg run of balance_beam geometry, a chain of
+        /// several straight CapsuleCollider segments end-to-end - from a connected component's
+        /// triangles. Bucketing the component into a waypoint chain first (same technique BuildRail uses
+        /// for its own bends) and building one capsule per consecutive waypoint pair means each segment
+        /// only has to be as fat as the beam's own true cross-section (see MaxDistanceToPolyline)
+        /// instead of a single straight capsule inflating its radius to cover however far a bend strays
+        /// from the straight line between the component's two farthest points. A straight beam still
+        /// collapses to exactly one segment, same as before - BucketAlongAxis's own fallback returns
+        /// just the two extreme points when the beam is short enough that only one bucket fits.
+        /// Positioned in `holder`'s local space, which has an identity local transform relative to the
+        /// map object, so local-space math on the map mesh's own (untransformed) vertex positions lands
+        /// in the right place without needing to convert to world space at all.
         /// </summary>
         private static void BuildBeam(Transform holder, Vector3[] verts, int[] subTris, List<int> triIndices, int index)
         {
             List<Vector3> points = CollectPoints(verts, subTris, triIndices);
             FindLongAxis(points, out Vector3 extremeA, out Vector3 extremeB, out float length);
-            Vector3 center = (extremeA + extremeB) * 0.5f;
             Vector3 axis = length > 0.0001f ? (extremeB - extremeA) / length : Vector3.forward;
-            float radius = Mathf.Max(MaxSidewaysDistance(points, center, axis), MinCrossSectionRadius);
 
-            var root = new GameObject($"Beam_{index}");
-            Undo.RegisterCreatedObjectUndo(root, UndoName);
-            root.transform.SetParent(holder, false);
-            root.transform.localPosition = center;
-            root.transform.localRotation = LookRotationSafe(axis);
+            List<Vector3> waypoints = BucketAlongAxis(points, extremeA, axis, length);
+            if (waypoints.Count < 2)
+            {
+                waypoints = new List<Vector3> { extremeA, extremeB };
+            }
 
-            var capsule = root.AddComponent<CapsuleCollider>();
-            capsule.direction = 2; // Z - "along the beam", matching BalanceBeam's expectations.
-            capsule.radius = radius;
-            capsule.height = length;
+            float radius = Mathf.Max(MaxDistanceToPolyline(points, waypoints), MinCrossSectionRadius);
 
-            root.AddComponent<BalanceBeam>();
+            BalanceBeam previousSegment = null;
+            for (int i = 0; i < waypoints.Count - 1; i++)
+            {
+                Vector3 a = waypoints[i];
+                Vector3 b = waypoints[i + 1];
+                float segmentLength = Vector3.Distance(a, b);
+                if (segmentLength < 0.001f) continue;
+
+                Vector3 segmentAxis = (b - a) / segmentLength;
+                Vector3 segmentCenter = (a + b) * 0.5f;
+
+                var root = new GameObject(waypoints.Count > 2 ? $"Beam_{index}_{i}" : $"Beam_{index}");
+                Undo.RegisterCreatedObjectUndo(root, UndoName);
+                root.transform.SetParent(holder, false);
+                root.transform.localPosition = segmentCenter;
+                root.transform.localRotation = LookRotationSafe(segmentAxis);
+
+                var capsule = root.AddComponent<CapsuleCollider>();
+                capsule.direction = 2; // Z - "along the beam", matching BalanceBeam's expectations.
+                capsule.radius = radius;
+                capsule.height = segmentLength;
+
+                var segment = root.AddComponent<BalanceBeam>();
+
+                // Segment i's local +Z end lands exactly at waypoint b, which is also segment i+1's
+                // local -Z start (same shared point) - so linking them here is just "the segment built
+                // right before this one, if any" with no extra geometry lookup needed.
+                if (previousSegment != null)
+                {
+                    previousSegment.NextInChain = segment;
+                    segment.PreviousInChain = previousSegment;
+                }
+                previousSegment = segment;
+            }
         }
 
         /// <summary>
@@ -350,15 +394,19 @@ namespace Blocks.Gameplay.Core
         {
             List<Vector3> points = CollectPoints(verts, subTris, triIndices);
             FindLongAxis(points, out Vector3 extremeA, out Vector3 extremeB, out float length);
-            Vector3 center = (extremeA + extremeB) * 0.5f;
             Vector3 axis = length > 0.0001f ? (extremeB - extremeA) / length : Vector3.forward;
-            float radius = Mathf.Max(MaxSidewaysDistance(points, center, axis), MinCrossSectionRadius);
 
             List<Vector3> waypointsLocal = BucketAlongAxis(points, extremeA, axis, length);
             if (waypointsLocal.Count < 2)
             {
                 waypointsLocal = new List<Vector3> { extremeA, extremeB };
             }
+
+            // Measured against the whole waypoint chain rather than the single straight line between
+            // the rail's two ends (see MaxDistanceToPolyline) - a bent rail's interior points are close
+            // to the path that actually follows the bend, so this doesn't inflate the rider's height
+            // offset the way measuring straight-line cross-section would.
+            float radius = Mathf.Max(MaxDistanceToPolyline(points, waypointsLocal), MinCrossSectionRadius);
 
             var waypointsWorld = new Vector3[waypointsLocal.Count];
             for (int i = 0; i < waypointsLocal.Count; i++)
@@ -451,6 +499,38 @@ namespace Blocks.Gameplay.Core
                 if (side > maxSide) maxSide = side;
             }
             return maxSide;
+        }
+
+        /// <summary>
+        /// For every point, finds the closest point on the given polyline (e.g. the waypoint chain from
+        /// BucketAlongAxis) and returns the largest such perpendicular distance seen across all points -
+        /// a much tighter "cross-section radius" for a bent beam/rail than MaxSidewaysDistance's single
+        /// straight line between the component's two extreme ends, since a bend's own interior points
+        /// sit close to the polyline that actually follows the bend, not far from some ruler-straight
+        /// shortcut between its ends.
+        /// </summary>
+        private static float MaxDistanceToPolyline(List<Vector3> points, List<Vector3> polyline)
+        {
+            if (polyline.Count < 2) return 0f;
+
+            float maxDistSqr = 0f;
+            foreach (Vector3 p in points)
+            {
+                float closestSqr = float.MaxValue;
+                for (int i = 0; i < polyline.Count - 1; i++)
+                {
+                    Vector3 a = polyline[i];
+                    Vector3 b = polyline[i + 1];
+                    Vector3 ab = b - a;
+                    float lenSqr = ab.sqrMagnitude;
+                    float t = lenSqr > 0.0001f ? Mathf.Clamp01(Vector3.Dot(p - a, ab) / lenSqr) : 0f;
+                    Vector3 closest = a + ab * t;
+                    float distSqr = (p - closest).sqrMagnitude;
+                    if (distSqr < closestSqr) closestSqr = distSqr;
+                }
+                if (closestSqr > maxDistSqr) maxDistSqr = closestSqr;
+            }
+            return Mathf.Sqrt(maxDistSqr);
         }
 
         /// <summary>

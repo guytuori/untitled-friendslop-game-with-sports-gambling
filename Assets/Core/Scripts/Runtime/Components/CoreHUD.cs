@@ -810,6 +810,15 @@ namespace Blocks.Gameplay.Core
                 m_ChallengeBetStatusLabel.style.display = DisplayStyle.None;
             }
 
+            // GameManager locks and hides the cursor for normal gameplay (mouse-look movement). That's
+            // exactly what made the betting buttons uninteractable: a locked cursor doesn't move around
+            // the screen, so a click always lands wherever the (invisible) cursor already was - never on
+            // a button. Give the cursor back while the overlay is up, and re-lock it once betting closes
+            // so movement/look return to normal. Fully qualified because UnityEngine.UIElements (used
+            // throughout this file) also declares its own Cursor type for USS cursor styling.
+            UnityEngine.Cursor.lockState = isActive ? CursorLockMode.None : CursorLockMode.Locked;
+            UnityEngine.Cursor.visible = isActive;
+
             RefreshChallengeOverlay();
         }
 
