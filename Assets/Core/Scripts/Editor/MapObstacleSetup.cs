@@ -8,9 +8,11 @@ namespace Blocks.Gameplay.Core
     /// One-time setup helper that turns specific textured parts of an imported map's combined mesh
     /// into gameplay obstacles: any geometry using a material whose name contains "balance_beam" becomes
     /// one or more <see cref="BalanceBeam"/>s, any geometry using a material whose name contains
-    /// "grind_rail" becomes one or more <see cref="GrindRail"/>s, and any geometry using a material
+    /// "grind_rail" becomes one or more <see cref="GrindRail"/>s, any geometry using a material
     /// whose name contains "pole" becomes one or more <see cref="Pole"/>s (fireman's poles - see
-    /// PoleGrabAbility).
+    /// PoleGrabAbility), and any geometry using a material whose name contains "player_spawn_point"
+    /// becomes one or more <see cref="PlayerSpawnPoint"/> markers (see GameManager, which picks
+    /// randomly among them to place a player on spawn/respawn).
     ///
     /// How it works: the target submesh's triangles are grouped into connected components (two
     /// triangles are considered connected if they share an edge - matched by rounded local-space
@@ -52,31 +54,39 @@ namespace Blocks.Gameplay.Core
     ///   would still work. A CapsuleCollider plus a Pole component are added to a new child object - no
     ///   visual mesh, since the map's own render geometry already shows the pole. The collider stays
     ///   solid (see Pole's class summary for why that's compatible with PoleGrabAbility).
+    /// - Player spawn points: no long-axis/waypoint analysis at all - each connected component just
+    ///   becomes a single bare marker GameObject (a <see cref="PlayerSpawnPoint"/>, no collider, no
+    ///   visual mesh) positioned at the component's centroid. A spawn tile doesn't need a shape or
+    ///   orientation the way a beam/rail/pole does, just a point in space for GameManager to place a
+    ///   player at. See MapColliderSetup for how the "player_spawn_point" tiles themselves are made
+    ///   invisible and non-solid.
     ///
-    /// Multiple physically separate balance_beam, grind_rail or pole regions on the map become multiple
-    /// separate beams/rails/poles - for grind rails in particular this is the intended shape of the
-    /// mechanic, not a limitation: see GrindRailCourseBuilder's own two-separate-rails-with-a-jump-gap
-    /// course design, where snapping onto a *different* rail than the one you left is called out as
-    /// the intended way to play.
+    /// Multiple physically separate balance_beam, grind_rail, pole or player_spawn_point regions on the
+    /// map become multiple separate beams/rails/poles/spawn points - for grind rails in particular this
+    /// is the intended shape of the mechanic, not a limitation: see GrindRailCourseBuilder's own
+    /// two-separate-rails-with-a-jump-gap course design, where snapping onto a *different* rail than the
+    /// one you left is called out as the intended way to play.
     ///
     /// Usage: select the map's GameObject instance in the Hierarchy (the same one MapColliderSetup
     /// targets) and run Friendslop > Build Balance Beams And Grind Rails And Poles From Map. Run
     /// MapColliderSetup either before or after this tool - it already knows to skip flat colliders for
-    /// these three materials, in either order. Make sure the player prefab has BalanceBeamAbility /
+    /// these materials, in either order. Make sure the player prefab has BalanceBeamAbility /
     /// GrindRailAbility / PoleGrabAbility on it too (Friendslop > Add Balance Beam To .../ Add Grind
     /// Rail To .../ Add Pole Grab To ...) or the new beams/rails/poles won't do anything.
     ///
-    /// Safe to re-run: the previous run's "MapBalanceBeams"/"MapGrindRails"/"MapPoles" holder objects
-    /// are destroyed and rebuilt from scratch each time.
+    /// Safe to re-run: the previous run's "MapBalanceBeams"/"MapGrindRails"/"MapPoles"/
+    /// "MapPlayerSpawnPoints" holder objects are destroyed and rebuilt from scratch each time.
     /// </summary>
     public static class MapObstacleSetup
     {
         private const string BalanceBeamKeyword = "balance_beam";
         private const string GrindRailKeyword = "grind_rail";
         private const string PoleKeyword = "pole";
+        private const string PlayerSpawnPointKeyword = "player_spawn_point";
         private const string BeamHolderName = "MapBalanceBeams";
         private const string RailHolderName = "MapGrindRails";
         private const string PoleHolderName = "MapPoles";
+        private const string SpawnPointHolderName = "MapPlayerSpawnPoints";
         private const string ColliderChildPrefix = "Collider_"; // matches MapColliderSetup's naming
         private const string UndoName = "Build Map Balance Beams And Grind Rails And Poles";
 
@@ -119,10 +129,11 @@ namespace Blocks.Gameplay.Core
             int beamSubmesh = FindSubmesh(materials, mesh.subMeshCount, BalanceBeamKeyword);
             int railSubmesh = FindSubmesh(materials, mesh.subMeshCount, GrindRailKeyword);
             int poleSubmesh = FindSubmesh(materials, mesh.subMeshCount, PoleKeyword);
+            int spawnSubmesh = FindSubmesh(materials, mesh.subMeshCount, PlayerSpawnPointKeyword);
 
-            if (beamSubmesh < 0 && railSubmesh < 0 && poleSubmesh < 0)
+            if (beamSubmesh < 0 && railSubmesh < 0 && poleSubmesh < 0 && spawnSubmesh < 0)
             {
-                Debug.LogError($"[Friendslop] Couldn't find a submesh material containing '{BalanceBeamKeyword}', '{GrindRailKeyword}' or '{PoleKeyword}' on '{selected.name}'.");
+                Debug.LogError($"[Friendslop] Couldn't find a submesh material containing '{BalanceBeamKeyword}', '{GrindRailKeyword}', '{PoleKeyword}' or '{PlayerSpawnPointKeyword}' on '{selected.name}'.");
                 return;
             }
 
@@ -132,9 +143,11 @@ namespace Blocks.Gameplay.Core
             RemoveExisting(selected.transform, BeamHolderName);
             RemoveExisting(selected.transform, RailHolderName);
             RemoveExisting(selected.transform, PoleHolderName);
+            RemoveExisting(selected.transform, SpawnPointHolderName);
             RemoveFlatCollider(selected.transform, BalanceBeamKeyword);
             RemoveFlatCollider(selected.transform, GrindRailKeyword);
             RemoveFlatCollider(selected.transform, PoleKeyword);
+            RemoveFlatCollider(selected.transform, PlayerSpawnPointKeyword);
 
             int beamsBuilt = 0;
             if (beamSubmesh >= 0)
@@ -187,11 +200,29 @@ namespace Blocks.Gameplay.Core
                 }
             }
 
+            int spawnPointsBuilt = 0;
+            if (spawnSubmesh >= 0)
+            {
+                var spawnHolder = new GameObject(SpawnPointHolderName);
+                Undo.RegisterCreatedObjectUndo(spawnHolder, UndoName);
+                spawnHolder.transform.SetParent(selected.transform, false);
+
+                Vector3[] verts = mesh.vertices;
+                int[] subTris = mesh.GetTriangles(spawnSubmesh);
+                foreach (List<int> component in FindConnectedComponents(verts, subTris))
+                {
+                    if (component.Count < MinTrianglesPerComponent) continue;
+                    BuildSpawnPoint(spawnHolder.transform, verts, subTris, component, spawnPointsBuilt);
+                    spawnPointsBuilt++;
+                }
+            }
+
             Undo.CollapseUndoOperations(undoGroup);
             EditorUtility.SetDirty(selected);
 
-            Debug.Log($"[Friendslop] Built {beamsBuilt} balance beam(s) from '{BalanceBeamKeyword}' geometry, {railsBuilt} grind rail(s) from '{GrindRailKeyword}' geometry, and {polesBuilt} pole(s) from '{PoleKeyword}' geometry on '{selected.name}'. " +
-                "Make sure the player prefab has BalanceBeamAbility / GrindRailAbility / PoleGrabAbility on it (Friendslop > Add Balance Beam To .../ Add Grind Rail To .../ Add Pole Grab To Platformer/Core Player). Remember to save the scene.");
+            Debug.Log($"[Friendslop] Built {beamsBuilt} balance beam(s) from '{BalanceBeamKeyword}' geometry, {railsBuilt} grind rail(s) from '{GrindRailKeyword}' geometry, {polesBuilt} pole(s) from '{PoleKeyword}' geometry, and {spawnPointsBuilt} player spawn point(s) from '{PlayerSpawnPointKeyword}' geometry on '{selected.name}'. " +
+                "Make sure the player prefab has BalanceBeamAbility / GrindRailAbility / PoleGrabAbility on it (Friendslop > Add Balance Beam To .../ Add Grind Rail To .../ Add Pole Grab To Platformer/Core Player). Remember to save the scene." +
+                (spawnPointsBuilt > 0 ? " GameManager auto-discovers PlayerSpawnPoint markers at runtime, so no manual wiring is needed for these." : ""));
         }
 
         [MenuItem("Friendslop/Remove Map Balance Beams And Grind Rails And Poles")]
@@ -207,8 +238,9 @@ namespace Blocks.Gameplay.Core
             RemoveExisting(selected.transform, BeamHolderName);
             RemoveExisting(selected.transform, RailHolderName);
             RemoveExisting(selected.transform, PoleHolderName);
+            RemoveExisting(selected.transform, SpawnPointHolderName);
             EditorUtility.SetDirty(selected);
-            Debug.Log($"[Friendslop] Removed balance beams, grind rails and poles from '{selected.name}'. Re-run Friendslop > Split Selected Map Collider By Material afterward if you want ordinary flat collision back on that geometry.");
+            Debug.Log($"[Friendslop] Removed balance beams, grind rails, poles and player spawn points from '{selected.name}'. Re-run Friendslop > Split Selected Map Collider By Material afterward if you want ordinary flat collision back on that geometry.");
         }
 
         private static int FindSubmesh(Material[] materials, int subMeshCount, string keyword)
@@ -451,6 +483,35 @@ namespace Blocks.Gameplay.Core
             capsule.height = length;
 
             root.AddComponent<Pole>();
+        }
+
+        /// <summary>
+        /// Builds one player spawn point marker from a connected component's triangles: a single bare
+        /// GameObject with a <see cref="PlayerSpawnPoint"/> component, positioned at the component's
+        /// centroid - no collider, no visual mesh, no orientation analysis, since a spawn point only
+        /// needs a location for GameManager to place a player at (see that class). Positioned in
+        /// `holder`'s local space, same as BuildBeam/BuildPole - identity local transform relative to
+        /// the map object, so local-space math on the map mesh's own vertices lands in the right place.
+        /// Deliberately left at the tile's own (possibly slightly-above-floor) height rather than being
+        /// projected down onto the ground, so a spawned player drops the remaining distance naturally.
+        /// </summary>
+        private static void BuildSpawnPoint(Transform holder, Vector3[] verts, int[] subTris, List<int> triIndices, int index)
+        {
+            List<Vector3> points = CollectPoints(verts, subTris, triIndices);
+
+            Vector3 centroid = Vector3.zero;
+            foreach (Vector3 p in points)
+            {
+                centroid += p;
+            }
+            centroid /= points.Count;
+
+            var root = new GameObject($"SpawnPoint_{index}");
+            Undo.RegisterCreatedObjectUndo(root, UndoName);
+            root.transform.SetParent(holder, false);
+            root.transform.localPosition = centroid;
+
+            root.AddComponent<PlayerSpawnPoint>();
         }
 
         private static List<Vector3> CollectPoints(Vector3[] verts, int[] subTris, List<int> triIndices)

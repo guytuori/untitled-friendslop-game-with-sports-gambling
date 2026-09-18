@@ -1,0 +1,85 @@
+fileFormatVersion: 2
+guid: 7d57d006f9d2bc547a0968da2afc4079
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 804e1ce4c496647cfa3f1a1134187c71, type: 3}
+  _removeEmptyRootObjects: 1
+  _scaleFactor: 1
+  _deduplicateResources: 0
+  _deduplicatedStatistics:
+    meshCountBefore: 0
+    meshCountAfter: 0
+    textureCountBefore: 0
+    textureCountAfter: 0
+  _maximumLod: 300
+  _readWriteEnabled: 1
+  _generateColliders: 0
+  _addColliders: 2
+  _swapUvs: 0
+  _generateLightmapUVs: 0
+  _importBlendShapeNames: 1
+  _blendShapeFrameWeight:
+    _option: 0
+    _multiplier: 1
+  _importNormals: 0
+  _importTangents: 0
+  _importCamera: 2
+  _importAnimations: 2
+  _mecanimHumanoidFlip: 0
+  _addAnimatorComponent: 0
+  _animationLoopTime: 1
+  _animationLoopPose: 0
+  _animationLoopSettingsPerClip: 0
+  _importMaterials: 1
+  _enableGpuInstancing: 0
+  _texturesReadWriteEnabled: 1
+  _generateMipMaps: 1
+  _useSceneNameIdentifier: 1
+  _textureCompression: -50
+  _gltfAsset: '<b>Generator: </b>Total Editor 3
+
+    <b>Version: </b>2.0
+
+    
+
+    <b>Extras:
+    </b>
+
+'
+  optimizeGameObjects: 0
+  materials:
+  - {fileID: -4803956742655768420, guid: 7d57d006f9d2bc547a0968da2afc4079, type: 3}
+  - {fileID: -7819029938145919140, guid: 7d57d006f9d2bc547a0968da2afc4079, type: 3}
+  - {fileID: -3961981927597909650, guid: 7d57d006f9d2bc547a0968da2afc4079, type: 3}
+  - {fileID: -3256749838499237489, guid: 7d57d006f9d2bc547a0968da2afc4079, type: 3}
+  textures:
+  - {fileID: 2800000, guid: 7e4c0291712d499448ca435bdce44c39, type: 3}
+  - {fileID: 2800000, guid: 2209b75917458a44f94edb20bf1c0b90, type: 3}
+  - {fileID: 2800000, guid: 848e4765f70277041b62a7979d8a1b72, type: 3}
+  - {fileID: 2800000, guid: 1e7fe4f9a80506c4dabb989e90d4f947, type: 3}
+  hasSceneData: 1
+  hasAnimationData: 0
+  hasMaterialData: 1
+  hasTextureData: 1
+  animations: []
+  _extensions: []
+  _textures:
+  - texture: {fileID: 2800000, guid: 7e4c0291712d499448ca435bdce44c39, type: 3}
+    shouldBeLinear: 0
+    shouldBeNormalMap: 0
+  - texture: {fileID: 2800000, guid: 2209b75917458a44f94edb20bf1c0b90, type: 3}
+    shouldBeLinear: 0
+    shouldBeNormalMap: 0
+  - texture: {fileID: 2800000, guid: 848e4765f70277041b62a7979d8a1b72, type: 3}
+    shouldBeLinear: 0
+    shouldBeNormalMap: 0
+  - texture: {fileID: 2800000, guid: 1e7fe4f9a80506c4dabb989e90d4f947, type: 3}
+    shouldBeLinear: 0
+    shouldBeNormalMap: 0
+  _mainAssetIdentifier: scenes/Scene
+  _importPlugins: []

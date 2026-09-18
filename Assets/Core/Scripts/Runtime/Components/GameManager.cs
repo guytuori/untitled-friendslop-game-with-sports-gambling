@@ -44,7 +44,10 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private bool autoRespawn = true;
 
         [Header("Spawning")]
-        [Tooltip("List of Transforms to use as spawn points.")]
+        [Tooltip("List of Transforms to use as spawn points. Auto-populated at startup from every " +
+            "PlayerSpawnPoint marker found in the scene (see RefreshSpawnPointsFromMarkers) - only used " +
+            "as-is, unreplaced, if no PlayerSpawnPoint markers exist yet. Every spawn (initial and " +
+            "respawn) picks randomly among these.")]
         [SerializeField] private List<Transform> spawnPoints;
 
         [Header("Events")]
@@ -103,6 +106,11 @@ namespace Blocks.Gameplay.Core
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            // Pick up every PlayerSpawnPoint marker in the scene (see MapObstacleSetup, which generates
+            // one per "player_spawn_point" map tile/cluster), so the spawn point set stays in sync with
+            // the map without needing to hand-wire the Inspector list every time a map changes.
+            RefreshSpawnPointsFromMarkers();
 
             // Validate required references
             if (sessionUI == null)
@@ -236,14 +244,14 @@ namespace Blocks.Gameplay.Core
                 Debug.LogWarning("[GameManager] CorePlayerState component not found on local player. Cannot set player name.", this);
             }
 
-            // Set spawn position and rotation based on client ID
+            // Set spawn position and rotation - a random spawn point, same as respawning.
             if (localPlayer.TryGetComponent<CoreMovement>(out var movement))
             {
-                Vector3 spawnPos = GetSpawnPosition(NetworkManager.Singleton.LocalClientId);
-                int index = GetSpawnIndex(NetworkManager.Singleton.LocalClientId);
-                if (index >= 0 && spawnPoints != null && spawnPoints.Count > index)
+                int index = GetRandomSpawnIndex();
+                Vector3 spawnPos = GetSpawnPositionForIndex(index);
+                if (TryGetSpawnTransform(index, out Transform spawnTransform))
                 {
-                    movement.transform.rotation = spawnPoints[index].rotation;
+                    movement.transform.rotation = spawnTransform.rotation;
                 }
 
                 movement.SetPosition(spawnPos);
@@ -312,14 +320,14 @@ namespace Blocks.Gameplay.Core
                 return;
             }
 
-            // Set spawn position and rotation based on client ID
+            // Set spawn position and rotation - a random spawn point, same as respawning.
             if (localPlayer.TryGetComponent<CoreMovement>(out var movement))
             {
-                Vector3 spawnPos = GetSpawnPosition(NetworkManager.Singleton.LocalClientId);
-                int index = GetSpawnIndex(NetworkManager.Singleton.LocalClientId);
-                if (index >= 0 && spawnPoints != null && spawnPoints.Count > index)
+                int index = GetRandomSpawnIndex();
+                Vector3 spawnPos = GetSpawnPositionForIndex(index);
+                if (TryGetSpawnTransform(index, out Transform spawnTransform))
                 {
-                    movement.transform.rotation = spawnPoints[index].rotation;
+                    movement.transform.rotation = spawnTransform.rotation;
                 }
 
                 movement.SetPosition(spawnPos);
@@ -456,15 +464,15 @@ namespace Blocks.Gameplay.Core
                 onRespawnStatus.Raise(new RespawnStatusPayload { playerId = localId, message = "", subtext = "", showSubtext = false });
             }
 
-            // Respawn at random spawn point (different from initial spawn which uses client ID modulo)
+            // Respawn at a random spawn point, same as the initial spawn.
             var coreMovement = playerState.GetComponent<CoreMovement>();
             if (coreMovement != null)
             {
                 int spawnIndex = GetRandomSpawnIndex();
-                if (spawnIndex >= 0 && spawnPoints != null && spawnPoints.Count > spawnIndex)
+                if (TryGetSpawnTransform(spawnIndex, out Transform spawnTransform))
                 {
-                    coreMovement.transform.rotation = spawnPoints[spawnIndex].rotation;
-                    coreMovement.SetPosition(spawnPoints[spawnIndex].position);
+                    coreMovement.transform.rotation = spawnTransform.rotation;
+                    coreMovement.SetPosition(spawnTransform.position);
                 }
                 else
                 {
@@ -513,50 +521,93 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Calculates the spawn index based on ClientID modulo spawn point count.
-        /// Used for initial spawning to distribute players evenly across spawn points.
+        /// Finds every <see cref="PlayerSpawnPoint"/> marker currently in the scene and uses them as the
+        /// spawn point set, overwriting whatever was hand-wired in the Inspector - keeps spawnPoints in
+        /// sync with the map automatically, since PlayerSpawnPoint markers are generated straight from
+        /// each map's "player_spawn_point" tiles (see MapObstacleSetup.BuildSpawnPoint). Leaves the
+        /// Inspector-assigned list untouched if no markers are found, so a scene that hasn't been
+        /// migrated to markers yet keeps working exactly as before.
+        ///
+        /// Called from GetRandomSpawnIndex (i.e. right before every spawn/respawn), not just once from
+        /// Awake - GameManager is a DontDestroyOnLoad singleton that can Awake in a boot/lobby scene
+        /// well before the actual map (and its PlayerSpawnPoint markers) has loaded, so an Awake-only
+        /// refresh would find zero markers and silently keep whatever stale list was serialized on the
+        /// GameManager instance (including entries pointing at spawn objects that have since been
+        /// deleted from the map). Refreshing at spawn time instead means this always reflects whatever
+        /// map is actually loaded when a player needs a spawn position.
         /// </summary>
-        /// <param name="clientId">The client ID to calculate the spawn index for.</param>
-        /// <returns>The spawn point index, or -1 if no spawn points are configured.</returns>
-        private int GetSpawnIndex(ulong clientId)
+        private void RefreshSpawnPointsFromMarkers()
         {
-            if (spawnPoints == null || spawnPoints.Count == 0) return -1;
-            return (int)(clientId % (ulong)spawnPoints.Count);
+            var markers = FindObjectsByType<PlayerSpawnPoint>(FindObjectsSortMode.None);
+            if (markers == null || markers.Length == 0)
+            {
+                return;
+            }
+
+            spawnPoints = new List<Transform>(markers.Length);
+            foreach (PlayerSpawnPoint marker in markers)
+            {
+                if (marker != null)
+                {
+                    spawnPoints.Add(marker.transform);
+                }
+            }
         }
 
         /// <summary>
-        /// Returns a random spawn index for respawning.
-        /// Used for respawning to add variety and prevent spawn camping.
+        /// Returns a random spawn index. Used for every spawn - initial and respawn alike - so players
+        /// don't all funnel through the same handful of spots and spawn camping is harder. Refreshes the
+        /// spawn point set from any PlayerSpawnPoint markers in the scene first (see
+        /// RefreshSpawnPointsFromMarkers) so this always reflects whatever map is currently loaded.
         /// </summary>
         /// <returns>A random spawn point index, or -1 if no spawn points are configured.</returns>
         private int GetRandomSpawnIndex()
         {
+            RefreshSpawnPointsFromMarkers();
             if (spawnPoints == null || spawnPoints.Count == 0) return -1;
             return Random.Range(0, spawnPoints.Count);
         }
 
         /// <summary>
-        /// Returns the world position for the given ClientID's assigned spawn point.
-        /// Defaults to Vector3.zero if no spawn points are set.
+        /// Safely resolves the spawn point Transform at the given index, without throwing on an invalid
+        /// index or on a list entry that was never assigned (or was assigned to something since
+        /// destroyed) - either of those used to surface as an UnassignedReferenceException/
+        /// NullReferenceException that aborted spawn positioning partway through, leaving the player
+        /// wherever they happened to already be instead of at a fallback position.
         /// </summary>
-        /// <param name="clientId">The client ID to get the spawn position for.</param>
-        /// <returns>The world position of the assigned spawn point.</returns>
-        private Vector3 GetSpawnPosition(ulong clientId)
+        /// <param name="index">The spawn point index to resolve.</param>
+        /// <param name="spawnTransform">The resolved Transform, or null if unavailable.</param>
+        /// <returns>True if a usable spawn point Transform was found.</returns>
+        private bool TryGetSpawnTransform(int index, out Transform spawnTransform)
         {
-            int index = GetSpawnIndex(clientId);
-            if (index == -1)
+            spawnTransform = null;
+            if (index < 0 || spawnPoints == null || spawnPoints.Count <= index)
             {
-                Debug.LogWarning("[GameManager] No spawn points configured. Using Vector3.zero as spawn position.", this);
+                return false;
+            }
+
+            spawnTransform = spawnPoints[index];
+            return spawnTransform != null;
+        }
+
+        /// <summary>
+        /// Returns the world position of the spawn point at the given index. Defaults to Vector3.zero if
+        /// the index is invalid, no spawn points are configured, or the entry at that index is unusable
+        /// (see TryGetSpawnTransform). Deliberately just the marker's raw position with no
+        /// ground-snapping - PlayerSpawnPoint markers sit a little above the true floor by design, so a
+        /// spawned player drops the remaining distance naturally under gravity.
+        /// </summary>
+        /// <param name="index">The spawn point index to get the position for.</param>
+        /// <returns>The world position of the spawn point at the given index.</returns>
+        private Vector3 GetSpawnPositionForIndex(int index)
+        {
+            if (!TryGetSpawnTransform(index, out Transform spawnTransform))
+            {
+                Debug.LogWarning($"[GameManager] No usable spawn point at index {index}. Using Vector3.zero as spawn position.", this);
                 return Vector3.zero;
             }
 
-            if (spawnPoints[index] == null)
-            {
-                Debug.LogError($"[GameManager] Spawn point at index {index} is null. Using Vector3.zero as spawn position.", this);
-                return Vector3.zero;
-            }
-
-            return spawnPoints[index].position;
+            return spawnTransform.position;
         }
 
         /// <summary>

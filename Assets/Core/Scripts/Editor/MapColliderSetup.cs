@@ -20,16 +20,26 @@ namespace Blocks.Gameplay.Core
     /// with no PhysicMaterial (Unity's project default friction), so non-ice parts of the map behave
     /// exactly as before.
     ///
-    /// Submeshes whose material name contains "balance_beam", "grind_rail" or "pole" are skipped
-    /// entirely - those are balance beams / grind rails / fireman's poles (see MapObstacleSetup), and
-    /// all three mechanics deliberately want no flat walkable collider there: a balance beam needs a
-    /// round CapsuleCollider with no flat spot, a grind rail wants no physical collider at all (it's a
-    /// proximity-snap mechanic), and a pole needs its own vertical CapsuleCollider (see Pole) rather
-    /// than whatever flat shape this tool would otherwise build from the pole's render mesh. A flat
-    /// MeshCollider generated here would just let the player casually walk across a beam/rail, or give
-    /// a pole a lumpy, non-cylindrical collision shape instead of the clean capsule PoleGrabAbility
-    /// expects. Run MapObstacleSetup AFTER this tool (or re-run this tool after MapObstacleSetup
+    /// Submeshes whose material name contains "balance_beam", "grind_rail", "pole" or
+    /// "player_spawn_point" are skipped entirely - the first three are balance beams / grind rails /
+    /// fireman's poles (see MapObstacleSetup), and all three mechanics deliberately want no flat
+    /// walkable collider there: a balance beam needs a round CapsuleCollider with no flat spot, a
+    /// grind rail wants no physical collider at all (it's a proximity-snap mechanic), and a pole needs
+    /// its own vertical CapsuleCollider (see Pole) rather than whatever flat shape this tool would
+    /// otherwise build from the pole's render mesh. A flat MeshCollider generated here would just let
+    /// the player casually walk across a beam/rail, or give a pole a lumpy, non-cylindrical collision
+    /// shape instead of the clean capsule PoleGrabAbility expects. "player_spawn_point" tiles want no
+    /// collider at all either - they're not something a player should ever stand or walk on, just a
+    /// marker for where GameManager places a player on spawn (see MapObstacleSetup's
+    /// PlayerSpawnPoint handling), so they get skipped here too, in addition to being made invisible
+    /// (see below). Run MapObstacleSetup AFTER this tool (or re-run this tool after MapObstacleSetup
     /// if you rebuild colliders later - it'll still correctly skip them).
+    ///
+    /// A submesh whose material name contains "player_spawn_point" also has its material swapped to a
+    /// fully transparent one (created once at InvisibleMaterialPath and reused thereafter - see
+    /// EnsureInvisibleMaterial), so the tile itself is invisible in the finished map instead of showing
+    /// its placeholder floor texture. Combined with the no-collider treatment above, this makes the
+    /// tile purely a positional marker with no visible or physical presence.
     ///
     /// A submesh whose material name contains "wall_climb" is treated differently: unlike the three
     /// above, it's NOT skipped - it still gets an ordinary flat MeshCollider like any other wall, since
@@ -69,8 +79,12 @@ namespace Blocks.Gameplay.Core
         // Keep in sync with WallClimbAbility/ClimbableWall's own expectations.
         private const string WallClimbKeyword = "wall_climb";
 
+        // Keep in sync with MapObstacleSetup's PlayerSpawnPoint handling.
+        private const string PlayerSpawnPointKeyword = "player_spawn_point";
+        private const string InvisibleMaterialPath = "Assets/Maps/M_SpawnPointInvisible.mat";
+
         // Keep in sync with MapObstacleSetup's own keyword constants.
-        private static readonly string[] NoFlatColliderKeywords = { "balance_beam", "grind_rail", "pole" };
+        private static readonly string[] NoFlatColliderKeywords = { "balance_beam", "grind_rail", "pole", PlayerSpawnPointKeyword };
 
         // Keep in sync with ChallengeZone/ChallengeZoneTrigger's own expectations.
         private const string StartKeyword = "start";
@@ -141,10 +155,14 @@ namespace Blocks.Gameplay.Core
                 Object.DestroyImmediate(wholeCollider);
             }
 
+            Material invisibleMaterial = EnsureInvisibleMaterial();
+            bool materialsChanged = false;
+
             int created = 0;
             int iceSubmeshes = 0;
             int climbableSubmeshes = 0;
             int challengeSubmeshes = 0;
+            int spawnPointSubmeshes = 0;
             int skipped = 0;
             ChallengeZone challengeZone = null;
             for (int sub = 0; sub < sourceMesh.subMeshCount; sub++)
@@ -152,6 +170,14 @@ namespace Blocks.Gameplay.Core
                 Material mat = sub < materials.Length ? materials[sub] : null;
                 string matName = mat != null ? mat.name : $"submesh{sub}";
                 string matNameLower = matName.ToLowerInvariant();
+
+                bool isSpawnPoint = matNameLower.Contains(PlayerSpawnPointKeyword);
+                if (isSpawnPoint && invisibleMaterial != null && sub < materials.Length && materials[sub] != invisibleMaterial)
+                {
+                    materials[sub] = invisibleMaterial;
+                    materialsChanged = true;
+                    spawnPointSubmeshes++;
+                }
 
                 bool skipFlatCollider = false;
                 foreach (string keyword in NoFlatColliderKeywords)
@@ -209,10 +235,16 @@ namespace Blocks.Gameplay.Core
                 created++;
             }
 
+            if (materialsChanged)
+            {
+                meshRenderer.sharedMaterials = materials;
+            }
+
             EditorUtility.SetDirty(selected);
-            Debug.Log($"[Friendslop] Split '{selected.name}' into {created} per-material colliders ({iceSubmeshes} using '{icePhysicMaterial.name}', {climbableSubmeshes} tagged '{nameof(ClimbableWall)}' from '{WallClimbKeyword}' material, {challengeSubmeshes} wired up as challenge start/finish triggers, {skipped} skipped as balance-beam/grind-rail/pole material - see MapObstacleSetup). Remember to save the scene." +
+            Debug.Log($"[Friendslop] Split '{selected.name}' into {created} per-material colliders ({iceSubmeshes} using '{icePhysicMaterial.name}', {climbableSubmeshes} tagged '{nameof(ClimbableWall)}' from '{WallClimbKeyword}' material, {challengeSubmeshes} wired up as challenge start/finish triggers, {spawnPointSubmeshes} '{PlayerSpawnPointKeyword}' tile(s) made invisible, {skipped} skipped as balance-beam/grind-rail/pole/player_spawn_point material - see MapObstacleSetup). Remember to save the scene." +
                 (climbableSubmeshes > 0 ? " Make sure the player prefab has WallClimbAbility on it too, and that its wallLayers includes whatever layer these colliders are on." : "") +
-                (challengeSubmeshes > 0 ? $" Check '{selected.name}''s new ChallengeZone component for its ChallengeDefinition asset and tweak its name/points/pars." : ""));
+                (challengeSubmeshes > 0 ? $" Check '{selected.name}''s new ChallengeZone component for its ChallengeDefinition asset and tweak its name/points/pars." : "") +
+                (spawnPointSubmeshes > 0 ? " Run Friendslop > Build Balance Beams And Grind Rails And Poles From Map (or Refresh Everything From Assets) afterward so PlayerSpawnPoint markers get created for these tiles." : ""));
         }
 
         /// <summary>
@@ -253,6 +285,72 @@ namespace Blocks.Gameplay.Core
             }
 
             return zone;
+        }
+
+        /// <summary>
+        /// Gets or creates the fully transparent Material used to hide "player_spawn_point" tiles,
+        /// created once at InvisibleMaterialPath and reused on every later run - the same create-once
+        /// pattern EnsureChallengeZone uses for its ChallengeDefinition asset. Handles both URP (this
+        /// project's render pipeline) and the built-in Standard shader as a fallback, in case URP isn't
+        /// available for some reason when this runs.
+        /// </summary>
+        private static Material EnsureInvisibleMaterial()
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(InvisibleMaterialPath);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            bool isUrp = shader != null;
+            if (shader == null)
+            {
+                shader = Shader.Find("Standard");
+            }
+
+            if (shader == null)
+            {
+                Debug.LogError("[Friendslop] Couldn't find a URP Lit or Standard shader to build the invisible spawn point material - player_spawn_point tiles will keep their placeholder texture.");
+                return null;
+            }
+
+            var material = new Material(shader) { name = "M_SpawnPointInvisible" };
+            Color transparent = new Color(1f, 1f, 1f, 0f);
+
+            if (isUrp)
+            {
+                material.SetFloat("_Surface", 1f); // 1 = Transparent
+                material.SetFloat("_Blend", 0f);    // 0 = Alpha
+                material.SetFloat("_ZWrite", 0f);
+                material.SetOverrideTag("RenderType", "Transparent");
+                material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                material.SetColor("_BaseColor", transparent);
+            }
+            else
+            {
+                material.SetFloat("_Mode", 3f); // 3 = Transparent
+                material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                material.SetInt("_ZWrite", 0);
+                material.DisableKeyword("_ALPHATEST_ON");
+                material.EnableKeyword("_ALPHABLEND_ON");
+                material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                material.color = transparent;
+            }
+
+            material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+            if (!AssetDatabase.IsValidFolder("Assets/Maps"))
+            {
+                Debug.LogWarning("[Friendslop] 'Assets/Maps' folder not found - creating the invisible spawn point material there anyway.");
+            }
+
+            AssetDatabase.CreateAsset(material, InvisibleMaterialPath);
+            AssetDatabase.SaveAssets();
+
+            Debug.Log($"[Friendslop] Created '{InvisibleMaterialPath}' for invisible player_spawn_point tiles.");
+            return material;
         }
 
         /// <summary>
