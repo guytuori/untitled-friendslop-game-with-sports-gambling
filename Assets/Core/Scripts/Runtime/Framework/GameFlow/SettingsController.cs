@@ -18,18 +18,19 @@ namespace Blocks.Gameplay.Core
     /// Back returns to <see cref="mainMenuSceneName"/> - same as pressing Esc or the gamepad's South
     /// (bottom-face) button, via the raw poll in Update() below.
     ///
-    /// CAVEAT on that gamepad shortcut: this project's UI EventSystem uses Unity's stock
-    /// InputSystemUIInputModule actions asset, which binds Submit to gamepad South too (see
-    /// MainMenuController's gamepad-navigation comment - this is a different actions asset than the
-    /// project's own GameplayInputSystem_Actions). That means pressing South while Graphics, Audio, or
-    /// Change Keybindings has focus fires BOTH this scene's "South = Back" shortcut and the UI module's
-    /// own Submit on the focused button, in the same frame - so a gamepad player pressing South to pick
-    /// Graphics/Audio/Change Keybindings gets sent straight back to the Main Menu right alongside (or
-    /// instead of) actually activating it. This is implemented literally as requested - South mapped to
-    /// Back, matching the user's own controller labeling of South as "B" - flagging it here because it
-    /// makes gamepad-only selection of the other three buttons effectively unusable until it's resolved,
-    /// e.g. by rebinding Submit off of South for this scene, or moving this shortcut to a button that
-    /// isn't already Submit (gamepad East is free - it's already bound to Cancel, not Submit).
+    /// RESOLVED COLLISION: this scene's South-is-Back shortcut used to collide with gamepad Submit, since
+    /// Unity's stock InputSystemUIInputModule actions asset binds Submit to gamepad South by default -
+    /// backwards from this project's actual Nintendo-style pad convention (A/East=confirm, B/South=cancel).
+    /// Pressing South while Graphics, Audio, or Change Keybindings had focus used to fire BOTH this
+    /// scene's "South = Back" shortcut and the UI module's own Submit on the focused button in the same
+    /// frame, bouncing a gamepad player straight back to Main Menu instead of (or alongside) actually
+    /// activating the button - including Change Keybindings itself. Fixed by GamepadUIBindingFix.Apply()
+    /// (called in Awake below), which overrides Submit's gamepad binding to East and Cancel's to South at
+    /// runtime - see that class for the full explanation and why it's a runtime override rather than a
+    /// fork of the shared stock asset (guid ca9f5fa95ffab41fb9a615ab714db018). With Submit off of South,
+    /// pressing South now only ever triggers this scene's own Back shortcut (plus the UI module's Cancel
+    /// action, which is a no-op on a plain Button) - no more double-fire, and gamepad players can select
+    /// Graphics/Audio/Change Keybindings normally.
     ///
     /// Every button plays a click sound the same way MainMenuController's do - see that class's summary
     /// for the PlayClipAtPoint/DontDestroyOnLoad caveat, which applies here too.
@@ -49,7 +50,7 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Scene to load when Change Keybindings is clicked.")]
         [SerializeField] private string keybindingsSceneName = "ChangeKeybindings";
 
-        [Tooltip("Scene to load when Back is clicked, or when Esc/gamepad South is pressed - see the class summary's caveat about South.")]
+        [Tooltip("Scene to load when Back is clicked, or when Esc/gamepad South is pressed.")]
         [SerializeField] private string mainMenuSceneName = "MainMenu";
 
         [Tooltip("Played when Graphics, Audio, or Change Keybindings is selected.")]
@@ -60,6 +61,10 @@ namespace Blocks.Gameplay.Core
 
         private void Awake()
         {
+            // See the class summary's "RESOLVED COLLISION" note - this is what actually fixes the
+            // South-is-both-Back-and-Submit collision.
+            GamepadUIBindingFix.Apply();
+
             VisualElement root = GetComponent<UIDocument>().rootVisualElement;
             BuildUI(root);
         }
@@ -144,8 +149,7 @@ namespace Blocks.Gameplay.Core
 
         private void Update()
         {
-            // Esc/gamepad-South shortcut for Back - see the class summary's caveat about this colliding
-            // with Submit on gamepad South.
+            // Esc/gamepad-South shortcut for Back.
             bool backShortcutPressed =
                 (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) ||
                 (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame);
@@ -175,7 +179,23 @@ namespace Blocks.Gameplay.Core
 
         private void OnChangeKeybindingsClicked()
         {
+            // ChangeKeybindingsController shows only the control scheme matching whatever device
+            // actually triggered this click - a raw poll of the gamepad's buttons at the moment the
+            // click handler runs, since a mouse click or keyboard-Enter Submit won't have any of them
+            // pressed this frame. Set before the scene loads, since it's a static field ChangeKeybindings
+            // reads in its own Awake().
+            ChangeKeybindingsController.EnteredViaGamepad = WasTriggeredByGamepad();
             SceneManager.LoadScene(keybindingsSceneName);
+        }
+
+        private static bool WasTriggeredByGamepad()
+        {
+            Gamepad pad = Gamepad.current;
+            if (pad == null) return false;
+
+            return pad.buttonSouth.wasPressedThisFrame || pad.buttonEast.wasPressedThisFrame ||
+                   pad.buttonNorth.wasPressedThisFrame || pad.buttonWest.wasPressedThisFrame ||
+                   pad.startButton.wasPressedThisFrame;
         }
 
         private void OnBackClicked()

@@ -67,6 +67,13 @@ namespace Blocks.Gameplay.Core
 
         private void Awake()
         {
+            // Keeps gamepad Submit/Cancel on this scene's EventSystem matching the project's actual
+            // Nintendo-style pad convention (A/East=confirm, B/South=cancel) instead of Unity's stock
+            // Xbox-oriented defaults - see GamepadUIBindingFix for the full explanation. Applied on every
+            // GameFlow screen with its own EventSystem for consistency, even though MainMenu doesn't have
+            // a South-shortcut collision to fix the way Settings does.
+            GamepadUIBindingFix.Apply();
+
             VisualElement root = GetComponent<UIDocument>().rootVisualElement;
             BuildUI(root);
         }

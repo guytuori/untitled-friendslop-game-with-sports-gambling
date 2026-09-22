@@ -230,6 +230,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.ChangeKeybindingsController
   titleImage: {fileID: 2800000, guid: a6c66037b0d4c464f887ac0bb4232b9d, type: 3}
   settingsSceneName: Settings
+  selectSound: {fileID: 8300000, guid: 94cf81bf6cc94189874acf02a7153b02, type: 3}
   cancelSound: {fileID: 8300000, guid: 5d86e8758d304cdfb08984ec18e3857e, type: 3}
 --- !u!114 &1831101766
 MonoBehaviour:
