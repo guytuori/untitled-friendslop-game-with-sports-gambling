@@ -32,7 +32,7 @@ namespace Blocks.Gameplay.Core
         [Header("Air Control")]
         [Tooltip("How much influence input has in the air. 0 = no control, 1 = full control.")]
         [Range(0f, 1f)]
-        [SerializeField] private float airControl = 0.5f;
+        [SerializeField] private float airControl = 1;
 
         [Tooltip("How fast the character can turn in the air.")]
         [SerializeField] private float airRotationSpeed = 5f;

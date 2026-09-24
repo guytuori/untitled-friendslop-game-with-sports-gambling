@@ -247,7 +247,11 @@ namespace Blocks.Gameplay.Core
             WallNormal = wallNormal;
             IsClimbing = true;
             m_Motor.SetVerticalVelocity(0f);
-            m_Motor.RotationOverride = () => Quaternion.LookRotation(-WallNormal, Vector3.up);
+            //NOTE: I think the user should maintain their orientation when wall grabbing
+            //starting the wall movement is when the override should kick it, otherwise it should
+            //just feel like a quick spiderman stick
+            //m_Motor.RotationOverride = () => Quaternion.LookRotation(-WallNormal, Vector3.up);
+            m_Motor.RotationOverride = () => Quaternion.LookRotation(transform.forward, Vector3.up);
         }
 
         private void ExitClimb()

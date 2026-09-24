@@ -20,7 +20,7 @@ namespace Blocks.Gameplay.Core
     /// Built and configured entirely at runtime by GrindRailCourseBuilder via <see cref="Configure"/>
     /// - there's no Inspector authoring workflow for this yet.
     /// </summary>
-     
+     [ExecuteInEditMode]
     public class GrindRail : MonoBehaviour
     {
         [Tooltip("World-space points defining the rail's path, in order. Needs at least 2.")]
@@ -31,6 +31,7 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("How far past either end (in arc-length meters) the player can still be considered 'on' the rail before it releases them - same idea as BalanceBeam's exitMargin.")]
         [SerializeField] private float exitMargin = 0.35f;
+        [SerializeField] private bool isTube;
 
         private float[] m_CumulativeLength;
         private float[] m_TurnAngleAtWaypoint;
@@ -118,12 +119,45 @@ namespace Blocks.Gameplay.Core
             }
             waypoints = generatedPoints.ToArray();
         }
+       
+
+        public void GenerateCirclePointsXZ(int pointCount = 16,float width = 25 )
+        {
+            Vector3 centerPosition = transform.position;
+            List<Vector3> points = new List<Vector3>();
+            float angleStep =  720f / pointCount;
+            int count = 0;
+            for (int i = 0; i < pointCount; i++)
+            {
+                float currentAngle = i * angleStep;
+                float angleInRadians = currentAngle * Mathf.Deg2Rad;
+
+                // Calculate local X and Z offsets
+                float x = Mathf.Cos(angleInRadians) * radius;
+                float z = Mathf.Sin(angleInRadians) * radius;
+
+                Vector3 point = centerPosition + new Vector3(x * width,  z * width, count * 2);
+                points.Add(point);
+                count++;
+            }
+            waypoints = points.ToArray();
+        }
 
         private void OnEnable()
         {
             s_ActiveRails.Add(this);
             if (waypoints == null || waypoints.Length == 0)
-            { GenerateWaypoints(transform,1); }
+            { 
+             
+                if (isTube)
+                {
+                    GenerateCirclePointsXZ();
+                }
+                else 
+                {
+                    GenerateWaypoints(transform, 1);
+                }
+            }
         }
 
         private void OnDisable()

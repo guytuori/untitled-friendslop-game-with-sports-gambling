@@ -15,7 +15,7 @@ namespace Blocks.Gameplay.Core
         [Tooltip("The height of the double jump.")]
         [SerializeField] private float doubleJumpHeight = 2.0f;
         [Tooltip("Optional stamina cost for the double jump.")]
-        [SerializeField] private float staminaCost = 0f;
+        [SerializeField] private float staminaCost = 2f;
 
         [Header("Input Events")]
         [Tooltip("Event raised when the jump button is pressed.")]
@@ -24,6 +24,8 @@ namespace Blocks.Gameplay.Core
         private CorePlayerManager m_PlayerManager;
         private CoreMovement m_CoreMovement;
         private CoreStatsHandler m_CoreStats;
+
+        private int m_doubleJumpedCount;
         private bool m_HasDoubleJumped;
         private bool m_IsActive = true;
 
@@ -33,6 +35,7 @@ namespace Blocks.Gameplay.Core
 
         public void Initialize(CorePlayerManager playerManager)
         {
+            staminaCost = 2f;
             m_PlayerManager = playerManager;
             m_CoreMovement = playerManager.CoreMovement;
             m_CoreStats = playerManager.CoreStats;
@@ -101,7 +104,8 @@ namespace Blocks.Gameplay.Core
             if (m_CoreMovement == null) return;
 
             // Only allow double jump if airborne and haven't jumped yet
-            if (!m_CoreMovement.IsGrounded && !m_HasDoubleJumped)
+            //&& !m_HasDoubleJumped
+            if (!m_CoreMovement.IsGrounded )
             {
                 AttemptDoubleJump();
             }
@@ -112,7 +116,7 @@ namespace Blocks.Gameplay.Core
             // Check stamina if needed
             if (staminaCost > 0f && m_CoreStats != null)
             {
-                if (!m_CoreStats.TryConsumeStat(StatKeys.Stamina, staminaCost, OwnerClientId))
+                if (!m_CoreStats.TryConsumeStat(StatKeys.Stamina, staminaCost * m_doubleJumpedCount, OwnerClientId))
                 {
                     return;
                 }
@@ -124,14 +128,15 @@ namespace Blocks.Gameplay.Core
         private void PerformDoubleJump()
         {
             m_HasDoubleJumped = true;
-
+            m_doubleJumpedCount++;
             // Calculate jump velocity: v = sqrt(2 * g * h)
             // Note: Gravity is negative, so we multiply by -2
             float jumpVelocity = Mathf.Sqrt(doubleJumpHeight * -2f * m_CoreMovement.gravity);
 
             // Apply velocity directly
+            
+            m_CoreMovement.ApplyExternalForce(m_CoreMovement.transform.forward * (1 + m_doubleJumpedCount),ForceMode.Impulse);
             m_CoreMovement.SetVerticalVelocity(jumpVelocity);
-
             // Reset any downward force/gravity accumulation if needed, though SetVerticalVelocity handles the main part
         }
 
@@ -140,6 +145,7 @@ namespace Blocks.Gameplay.Core
             if (isGrounded)
             {
                 m_HasDoubleJumped = false;
+                m_doubleJumpedCount = 0;
             }
         }
 
