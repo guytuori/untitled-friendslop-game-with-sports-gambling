@@ -41,11 +41,34 @@ namespace Blocks.Gameplay.Core
         public string WagerSelect = "rightShoulder";
     }
 
+    /// <summary>
+    /// The Audio Settings screen's four sliders (Master, Music, Sound Effects, Voice), each an int 0-10
+    /// representing 0%-100% in 10% steps - i.e. the 11 notches from the spec, with the slider's raw
+    /// integer value directly being "tens of a percent" (7 == 70%). All default to 10 (100%), so a fresh
+    /// install plays at full volume until the player turns something down.
+    ///
+    /// Music/SoundEffects/Voice apply only to sounds explicitly tagged with the matching AudioCategory
+    /// when they're played (see AudioVolumeService) - NOT by detecting which folder a clip's source asset
+    /// lives in. Unity doesn't retain an AudioClip's original import folder at runtime in a built player,
+    /// so there's no API to check "did this come from Assets/Music" the way the spec's wording literally
+    /// describes; explicit per-clip tagging at the call site is the closest achievable equivalent, and is
+    /// what AudioSettingsController/AudioVolumeService actually implement.
+    /// </summary>
+    [Serializable]
+    public class AudioSettingsData
+    {
+        public int MasterVolume = 10;
+        public int MusicVolume = 10;
+        public int SoundEffectsVolume = 10;
+        public int VoiceVolume = 10;
+    }
+
     [Serializable]
     public class InputBindingsData
     {
         public KeyboardBindings Keyboard = new KeyboardBindings();
         public GamepadBindings Gamepad = new GamepadBindings();
+        public AudioSettingsData Audio = new AudioSettingsData();
     }
 
     /// <summary>

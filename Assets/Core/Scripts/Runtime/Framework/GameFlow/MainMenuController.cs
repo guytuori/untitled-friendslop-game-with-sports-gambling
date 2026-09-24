@@ -19,11 +19,13 @@ namespace Blocks.Gameplay.Core
     /// gamepad navigation has nothing to move from without a starting point).
     ///
     /// Every button plays a click sound (<see cref="selectSound"/> or <see cref="cancelSound"/>) via
-    /// AudioSource.PlayClipAtPoint - a one-shot fire-and-forget clip, not a persistent AudioSource. That
-    /// temporary GameObject isn't marked DontDestroyOnLoad, so a sound triggered right before this
-    /// button's own scene load (Settings, or Host once connected) can get cut short by the unload; this
-    /// hasn't been flagged as an issue yet but would need a small delay-before-load, or a persistent
-    /// DontDestroyOnLoad AudioSource, to fully fix if it becomes noticeable.
+    /// AudioVolumeService.PlayOneShot (AudioCategory.SoundEffects) - a thin wrapper around
+    /// AudioSource.PlayClipAtPoint that applies the Audio Settings screen's Master/SoundEffects sliders,
+    /// still a one-shot fire-and-forget clip rather than a persistent AudioSource. That temporary
+    /// GameObject isn't marked DontDestroyOnLoad, so a sound triggered right before this button's own
+    /// scene load (Settings, or Host once connected) can get cut short by the unload; this hasn't been
+    /// flagged as an issue yet but would need a small delay-before-load, or a persistent DontDestroyOnLoad
+    /// AudioSource, to fully fix if it becomes noticeable.
     ///
     /// For that call to have anything to talk to, this scene needs its own GameNetworkManager - unlike
     /// the test scenes, this one doesn't come with the gameplay content that normally carries a
@@ -145,7 +147,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (clickSound != null)
                 {
-                    AudioSource.PlayClipAtPoint(clickSound, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.SoundEffects, Vector3.zero);
                 }
                 onClick();
             })

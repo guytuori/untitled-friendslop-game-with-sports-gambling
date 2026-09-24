@@ -21,6 +21,9 @@ EditorBuildSettings:
     path: Assets/Core/Scenes/ChangeKeybindings.unity
     guid: 8292fabf67744114b95c2a3853538cc7
   - enabled: 1
+    path: Assets/Core/Scenes/AudioSettings.unity
+    guid: 240a5fe0d884473eaec6882868ee8777
+  - enabled: 1
     path: Assets/Core/Scenes/[BB] Core.unity
     guid: 5492879da6a8a4759a6862bcc1e31e6e
   - enabled: 1

@@ -348,7 +348,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (clickSound != null)
                 {
-                    AudioSource.PlayClipAtPoint(clickSound, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.SoundEffects, Vector3.zero);
                 }
                 onClick();
             })
@@ -379,7 +379,7 @@ namespace Blocks.Gameplay.Core
 
             if (selectSound != null)
             {
-                AudioSource.PlayClipAtPoint(selectSound, Vector3.zero);
+                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.SoundEffects, Vector3.zero);
             }
 
             m_AwaitingRebindCommand = commandKey;
@@ -747,7 +747,7 @@ namespace Blocks.Gameplay.Core
 
             if (selectSound != null)
             {
-                AudioSource.PlayClipAtPoint(selectSound, Vector3.zero);
+                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.SoundEffects, Vector3.zero);
             }
 
             // Clears every override this screen could have applied to the real gameplay actions,

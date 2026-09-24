@@ -12,11 +12,12 @@ namespace Blocks.Gameplay.Core
     /// that size), over a black background, with the menu buttons stacked in the bottom-right corner
     /// instead of centered.
     ///
-    /// Buttons are Graphics / Audio / Change Keybindings / Back. Graphics and Audio don't do anything
-    /// yet - they just log that they were clicked, as placeholders until there's an actual
-    /// graphics/audio options panel to show. Change Keybindings loads <see cref="keybindingsSceneName"/>.
-    /// Back returns to <see cref="mainMenuSceneName"/> - same as pressing Esc or the gamepad's South
-    /// (bottom-face) button, via the raw poll in Update() below.
+    /// Buttons are Graphics / Audio / Change Keybindings / Back. Graphics doesn't do anything yet - it
+    /// just logs that it was clicked, as a placeholder until there's an actual graphics options panel to
+    /// show. Audio loads <see cref="audioSettingsSceneName"/> (see AudioSettingsController) and Change
+    /// Keybindings loads <see cref="keybindingsSceneName"/>. Back returns to
+    /// <see cref="mainMenuSceneName"/> - same as pressing Esc or the gamepad's South (bottom-face)
+    /// button, via the raw poll in Update() below.
     ///
     /// RESOLVED COLLISION: this scene's South-is-Back shortcut used to collide with gamepad Submit, since
     /// Unity's stock InputSystemUIInputModule actions asset binds Submit to gamepad South by default -
@@ -49,6 +50,9 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("Scene to load when Change Keybindings is clicked.")]
         [SerializeField] private string keybindingsSceneName = "ChangeKeybindings";
+
+        [Tooltip("Scene to load when Audio is clicked.")]
+        [SerializeField] private string audioSettingsSceneName = "AudioSettings";
 
         [Tooltip("Scene to load when Back is clicked, or when Esc/gamepad South is pressed.")]
         [SerializeField] private string mainMenuSceneName = "MainMenu";
@@ -116,14 +120,14 @@ namespace Blocks.Gameplay.Core
         private static readonly Color UnfocusedBackground = new Color(0.12f, 0.12f, 0.12f);
         private static readonly Color UnfocusedText = new Color(0.5f, 0.5f, 0.5f);
 
-        /// <summary>Same click-sound wrapper as MainMenuController.MakeButton - see that class for why.</summary>
+        /// <summary>Same click-sound wrapper as MainMenuController.MakeButton - see that class for why, now routed through AudioVolumeService so the Audio Settings sliders affect it.</summary>
         private static Button MakeButton(string text, System.Action onClick, AudioClip clickSound)
         {
             var button = new Button(() =>
             {
                 if (clickSound != null)
                 {
-                    AudioSource.PlayClipAtPoint(clickSound, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.SoundEffects, Vector3.zero);
                 }
                 onClick();
             })
@@ -158,7 +162,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (cancelSound != null)
                 {
-                    AudioSource.PlayClipAtPoint(cancelSound, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(cancelSound, AudioCategory.SoundEffects, Vector3.zero);
                 }
                 OnBackClicked();
             }
@@ -173,8 +177,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnAudioClicked()
         {
-            // No audio options panel yet - same placeholder purpose as OnGraphicsClicked above.
-            Debug.Log("[Settings] Audio selected.");
+            SceneManager.LoadScene(audioSettingsSceneName);
         }
 
         private void OnChangeKeybindingsClicked()
