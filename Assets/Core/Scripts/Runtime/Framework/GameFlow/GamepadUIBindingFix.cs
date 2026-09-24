@@ -31,6 +31,23 @@ namespace Blocks.Gameplay.Core
     /// </summary>
     public static class GamepadUIBindingFix
     {
+        /// <summary>
+        /// The bare gamepad control name Submit is bound to after Apply() - "A" in this project's
+        /// Nintendo-style convention. Named here (rather than inlined below) so the mapping has one
+        /// place to change. Note this only governs UI navigation (menus) - it's a completely separate
+        /// InputActionAsset from GameplayInputSystem_Actions, so a player is still free to rebind any
+        /// gameplay command (Jump, Grab, etc. - see ChangeKeybindingsController) onto East/West/South
+        /// without that ever affecting what Submit does in a menu, or vice versa.
+        /// </summary>
+        public const string SubmitControl = "buttonEast";
+
+        /// <summary>
+        /// The bare gamepad control name Cancel is bound to after Apply() - "B" in this project's
+        /// Nintendo-style convention. Same purpose and independence from gameplay bindings as
+        /// <see cref="SubmitControl"/> above.
+        /// </summary>
+        public const string CancelControl = "buttonSouth";
+
         public static void Apply()
         {
             var module = Object.FindFirstObjectByType<InputSystemUIInputModule>();
@@ -38,8 +55,8 @@ namespace Blocks.Gameplay.Core
 
             // Swap: Submit moves off South and onto East (the project's "A"), Cancel moves off East and
             // onto South (the project's "B") - matching real Nintendo-pad confirm/cancel convention.
-            OverrideGamepadBinding(module.submit.action, "<Gamepad>/buttonEast");
-            OverrideGamepadBinding(module.cancel.action, "<Gamepad>/buttonSouth");
+            OverrideGamepadBinding(module.submit.action, $"<Gamepad>/{SubmitControl}");
+            OverrideGamepadBinding(module.cancel.action, $"<Gamepad>/{CancelControl}");
         }
 
         /// <summary>

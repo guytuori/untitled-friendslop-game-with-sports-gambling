@@ -24,6 +24,22 @@ namespace Blocks.Gameplay.Core
     /// left or right stick moving past a deadzone and completely ignores button presses, since Move is
     /// inherently a 2D stick command, not a single button.
     ///
+    /// MENU NAVIGATION STAYS FIXED (gamepad only): entering a row's rebind mode and backing out of this
+    /// screen always mean Submit (East/"A") and Cancel (South/"B") respectively, no matter what the
+    /// player rebinds Jump/Grab/etc. to via the rows below - so A and B remain fully assignable to any
+    /// gameplay command here, same as every other button. That's not a coincidence that needs enforcing
+    /// in this class: Submit/Cancel live on the separate stock UI actions asset GamepadUIBindingFix
+    /// controls, entirely independent of GameplayInputSystem_Actions (the asset these rows actually
+    /// rebind) - so a player setting, say, Jump to East never touches what Submit is bound to, and this
+    /// screen's own navigation can't drift regardless of what's rebound below.
+    ///
+    /// The Submit press that activates a row's Button (mouse click, keyboard Enter/Space, or gamepad
+    /// East) is still "just pressed" on the very frame BeginRebind runs on - polling for a capture that
+    /// same frame would immediately grab that same press as the new binding, before the player's let go
+    /// of it. m_RebindStartedFrame records which frame BeginRebind ran on so Update can skip polling for
+    /// exactly that one frame - see Update for why one frame is always enough regardless of how long the
+    /// button is then held.
+    ///
     /// While awaiting a rebind, this temporarily sets EventSystem.sendNavigationEvents to false - without
     /// that, the exact same physical input being captured (a stick push, a gamepad button) would
     /// simultaneously also move UI focus or re-submit the row being rebound, since the scene's own
@@ -66,9 +82,16 @@ namespace Blocks.Gameplay.Core
     /// clicked - Back without saving discards whatever was changed this visit, the usual settings-screen
     /// convention. The same applies to real overrides: they take effect on gameplay immediately (since
     /// they're applied live to the shared asset as each row is rebound), but only persist past this
-    /// process if Save Changes is clicked before leaving. Both action buttons are also disabled while a
-    /// rebind capture is in progress, so an accidental mouse click on Save/Back can't interrupt a capture
-    /// that's mid-flight.
+    /// process if Save Changes is clicked before leaving. All three action buttons (Restore Defaults,
+    /// Save Changes, Back) are disabled while a rebind capture is in progress, so an accidental mouse
+    /// click can't interrupt a capture that's mid-flight.
+    ///
+    /// Restore Defaults (above Save Changes, above Back) resets BOTH control schemes' bindings - real and
+    /// cosmetic - back to their defaults in one click, regardless of which scheme this visit is showing:
+    /// clicking it while looking at the keyboard layout also resets the gamepad bindings the player isn't
+    /// currently looking at, and vice versa. Like every other rebind here, it only touches the in-memory
+    /// working copy - it's still just a working change until Save Changes is clicked. See
+    /// OnRestoreDefaultsClicked for how each half (real vs cosmetic) is actually reset.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class ChangeKeybindingsController : MonoBehaviour
@@ -97,8 +120,10 @@ namespace Blocks.Gameplay.Core
         private GameplayInputSystem_Actions m_GameplayActions;
         private bool m_UseGamepad;
         private string m_AwaitingRebindCommand;
+        private int m_RebindStartedFrame = -1;
         private readonly Dictionary<string, Button> m_RowButtons = new Dictionary<string, Button>();
         private Button m_FirstFocusable;
+        private Button m_RestoreDefaultsButton;
         private Button m_SaveButton;
         private Button m_BackButton;
 
@@ -183,8 +208,8 @@ namespace Blocks.Gameplay.Core
                 AddRow(list, "OPEN MENU", "OpenMenu");
             }
 
-            // Same absolutely-positioned bottom-right column as the other GameFlow screens, with Save
-            // Changes added above Back.
+            // Same absolutely-positioned bottom-right column as the other GameFlow screens, with Restore
+            // Defaults and Save Changes added above Back (Restore Defaults on top, per spec).
             var buttonColumn = new VisualElement();
             buttonColumn.style.position = Position.Absolute;
             buttonColumn.style.right = 40;
@@ -192,11 +217,19 @@ namespace Blocks.Gameplay.Core
             buttonColumn.style.flexDirection = FlexDirection.Column;
             buttonColumn.style.alignItems = Align.FlexEnd;
 
+            m_RestoreDefaultsButton = MakeActionButton("Restore Defaults", OnRestoreDefaultsClicked, selectSound);
+            buttonColumn.Add(m_RestoreDefaultsButton);
             m_SaveButton = MakeActionButton("Save Changes", OnSaveChangesClicked, selectSound);
             buttonColumn.Add(m_SaveButton);
             m_BackButton = MakeActionButton("Back", OnBackClicked, cancelSound);
             buttonColumn.Add(m_BackButton);
             root.Add(buttonColumn);
+
+            // The row list and the action column aren't visually aligned (rows start at left:60, the
+            // action column is anchored to the right edge instead), so UI Toolkit's automatic
+            // nearest-neighbor navigation can't reliably jump between them left/right - see
+            // SetupCrossColumnNavigation for the explicit fix.
+            SetupCrossColumnNavigation();
 
             // See MainMenuController.BuildUI for why this is needed: nothing has focus by default, and
             // gamepad Move/Submit only act on whatever's currently focused. The first binding row gets
@@ -242,6 +275,61 @@ namespace Blocks.Gameplay.Core
             {
                 m_FirstFocusable = bindingButton;
             }
+        }
+
+        /// <summary>
+        /// Wires explicit left/right gamepad-navigation between the row list and the action column,
+        /// since they aren't visually aligned and UI Toolkit's automatic navigation only reliably jumps
+        /// between elements that roughly line up. Pressing right from ANY row always lands on Save
+        /// Changes (the middle, most central action button); pressing left from ANY of Restore Defaults/
+        /// Save Changes/Back always lands on the first row (whichever command that is for the active
+        /// scheme - Move for gamepad, Forwards for keyboard+mouse). Every other direction (up/down within
+        /// either column) is left untouched, so normal automatic navigation still handles those. Must run
+        /// after both the rows and the action buttons exist, since it references m_SaveButton/
+        /// m_FirstFocusable - called once at the end of BuildUI.
+        /// </summary>
+        private void SetupCrossColumnNavigation()
+        {
+            foreach (Button rowButton in m_RowButtons.Values)
+            {
+                rowButton.RegisterCallback<NavigationMoveEvent>(OnRowNavigationMove);
+            }
+
+            m_RestoreDefaultsButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
+            m_SaveButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
+            m_BackButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
+        }
+
+        private void OnRowNavigationMove(NavigationMoveEvent evt)
+        {
+            if (evt.direction != NavigationMoveEvent.Direction.Right) return;
+
+            m_SaveButton.Focus();
+            SuppressDefaultNavigation(evt);
+        }
+
+        private void OnActionNavigationMove(NavigationMoveEvent evt)
+        {
+            if (evt.direction != NavigationMoveEvent.Direction.Left) return;
+            if (m_FirstFocusable == null) return;
+
+            m_FirstFocusable.Focus();
+            SuppressDefaultNavigation(evt);
+        }
+
+        /// <summary>
+        /// StopPropagation alone only stops the event bubbling further up the visual tree - it does NOT
+        /// stop UI Toolkit's own built-in "find the nearest focusable element in this direction" logic,
+        /// which runs as that event's separate default action regardless of propagation. PreventDefault
+        /// is what actually suppresses that - without it, the automatic nearest-neighbor jump still runs
+        /// right after our manual .Focus() call above and immediately overrides it (which is exactly what
+        /// was happening before this method existed: the manual focus call had no visible effect except by
+        /// coincidence on rows already spatially close to the action column).
+        /// </summary>
+        private static void SuppressDefaultNavigation(NavigationMoveEvent evt)
+        {
+            evt.PreventDefault();
+            evt.StopPropagation();
         }
 
         // Same grayed-out/bright-pill focus treatment as the other GameFlow screens, plus a distinct
@@ -295,6 +383,7 @@ namespace Blocks.Gameplay.Core
             }
 
             m_AwaitingRebindCommand = commandKey;
+            m_RebindStartedFrame = Time.frameCount;
             Button button = m_RowButtons[commandKey];
             button.text = m_UseGamepad && commandKey == "Move" ? "Move a stick..." : "Press...";
             button.style.backgroundColor = AwaitingBackground;
@@ -336,6 +425,14 @@ namespace Blocks.Gameplay.Core
         private void Update()
         {
             if (m_AwaitingRebindCommand == null) return;
+
+            // The Submit press (gamepad button, or Enter/Space on keyboard) that activated this row's
+            // Button and triggered BeginRebind is still "just pressed" on this exact frame - polling
+            // immediately would capture that same still-active press as the new binding before the
+            // player's had any chance to press something else. wasPressedThisFrame is only ever true on
+            // the single frame a press started, so skipping polling for exactly that one frame (the frame
+            // BeginRebind ran on) is enough, regardless of how long the player then holds the button down.
+            if (Time.frameCount == m_RebindStartedFrame) return;
 
             if (m_UseGamepad)
             {
@@ -643,6 +740,42 @@ namespace Blocks.Gameplay.Core
         }
 
         #endregion
+
+        private void OnRestoreDefaultsClicked()
+        {
+            if (m_AwaitingRebindCommand != null) return; // don't reset mid-capture, see class summary
+
+            if (selectSound != null)
+            {
+                AudioSource.PlayClipAtPoint(selectSound, Vector3.zero);
+            }
+
+            // Clears every override this screen could have applied to the real gameplay actions,
+            // reverting them to GameplayInputSystem_Actions' own baked-in defaults - for BOTH control
+            // schemes at once, regardless of which one is currently shown (m_UseGamepad only affects
+            // which rows are drawn, not which scheme this clears). This only removes overrides; it
+            // doesn't touch actions this screen never exposes a row for (Look, Previous, Next, etc.),
+            // since nothing else in the project applies overrides to those.
+            m_GameplayActions.asset.RemoveAllBindingOverrides();
+
+            // Resets the cosmetic Wager bindings the same way - both schemes at once, not just the one
+            // on screen.
+            m_Bindings = new InputBindingsData();
+
+            // This doesn't call Save - Restore Defaults only resets the in-memory working copy, same as
+            // any other rebind on this screen. Leaving without clicking Save Changes discards it, same
+            // as the class summary's usual "Back without saving" behavior.
+            RefreshAllRowLabels();
+        }
+
+        /// <summary>Refreshes every currently-visible row's button text from the underlying data - needed after Restore Defaults changes bindings without going through the usual per-row BeginRebind/CompleteRebind flow.</summary>
+        private void RefreshAllRowLabels()
+        {
+            foreach (var pair in m_RowButtons)
+            {
+                pair.Value.text = GetBindingDisplay(pair.Key);
+            }
+        }
 
         private void OnSaveChangesClicked()
         {
