@@ -17,6 +17,12 @@ namespace Blocks.Gameplay.Core
     /// no gamepad at all) - see AlternateBindingsGroup and the new bindings tagged "Keyboard_P2" in the
     /// .inputactions asset. Add more command-line-selected schemes here the same way if a third local
     /// player is ever needed.
+    ///
+    /// Rebindable controls: this asset's bindings can be overridden at runtime by the player via the
+    /// Change Keybindings screen (see ChangeKeybindingsController), which persists overrides through
+    /// InputBindingOverridesStore. ApplySavedOverridesIfAny below applies whatever was last saved, right
+    /// after this instance's own GameplayInputSystem_Actions is constructed - so a player's rebinds take
+    /// effect the moment gameplay starts, not just on the settings screen that changed them.
     /// </summary>
     public class CoreInputHandler : NetworkBehaviour
     {
@@ -54,6 +60,11 @@ namespace Blocks.Gameplay.Core
         private void Awake()
         {
             m_InputActions = new GameplayInputSystem_Actions();
+
+            // Picks up whatever bindings the player last saved from the Change Keybindings screen (see
+            // the class summary's "Rebindable controls" note) - a no-op, falling back to this asset's
+            // own defaults, if nothing's been saved yet.
+            InputBindingOverridesStore.ApplySavedOverrides(m_InputActions.asset);
         }
 
         public override void OnNetworkSpawn()

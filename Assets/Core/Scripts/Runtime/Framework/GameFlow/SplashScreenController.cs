@@ -7,15 +7,16 @@ using UnityEngine.UIElements;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// The very first screen in the boot flow: "Splash Screen" in white text on a black background.
-    /// Advances to the title screen after <see cref="displayDuration"/> seconds, or as soon as any
-    /// key/button is pressed, whichever comes first - fading to black first so the cut isn't jarring.
+    /// The very first screen in the boot flow: a stack of centered credit lines in white text on a
+    /// black background. Advances to the title screen after <see cref="displayDuration"/> seconds, or
+    /// as soon as any key/button is pressed, whichever comes first - fading to black first so the cut
+    /// isn't jarring.
     ///
     /// Built entirely in code against this GameObject's UIDocument (see BuildUI) rather than a
-    /// separate UXML template asset, since this whole screen is a single centered label - not worth a
-    /// template file. Setup: see Friendslop > Build Splash, Title And Main Menu Scenes
-    /// (GameFlowScenesSetup), which creates this scene, adds this component, and registers it as the
-    /// first scene in Build Settings so it's what a build actually launches into.
+    /// separate UXML template asset. Note that UI Toolkit's Label does not render "\n"/"\r\n" inside a
+    /// single Label's text as line breaks, so each line is its own Label stacked in a vertical column
+    /// rather than one Label with embedded newlines. This is the first scene in Build Settings, so it's
+    /// what a build actually launches into.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class SplashScreenController : MonoBehaviour
@@ -39,6 +40,8 @@ namespace Blocks.Gameplay.Core
             BuildUI(m_Root);
         }
 
+        private static readonly string[] CreditLines = { "Guy Tuori", "and", "Daniel Donato", "present" };
+
         private void BuildUI(VisualElement root)
         {
             root.style.flexGrow = 1;
@@ -46,9 +49,22 @@ namespace Blocks.Gameplay.Core
             root.style.justifyContent = Justify.Center;
             root.style.alignItems = Align.Center;
 
-            var label = new Label("Splash Screen");
+            foreach (string line in CreditLines)
+            {
+                AddLine(root, line);
+            }
+        }
+
+        /// <summary>
+        /// Adds one centered line of text as its own Label. UI Toolkit's Label ignores embedded
+        /// newlines, so a multi-line block of text has to be built as a stack of Labels like this
+        /// rather than one Label with "\n" in its string.
+        /// </summary>
+        private static void AddLine(VisualElement root, string text)
+        {
+            var label = new Label(text);
             label.style.color = Color.white;
-            label.style.fontSize = 36;
+            label.style.fontSize = 12;
             root.Add(label);
         }
 
