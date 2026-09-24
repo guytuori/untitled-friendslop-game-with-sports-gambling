@@ -179,7 +179,7 @@ namespace Blocks.Gameplay.Core
             // WalkAbility's contribution *before* it runs (see the Priority discussion in the class
             // summary) so the two don't fight.
             Vector2 rawInput = m_Motor.MoveInput;
-            m_Motor.SetMoveInput(Vector2.zero);
+           // m_Motor.SetMoveInput(Vector2.zero);
 
             if (m_Motor.JumpRequested)
             {

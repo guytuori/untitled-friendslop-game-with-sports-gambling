@@ -288,9 +288,16 @@ namespace Blocks.Gameplay.Core
 
             PerformWallJump();
         }
-
+        [SerializeField] private int wallJumpStyle;
         private void PerformWallJump()
         {
+            if (wallJumpStyle == 1)
+            {
+                ControlledWallJump();
+                return;
+            }
+            
+
             float jumpVelocity = Mathf.Sqrt(wallJumpHeight * -2f * m_Motor.gravity);
             m_Motor.SetVerticalVelocity(jumpVelocity);
             m_Motor.ApplyExternalForce(WallNormal * wallJumpPushForce, ForceMode.Impulse);
@@ -298,6 +305,25 @@ namespace Blocks.Gameplay.Core
             ExitClimb();
             m_RegrabTimer = regrabCooldown;
         }
+
+        private void ControlledWallJump()
+        {
+            float jumpVelocity = Mathf.Sqrt(wallJumpHeight * -2f * m_Motor.gravity);
+
+            Vector2 rawInput = m_Motor.MoveInput;
+            Vector3 jumpDirection = WallNormal;
+
+            if (rawInput.sqrMagnitude > 0.1f)
+            {
+                jumpDirection = rawInput.normalized;
+            }
+          //  m_Motor.SetVerticalVelocity(jumpVelocity);
+            m_Motor.ApplyExternalForce(jumpDirection * wallJumpPushForce, ForceMode.Impulse);
+
+            ExitClimb();
+            m_RegrabTimer = regrabCooldown;
+        }
+
 
         #endregion
 
@@ -317,8 +343,9 @@ namespace Blocks.Gameplay.Core
             Vector3 inputDir = GetWorldInputDirection();
             if (inputDir.sqrMagnitude < 0.01f)
             {
-                if (!IsClimbing) return false;
-                inputDir = -WallNormal;
+                //if (!IsClimbing) return false;
+                inputDir = transform.forward;
+               // inputDir = -WallNormal;orld 
             }
 
             Vector3 capsuleCenter = m_Controller.transform.TransformPoint(m_Controller.center);
@@ -351,10 +378,10 @@ namespace Blocks.Gameplay.Core
             if (!IsClimbing)
             {
                 float pressAmount = Vector3.Dot(inputDir, -hit.normal);
-                if (pressAmount < minPressInto)
-                {
-                    return false; // brushing past the wall, not pressing into it - only checked on initial attach
-                }
+                //if (pressAmount < minPressInto)
+                //{
+                //    return false; // brushing past the wall, not pressing into it - only checked on initial attach
+                //}
             }
 
             if (!IsSurfaceClimbable(hit))

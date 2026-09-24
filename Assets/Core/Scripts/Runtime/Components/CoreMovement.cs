@@ -623,7 +623,7 @@ namespace Blocks.Gameplay.Core
                     m_VerticalVelocity += gravity * Time.deltaTime;
                 }
             }
-
+            
             // Apply rotation based on coupling mode and movement
             ApplyRotation(finalModifier.ArealVelocity);
 

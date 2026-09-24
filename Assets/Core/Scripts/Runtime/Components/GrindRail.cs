@@ -20,6 +20,7 @@ namespace Blocks.Gameplay.Core
     /// Built and configured entirely at runtime by GrindRailCourseBuilder via <see cref="Configure"/>
     /// - there's no Inspector authoring workflow for this yet.
     /// </summary>
+     
     public class GrindRail : MonoBehaviour
     {
         [Tooltip("World-space points defining the rail's path, in order. Needs at least 2.")]
@@ -51,9 +52,78 @@ namespace Blocks.Gameplay.Core
             }
         }
 
+        public void GenerateWaypoints(Transform parent, float stepDistance = 1.0f, float maxUpwardAngle = 45.0f)
+        {
+            List<Vector3> generatedPoints = new List<Vector3>();
+
+            if (parent == null)
+            {
+                return ;
+            }
+
+            // Process each child transform
+            foreach (Transform child in parent)
+            {
+                MeshFilter filter = child.GetComponent<MeshFilter>();
+                Collider collider = child.GetComponent<Collider>();
+
+                if (filter == null || filter.sharedMesh == null)
+                {
+                    continue; // Skip children without a valid mesh
+                }
+
+                // Get mesh bounds in world space
+                Bounds bounds = collider != null ? collider.bounds : filter.sharedMesh.bounds;
+
+                // Calculate total depth along the child's local forward direction
+                Vector3 localMin = filter.sharedMesh.bounds.min;
+                Vector3 localMax = filter.sharedMesh.bounds.max;
+                float meshForwardLength = Mathf.Abs(localMax.z - localMin.z) * child.lossyScale.z;
+
+                Vector3 startPos = child.TransformPoint(new Vector3(0, 0, localMin.z));
+                Vector3 forwardDir = child.forward;
+
+                // Start raycasting slightly above the highest point of the mesh bounds
+                float rayOriginY = bounds.max.y + 1.0f;
+                float maxRayDistance = bounds.size.y + 2.0f;
+
+                // Step along the forward direction
+                for (float dist = 0f; dist <= meshForwardLength; dist += stepDistance)
+                {
+                    Vector3 samplePos = startPos + (forwardDir * dist);
+
+                    // Origin directly above current step point
+                    Vector3 rayOrigin = new Vector3(samplePos.x, rayOriginY, samplePos.z);
+                    Ray ray = new Ray(rayOrigin, Vector3.down);
+
+                    if (collider != null)
+                    {
+                        // Precise hit testing using child collider
+                        if (collider.Raycast(ray, out RaycastHit hit, maxRayDistance))
+                        {
+                            // Verify the hit surface normal is upward-facing
+                            if (Vector3.Angle(hit.normal, Vector3.up) <= maxUpwardAngle)
+                            {
+                                generatedPoints.Add(hit.point);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Fallback to top bounds level if no collider is attached
+                        Vector3 fallbackPoint = new Vector3(samplePos.x, bounds.max.y, samplePos.z);
+                        generatedPoints.Add(fallbackPoint);
+                    }
+                }
+            }
+            waypoints = generatedPoints.ToArray();
+        }
+
         private void OnEnable()
         {
             s_ActiveRails.Add(this);
+            if (waypoints == null || waypoints.Length == 0)
+            { GenerateWaypoints(transform,1); }
         }
 
         private void OnDisable()

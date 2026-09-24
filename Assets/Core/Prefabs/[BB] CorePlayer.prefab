@@ -76,7 +76,7 @@ CharacterController:
   serializedVersion: 3
   m_Height: 1.8
   m_Radius: 0.28
-  m_SlopeLimit: 45
+  m_SlopeLimit: 89
   m_StepOffset: 0.25
   m_SkinWidth: 0.02
   m_MinMoveDistance: 0
@@ -529,7 +529,7 @@ MonoBehaviour:
   staminaCostPerSecond: 10
   stickForce: 2
   wallJumpHeight: 2.2
-  wallJumpPushForce: 7
+  wallJumpPushForce: 25
   regrabCooldown: 0.25
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!114 &6234546863735232799
