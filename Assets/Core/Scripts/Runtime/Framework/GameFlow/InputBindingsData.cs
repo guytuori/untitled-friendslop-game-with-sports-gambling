@@ -63,31 +63,55 @@ namespace Blocks.Gameplay.Core
         public int VoiceVolume = 10;
     }
 
+    /// <summary>
+    /// The Graphics Settings screen's four dropdowns (Resolution, Frame Rate, VSync, Windowed Mode).
+    /// Stored as concrete values (a width/height pair, a raw fps number, and two bools) rather than raw
+    /// dropdown indices, so the saved JSON stays self-describing and stable even if
+    /// GraphicsSettingsController's own choice ordering ever changes - see that class for how each
+    /// dropdown's index maps to and from these fields. Defaults (1920x1080, 60fps, VSync off, Full Screen)
+    /// match the spec's stated defaults exactly.
+    /// </summary>
+    [Serializable]
+    public class GraphicsSettingsData
+    {
+        public int ResolutionWidth = 1920;
+        public int ResolutionHeight = 1080;
+        public int FrameRate = 60;
+        public bool VSyncEnabled = false;
+        public bool Fullscreen = true;
+    }
+
     [Serializable]
     public class InputBindingsData
     {
         public KeyboardBindings Keyboard = new KeyboardBindings();
         public GamepadBindings Gamepad = new GamepadBindings();
         public AudioSettingsData Audio = new AudioSettingsData();
+        public GraphicsSettingsData Graphics = new GraphicsSettingsData();
     }
 
     /// <summary>
-    /// Loads/saves <see cref="InputBindingsData"/> (the cosmetic Wager-only bindings) as JSON at
-    /// Application.persistentDataPath - the standard per-player, per-machine location for save/config
-    /// data that lives outside the Assets folder (and so outside source control), which is what lets it
-    /// persist between sessions the way a save file does.
+    /// Loads/saves <see cref="InputBindingsData"/> as JSON at Application.persistentDataPath - the
+    /// standard per-player, per-machine location for save/config data that lives outside the Assets folder
+    /// (and so outside source control), which is what lets it persist between sessions the way a save file
+    /// does. Named settings.json (not keybindings.json - its name for a while, back when this store only
+    /// covered the Wager-command bindings below) since every GameFlow settings screen now shares this one
+    /// file: the cosmetic Keyboard/Gamepad Wager bindings, the Audio screen's four volume sliders
+    /// (<see cref="AudioSettingsData"/>), and the Graphics screen's four dropdowns
+    /// (<see cref="GraphicsSettingsData"/>).
     ///
     /// If the file doesn't exist yet (first launch, or it was deleted) or fails to parse for any reason,
     /// Load() falls back to InputBindingsData's own field initializers - see KeyboardBindings and
-    /// GamepadBindings above for what those default bindings actually are.
+    /// GamepadBindings above for what those default bindings actually are, and AudioSettingsData/
+    /// GraphicsSettingsData for those screens' own defaults.
     ///
-    /// This only covers the Wager commands. The real movement/action commands are handled by
-    /// <see cref="InputBindingOverridesStore"/> below, via Unity's own Input System binding-override
-    /// mechanism rather than a hand-rolled JSON schema.
+    /// The real movement/action commands (as opposed to the cosmetic Wager bindings) are handled by
+    /// <see cref="InputBindingOverridesStore"/> below instead, via Unity's own Input System binding-override
+    /// mechanism rather than this hand-rolled JSON schema.
     /// </summary>
     public static class InputBindingsStore
     {
-        private const string FileName = "keybindings.json";
+        private const string FileName = "settings.json";
 
         private static string FilePath => Path.Combine(Application.persistentDataPath, FileName);
 
@@ -138,7 +162,7 @@ namespace Blocks.Gameplay.Core
     /// opposed to every binding on it) - there's no need for a custom schema here the way
     /// InputBindingsData needed one, since JsonUtility can't serialize Dictionaries and the override data
     /// isn't a simple fixed set of named fields to begin with. Persisted to a separate file from
-    /// keybindings.json so a corrupt/missing one doesn't affect the other.
+    /// settings.json so a corrupt/missing one doesn't affect the other.
     /// </summary>
     public static class InputBindingOverridesStore
     {

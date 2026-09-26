@@ -12,12 +12,11 @@ namespace Blocks.Gameplay.Core
     /// that size), over a black background, with the menu buttons stacked in the bottom-right corner
     /// instead of centered.
     ///
-    /// Buttons are Graphics / Audio / Change Keybindings / Back. Graphics doesn't do anything yet - it
-    /// just logs that it was clicked, as a placeholder until there's an actual graphics options panel to
-    /// show. Audio loads <see cref="audioSettingsSceneName"/> (see AudioSettingsController) and Change
-    /// Keybindings loads <see cref="keybindingsSceneName"/>. Back returns to
-    /// <see cref="mainMenuSceneName"/> - same as pressing Esc or the gamepad's South (bottom-face)
-    /// button, via the raw poll in Update() below.
+    /// Buttons are Graphics / Audio / Change Keybindings / Back. Graphics loads
+    /// <see cref="graphicsSettingsSceneName"/> (see GraphicsSettingsController), Audio loads
+    /// <see cref="audioSettingsSceneName"/> (see AudioSettingsController) and Change Keybindings loads
+    /// <see cref="keybindingsSceneName"/>. Back returns to <see cref="mainMenuSceneName"/> - same as
+    /// pressing Esc or the gamepad's South (bottom-face) button, via the raw poll in Update() below.
     ///
     /// RESOLVED COLLISION: this scene's South-is-Back shortcut used to collide with gamepad Submit, since
     /// Unity's stock InputSystemUIInputModule actions asset binds Submit to gamepad South by default -
@@ -50,6 +49,9 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("Scene to load when Change Keybindings is clicked.")]
         [SerializeField] private string keybindingsSceneName = "ChangeKeybindings";
+
+        [Tooltip("Scene to load when Graphics is clicked.")]
+        [SerializeField] private string graphicsSettingsSceneName = "GraphicsSettings";
 
         [Tooltip("Scene to load when Audio is clicked.")]
         [SerializeField] private string audioSettingsSceneName = "AudioSettings";
@@ -170,9 +172,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnGraphicsClicked()
         {
-            // No graphics options panel yet - just confirms the button works until there's something
-            // real to show.
-            Debug.Log("[Settings] Graphics selected.");
+            SceneManager.LoadScene(graphicsSettingsSceneName);
         }
 
         private void OnAudioClicked()
