@@ -45,7 +45,7 @@ namespace Blocks.Gameplay.Core
     /// in-memory AudioSettingsData working copy and calls AudioVolumeService.ApplyLive after every
     /// committed change so the effect is audible immediately (the same "live now, only permanent on Save"
     /// pattern ChangeKeybindingsController uses for real gameplay rebinds), and only writes it into
-    /// keybindings.json - the same config file Change Keybindings uses, via the existing
+    /// settings.json - the same config file Change Keybindings uses, via the existing
     /// InputBindingsStore/InputBindingsData.Audio field - when Save Changes is clicked.
     ///
     /// Restore Defaults (above Save Changes, above Back - same order as Change Keybindings) resets all
@@ -589,7 +589,7 @@ namespace Blocks.Gameplay.Core
 
             // Loads the current on-disk data (rather than just writing a lone AudioSettingsData) so
             // saving Audio here can never clobber Keyboard/Gamepad bindings saved from the Change
-            // Keybindings screen, or vice versa - both screens share the same keybindings.json file.
+            // Keybindings screen, or vice versa - both screens share the same settings.json file.
             InputBindingsData data = InputBindingsStore.Load();
             data.Audio = CloneSettings(m_Settings);
             InputBindingsStore.Save(data);
