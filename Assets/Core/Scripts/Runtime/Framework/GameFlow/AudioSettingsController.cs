@@ -18,14 +18,16 @@ namespace Blocks.Gameplay.Core
     /// EDIT MODE: a slider being focused ("selected") is NOT the same as it being adjustable - Submit
     /// (A/gamepad East, Enter, or a mouse click) on a focused slider puts it into "edit mode"
     /// (<see cref="m_EditingSlider"/>), and only while a slider is being edited do Left/Right actually
-    /// change its value (UI Toolkit's own built-in slider behavior, left untouched during editing) - the
-    /// slider never loses focus while being edited, even at 0%/100% where Left/Right have nothing further
-    /// to move to. Submit again while editing commits the value and exits edit mode; Cancel (B/gamepad
-    /// South, Esc) while editing discards the change and reverts to whatever the value was right before
-    /// editing started, then exits edit mode.
+    /// change its value. This is done explicitly by OnSliderNavigationMove (one notch per press, clamped to
+    /// 0/10) rather than by leaning on UI Toolkit's own built-in slider scrub behavior - see that method's
+    /// doc comment for why. Mouse dragging is unaffected either way (a separate PointerDown-based code
+    /// path). The slider never loses focus while being edited, even at 0%/100% where Left/Right have
+    /// nothing further to move to. Submit again while editing commits the value and exits edit mode; Cancel
+    /// (B/gamepad South, Esc) while editing discards the change and reverts to whatever the value was right
+    /// before editing started, then exits edit mode.
     ///
     /// Up/Down never use UI Toolkit's own automatic nearest-neighbor navigation, in or out of edit mode -
-    /// PreventDefault always runs for them (see OnAnySliderNavigationMove), the same "don't trust the
+    /// PreventDefault always runs for them (see OnSliderNavigationMove), the same "don't trust the
     /// automatic navigation, override it explicitly" lesson ChangeKeybindingsController's own cross-column
     /// fix already established for Left/Right there. While editing, Up/Down are fully suppressed with no
     /// effect at all, so a stray navigation press can't silently abandon an in-progress edit without an
@@ -53,14 +55,25 @@ namespace Blocks.Gameplay.Core
     ///
     /// CROSS-CONTROL NAVIGATION: the sliders sit in the middle of the screen and the action-button column
     /// is anchored to the bottom-right corner - same misalignment ChangeKeybindingsController solves for
-    /// its row list vs its action column. Pressing Right from ANY slider (while not editing it) always
-    /// lands on Save Changes; pressing Left from ANY of Restore Defaults/Save Changes/Back always lands on
-    /// the Master Volume slider (the first one) - the exact same "any row -> Save Changes" /
-    /// "any action button -> first row" pattern as ChangeKeybindingsController.SetupCrossColumnNavigation,
-    /// just reusing Left/Right here instead of that screen's rows (which are Buttons, not sliders, so
-    /// Left/Right were free there without an edit-mode gate). Same SuppressDefaultNavigation
-    /// (PreventDefault + StopPropagation) mechanism - see ChangeKeybindingsController for why
-    /// StopPropagation alone isn't enough to override UI Toolkit's automatic navigation.
+    /// its row list vs its action column, so neither column ever relies on UI Toolkit's automatic
+    /// nearest-neighbor navigation for ANY direction, not just the crossing between them:
+    ///   - Sliders (not editing): Up/Down move explicitly along Master/Music/SoundEffects/Voice (see
+    ///     OnSliderNavigationMove); Left is inert; Right always crosses to Save Changes.
+    ///   - Action buttons: Up/Down move explicitly along Restore Defaults/Save Changes/Back (see
+    ///     OnActionNavigationMove); Left always crosses back to the Master Volume slider; Right is
+    ///     inert.
+    /// Same SuppressDefaultNavigation (PreventDefault + StopPropagation) mechanism throughout - see
+    /// ChangeKeybindingsController for why StopPropagation alone isn't enough to override UI Toolkit's
+    /// automatic navigation.
+    ///
+    /// NAVIGATION EVENT TARGETS: every Submit/Cancel/Move handler on this screen takes its slider or
+    /// button as an explicit parameter, captured by closure at registration time (see AddSliderRow and
+    /// SetupCrossColumnNavigation), rather than inferring "which element" from evt.target. This is load-
+    /// bearing for the sliders specifically: SliderInt is a composite control, and evt.target for a
+    /// NavigationMoveEvent resolves to an internal leaf element rather than the outer SliderInt, so casting
+    /// it throws InvalidCastException (confirmed on-device with a gamepad d-pad and stick). Registering per-
+    /// element closures sidesteps that regardless of exactly which internal element evt.target turns out to
+    /// be, for any event type.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class AudioSettingsController : MonoBehaviour
@@ -87,7 +100,7 @@ namespace Blocks.Gameplay.Core
         private readonly Dictionary<SliderInt, Label> m_SliderValueLabels = new Dictionary<SliderInt, Label>();
         private readonly Dictionary<SliderInt, System.Action<int>> m_SliderOnChanged = new Dictionary<SliderInt, System.Action<int>>();
 
-        /// <summary>Fixed Up/Down order the sliders navigate in while not editing - see OnAnySliderNavigationMove. Populated once all four exist, at the end of BuildUI.</summary>
+        /// <summary>Fixed Up/Down order the sliders navigate in while not editing - see OnSliderNavigationMove. Populated once all four exist, at the end of BuildUI.</summary>
         private SliderInt[] m_SlidersInOrder;
 
         /// <summary>The slider currently in edit mode, or null if none - see the class summary's "EDIT MODE" section.</summary>
@@ -99,6 +112,9 @@ namespace Blocks.Gameplay.Core
         private Button m_RestoreDefaultsButton;
         private Button m_SaveButton;
         private Button m_BackButton;
+
+        /// <summary>Fixed Up/Down order the action buttons navigate in - see OnActionNavigationMove. Populated once all three exist, at the end of BuildUI.</summary>
+        private Button[] m_ButtonsInOrder;
 
         private void Awake()
         {
@@ -180,6 +196,7 @@ namespace Blocks.Gameplay.Core
             buttonColumn.Add(m_SaveButton);
             m_BackButton = MakeActionButton("Back", OnBackClicked, cancelSound);
             buttonColumn.Add(m_BackButton);
+            m_ButtonsInOrder = new[] { m_RestoreDefaultsButton, m_SaveButton, m_BackButton };
             root.Add(buttonColumn);
 
             SetupCrossColumnNavigation();
@@ -192,8 +209,8 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>
         /// Builds one Label + SliderInt(0-10) + percent-value-Label row, registers it for edit-mode
-        /// Submit/Cancel handling (see OnAnySliderSubmit/OnAnySliderCancel) and the Right-to-Save-Changes
-        /// override (see OnAnySliderNavigationMove), and records onChanged/its value Label so
+        /// Submit/Cancel handling (see OnSliderSubmit/OnSliderCancel) and the Right-to-Save-Changes
+        /// override (see OnSliderNavigationMove), and records onChanged/its value Label so
         /// ExitEditMode(commit: false) can revert both the underlying settings field and the on-screen
         /// text without needing a big per-slider switch.
         /// </summary>
@@ -218,9 +235,15 @@ namespace Blocks.Gameplay.Core
             // right afterward - so these two only ever need to handle the plain focused/unfocused cases.
             slider.RegisterCallback<FocusInEvent>(_ => SetFocusedVisual(slider, true));
             slider.RegisterCallback<FocusOutEvent>(_ => SetFocusedVisual(slider, false));
-            slider.RegisterCallback<NavigationSubmitEvent>(OnAnySliderSubmit);
-            slider.RegisterCallback<NavigationCancelEvent>(OnAnySliderCancel);
-            slider.RegisterCallback<NavigationMoveEvent>(OnAnySliderNavigationMove);
+            // Registered as closures over this exact slider, rather than a single shared handler that
+            // infers "which slider" from evt.target - see OnSliderNavigationMove's doc comment for why
+            // evt.target can't be trusted to be the SliderInt itself for a NavigationMoveEvent.
+            slider.RegisterCallback<NavigationSubmitEvent>(evt => OnSliderSubmit(slider, evt));
+            slider.RegisterCallback<NavigationCancelEvent>(evt => OnSliderCancel(slider, evt));
+            // TrickleDown (capture phase), not the default bubble phase - see OnSliderNavigationMove's doc
+            // comment for why this is required to actually suppress the slider's own built-in Left/Right
+            // scrub while not editing, rather than merely reacting after it already happened.
+            slider.RegisterCallback<NavigationMoveEvent>(evt => OnSliderNavigationMove(slider, evt), TrickleDown.TrickleDown);
             row.Add(slider);
 
             var valueLabel = new Label(PercentText(initialValue));
@@ -249,11 +272,13 @@ namespace Blocks.Gameplay.Core
 
         private void LiveApply() => AudioVolumeService.ApplyLive(m_Settings);
 
-        /// <summary>Submit (A) on a focused slider enters edit mode; Submit again while already editing it commits the value and exits.</summary>
-        private void OnAnySliderSubmit(NavigationSubmitEvent evt)
+        /// <summary>
+        /// Submit (A) on a focused slider enters edit mode; Submit again while already editing it commits
+        /// the value and exits. Takes the slider explicitly (registered as a per-slider closure in
+        /// AddSliderRow) rather than reading evt.target - see OnSliderNavigationMove's doc comment for why.
+        /// </summary>
+        private void OnSliderSubmit(SliderInt slider, NavigationSubmitEvent evt)
         {
-            var slider = (SliderInt)evt.target;
-
             if (m_EditingSlider == slider)
             {
                 ExitEditMode(commit: true);
@@ -263,16 +288,22 @@ namespace Blocks.Gameplay.Core
                 EnterEditMode(slider);
             }
 
+            evt.PreventDefault();
             evt.StopPropagation();
         }
 
-        /// <summary>Cancel (B) while a slider is being edited discards the change and reverts to its pre-edit value; a no-op if that slider isn't the one being edited.</summary>
-        private void OnAnySliderCancel(NavigationCancelEvent evt)
+        /// <summary>
+        /// Cancel (B) while a slider is being edited discards the change and reverts to its pre-edit value;
+        /// a no-op if that slider isn't the one being edited. Takes the slider explicitly (registered as a
+        /// per-slider closure in AddSliderRow) rather than reading evt.target - see
+        /// OnSliderNavigationMove's doc comment for why.
+        /// </summary>
+        private void OnSliderCancel(SliderInt slider, NavigationCancelEvent evt)
         {
-            var slider = (SliderInt)evt.target;
             if (m_EditingSlider != slider) return;
 
             ExitEditMode(commit: false);
+            evt.PreventDefault();
             evt.StopPropagation();
         }
 
@@ -328,10 +359,36 @@ namespace Blocks.Gameplay.Core
         /// even at 0/10 where there's nothing further to move to); while NOT editing, Right always leaves
         /// the slider column for Save Changes (see "CROSS-CONTROL NAVIGATION") and Left is suppressed with
         /// no effect (there's nothing to scrub without first entering edit mode via Submit).
+        ///
+        /// Takes the slider explicitly (registered as a per-slider closure in AddSliderRow) instead of
+        /// reading it off evt.target: SliderInt is a composite control (BaseSlider/BaseField wrap an inner
+        /// "drag container" element), and for a NavigationMoveEvent specifically, evt.target resolves to
+        /// that inner leaf element rather than the outer SliderInt itself - casting it to SliderInt throws
+        /// InvalidCastException (confirmed on device, both d-pad and stick). NavigationSubmitEvent's
+        /// evt.target apparently does resolve to the outer SliderInt (Submit/A worked before this fix), but
+        /// relying on that distinction was fragile, so every slider handler now takes its element as an
+        /// explicit parameter instead of inferring it from the event at all.
+        ///
+        /// Registered with TrickleDown (capture phase) rather than the default bubble phase - see
+        /// AddSliderRow - so this runs as early as possible, before the event can reach whatever internal
+        /// element actually implements the slider's own built-in Left/Right scrub-the-value behavior.
+        ///
+        /// This method no longer leans on that built-in behavior at all, in either state - it used to leave
+        /// Left/Right alone while editing and let UI Toolkit's own default action handle the scrub, but that
+        /// proved unreliable specifically for gamepad/keyboard input once this handler moved to the capture
+        /// phase (mouse dragging is a wholly separate PointerDown-based code path and was never affected
+        /// either way): the built-in scrub stopped firing for a NavigationMoveEvent at all once something
+        /// upstream in this same event's capture pass got involved, in a way that isn't practical to fully
+        /// pin down or rely on without being able to run the game and inspect it directly. Rather than
+        /// depend further on exactly when/whether that internal behavior runs, Left/Right while editing now
+        /// adjust slider.value directly by one notch (clamped to lowValue/highValue - this is also what
+        /// naturally satisfies "doesn't go past max/min"), which fires the same RegisterValueChangedCallback
+        /// a mouse drag would have, so the label/onChanged/LiveApply path is identical either way. Every
+        /// direction now unconditionally calls SuppressDefaultNavigation, editing or not, so the framework's
+        /// own default handling is never given a chance to run at all.
         /// </summary>
-        private void OnAnySliderNavigationMove(NavigationMoveEvent evt)
+        private void OnSliderNavigationMove(SliderInt slider, NavigationMoveEvent evt)
         {
-            var slider = (SliderInt)evt.target;
             bool isEditing = m_EditingSlider == slider;
 
             switch (evt.direction)
@@ -347,18 +404,24 @@ namespace Blocks.Gameplay.Core
                     break;
 
                 case NavigationMoveEvent.Direction.Right:
-                    if (!isEditing)
+                    if (isEditing)
+                    {
+                        slider.value = Mathf.Min(slider.highValue, slider.value + 1);
+                    }
+                    else
                     {
                         m_SaveButton.Focus();
-                        SuppressDefaultNavigation(evt);
                     }
+                    SuppressDefaultNavigation(evt);
                     break;
 
                 case NavigationMoveEvent.Direction.Left:
-                    if (!isEditing)
+                    if (isEditing)
                     {
-                        SuppressDefaultNavigation(evt);
+                        slider.value = Mathf.Max(slider.lowValue, slider.value - 1);
                     }
+                    // else: inert while not editing - nothing to scrub without entering edit mode first.
+                    SuppressDefaultNavigation(evt);
                     break;
             }
         }
@@ -375,20 +438,65 @@ namespace Blocks.Gameplay.Core
             m_SlidersInOrder[next].Focus();
         }
 
-        /// <summary>Wires the Left-from-any-action-button override - see the class summary's "CROSS-CONTROL NAVIGATION" section.</summary>
+        /// <summary>
+        /// Wires the action buttons' own navigation - see OnActionNavigationMove. Named to match its old
+        /// purpose, but now covers all four directions on the button column, not just the
+        /// Left-to-Master-Volume crossing. Registered as per-button closures (matching the sliders' own
+        /// AddSliderRow registration) rather than one shared handler reading evt.target - Button isn't
+        /// known to have the same composite-leaf-element issue SliderInt does, but the closure form costs
+        /// nothing and keeps every navigation handler on this screen following the same, now-proven-safe
+        /// pattern instead of leaving one still trusting evt.target's exact identity.
+        /// </summary>
         private void SetupCrossColumnNavigation()
         {
-            m_RestoreDefaultsButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
-            m_SaveButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
-            m_BackButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
+            m_RestoreDefaultsButton.RegisterCallback<NavigationMoveEvent>(evt => OnActionNavigationMove(m_RestoreDefaultsButton, evt));
+            m_SaveButton.RegisterCallback<NavigationMoveEvent>(evt => OnActionNavigationMove(m_SaveButton, evt));
+            m_BackButton.RegisterCallback<NavigationMoveEvent>(evt => OnActionNavigationMove(m_BackButton, evt));
         }
 
-        private void OnActionNavigationMove(NavigationMoveEvent evt)
+        /// <summary>
+        /// Same "never trust the automatic navigation, override it explicitly" treatment as the sliders
+        /// (see OnSliderNavigationMove) - Up/Down cycle through m_ButtonsInOrder explicitly instead of
+        /// relying on UI Toolkit's automatic nearest-neighbor navigation between the three buttons; Left
+        /// always crosses back to the Master Volume slider (see the class summary's "CROSS-CONTROL
+        /// NAVIGATION" section); Right is inert - there's nothing to the right of the action column.
+        /// Takes the button explicitly (see SetupCrossColumnNavigation) rather than reading evt.target.
+        /// </summary>
+        private void OnActionNavigationMove(Button button, NavigationMoveEvent evt)
         {
-            if (evt.direction != NavigationMoveEvent.Direction.Left) return;
+            switch (evt.direction)
+            {
+                case NavigationMoveEvent.Direction.Up:
+                    FocusAdjacentButton(button, -1);
+                    SuppressDefaultNavigation(evt);
+                    break;
 
-            m_MasterSlider.Focus();
-            SuppressDefaultNavigation(evt);
+                case NavigationMoveEvent.Direction.Down:
+                    FocusAdjacentButton(button, 1);
+                    SuppressDefaultNavigation(evt);
+                    break;
+
+                case NavigationMoveEvent.Direction.Left:
+                    m_MasterSlider.Focus();
+                    SuppressDefaultNavigation(evt);
+                    break;
+
+                case NavigationMoveEvent.Direction.Right:
+                    SuppressDefaultNavigation(evt);
+                    break;
+            }
+        }
+
+        /// <summary>Moves focus to the previous (step -1) or next (step 1) button in m_ButtonsInOrder, or does nothing if already at that end - no wraparound. Same pattern as FocusAdjacentSlider.</summary>
+        private void FocusAdjacentButton(Button from, int step)
+        {
+            int index = System.Array.IndexOf(m_ButtonsInOrder, from);
+            if (index < 0) return;
+
+            int next = index + step;
+            if (next < 0 || next >= m_ButtonsInOrder.Length) return;
+
+            m_ButtonsInOrder[next].Focus();
         }
 
         /// <summary>See ChangeKeybindingsController.SuppressDefaultNavigation - PreventDefault (not just StopPropagation) is what's actually required to override UI Toolkit's own automatic navigation.</summary>
