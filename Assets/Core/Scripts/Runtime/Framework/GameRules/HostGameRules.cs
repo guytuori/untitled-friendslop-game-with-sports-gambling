@@ -30,6 +30,15 @@ namespace Blocks.Gameplay.Core
         public bool ItemsEnabled = true;
         public bool PickupsEnabled = true;
 
+        public HostGameRulesData Clone() => (HostGameRulesData)MemberwiseClone();
+
+        /// <summary>Copies every field from <paramref name="other"/>, including IsPublic.</summary>
+        public void CopyFrom(HostGameRulesData other)
+        {
+            IsPublic = other.IsPublic;
+            ApplyPreset(other);
+        }
+
         /// <summary>Copies every preset-controlled field from <paramref name="preset"/>, leaving IsPublic as-is.</summary>
         public void ApplyPreset(HostGameRulesData preset)
         {

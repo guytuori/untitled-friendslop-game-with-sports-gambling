@@ -3,55 +3,61 @@ using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using UnityEngine.UIElements;
 
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// The Host Game screen, reached from the main menu's Host Game button: the game-rules filters a host
-    /// picks before starting a session. Top to bottom:
-    ///   - Presets: Normal / Hard / Very Hard buttons, which set every rule except visibility (see
-    ///     HostGamePresets). A fresh screen starts on Normal's values.
-    ///   - Visibility: Public Game / Private Game dropdown.
-    ///   - Map: a 2x5 grid of map thumbnails (see <see cref="maps"/>), with the hovered/selected map's
-    ///     name to the right and its flavor text underneath. Unselected maps are grayed out.
-    ///   - Max Players, Round Time, Bonus Time, Lives, Starting Points, Death Penalty, Wager Payout:
-    ///     sliders over fixed option lists, each showing its current option to the right.
-    ///   - Items and Pickups: On/Off dropdowns.
-    ///   - Back (bottom-left, returns to the main menu) and Host Game (bottom-right, placeholder).
-    ///     B/Esc while not editing also acts as Back.
+    /// The game-rules screen, used in two modes (see <see cref="mode"/>):
+    ///   - HostGame (the HostGame scene): the rules a host picks before starting a session, written into
+    ///     <see cref="HostGameRules.Current"/>. Bottom-right button is Host Game (placeholder).
+    ///   - FindGamesFilter (the FindGames scene, Join Game > Public > Custom): the same rows minus
+    ///     Visibility, each with an "All" checkbox on the left, editing <see cref="GameSearch.CustomFilter"/>.
+    ///     A checked All means that rule isn't filtered on; its control is dimmed, and changing the control
+    ///     unchecks All. Presets here apply the search presets (GameSearchPresets), and the bottom-right
+    ///     button is Find Games, which opens the Game Browser with this filter.
+    ///
+    /// Rows, top to bottom: Presets (Normal / Hard / Very Hard), Visibility (host only), Map (2x5 grid of
+    /// thumbnails - see <see cref="maps"/> - with the hovered/selected map's name to the right and flavor
+    /// text underneath; unselected maps grayed out), Max Players, Round Time, Bonus Time, Lives, Starting
+    /// Points, Death Penalty, Wager Payout (sliders over fixed option lists, current option shown to the
+    /// right), Items and Pickups (On/Off dropdowns). Back is bottom-left; B/Esc while not editing also
+    /// acts as Back. Choices aren't saved to disk - they're remembered for as long as the game runs.
+    ///
     /// The settings column scales down uniformly to fit the screen (e.g. 1280x720) - see
-    /// FitColumnToScreen. Back and Host Game are never scaled.
-    /// Choices are written straight into <see cref="HostGameRules.Current"/>, which isn't saved to disk -
-    /// it just remembers the last setup for as long as the game is running.
+    /// FitColumnToScreen. The two bottom buttons are never scaled.
     ///
     /// EDIT MODE: same model as AudioSettingsController/GraphicsSettingsController. A focused slider,
     /// dropdown, or the map grid only changes after Submit (A/Enter) puts it into edit mode; Submit again
-    /// keeps the change, Cancel (B/Esc) reverts to the value from before editing started. While editing:
+    /// keeps the change, Cancel (B/Esc) reverts it (including an All checkbox it unchecked). While editing:
     ///   - Sliders: Left/Right move one option (clamped at the ends); Up/Down do nothing.
     ///   - Dropdowns: Up/Down cycle options (wrapping, same as the Graphics screen); Left/Right do nothing.
     ///   - Map grid: all four directions move the selection within the grid (clamped at its edges), and
     ///     nothing can leave the grid until A or B.
-    /// The mouse bypasses edit mode entirely, same as the other screens: drag a slider, click a dropdown
-    /// to open its list, or click a map thumbnail to select it. Hovering a thumbnail previews its name
-    /// and flavor text.
+    /// All checkboxes aren't editables - A just toggles them. The mouse bypasses edit mode entirely: drag
+    /// a slider, click a dropdown to open its list, click a map thumbnail or a checkbox.
     ///
     /// NAVIGATION (not editing): every focusable element sits in an explicit grid of rows
-    /// (<see cref="m_NavRows"/>) - the three presets, then one row per setting, then Back / Host Game.
-    /// Up/Down move between rows and Left/Right move within a multi-element row (presets, bottom
-    /// buttons); Left/Right on a single-element setting row do nothing. UI Toolkit's own automatic
-    /// nearest-neighbor navigation is never used for any direction - same "override it explicitly"
-    /// lesson as every other GameFlow screen. Moving down into the bottom row lands on Host Game, and
-    /// moving up into the presets row lands on Normal (see <see cref="m_RowEntryColumn"/>).
+    /// (<see cref="m_NavRows"/>). Up/Down move between rows, keeping the same column when both rows have
+    /// the same number of elements (so in FindGamesFilter mode you can run straight down the All
+    /// checkboxes) and otherwise landing on that row's entry column (the control, Normal, or the
+    /// bottom-right button). Left/Right move within a row. UI Toolkit's automatic navigation is never used.
     ///
-    /// Sliders, dropdowns, and the map grid register their Submit/Cancel/Move handlers in the capture
-    /// phase (TrickleDown) and as per-element closures, never reading evt.target - the two lessons from
-    /// the Audio slider and Graphics dropdown bugs (composite controls' own default actions run before a
-    /// bubble-phase handler, and their evt.target can be an internal child element).
+    /// Sliders, dropdowns, checkboxes and the map grid register Submit/Cancel/Move in the capture phase
+    /// (TrickleDown) as per-element closures, never reading evt.target - the lessons from the Audio slider
+    /// and Graphics dropdown bugs (composite controls' own default actions run before a bubble-phase
+    /// handler, and their evt.target can be an internal child element).
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class HostGameController : MonoBehaviour
     {
+        public enum ScreenMode
+        {
+            HostGame,
+            FindGamesFilter
+        }
+
         [Serializable]
         public class MapEntry
         {
@@ -60,13 +66,20 @@ namespace Blocks.Gameplay.Core
             [TextArea] public string flavorText;
         }
 
+        [Tooltip("HostGame: rules for hosting. FindGamesFilter: the Join Game > Public > Custom search filter.")]
+        [SerializeField] private ScreenMode mode = ScreenMode.HostGame;
+
         [Tooltip("Maps in grid order, left-to-right then top-to-bottom (5 per row). By convention Last Stop is 9th and Random is 10th, so they land bottom-right.")]
         [SerializeField] private MapEntry[] maps;
 
-        [Tooltip("Scene to load when Back is clicked.")]
-        [SerializeField] private string mainMenuSceneName = "MainMenu";
+        [Tooltip("Scene to load when Back (or B/Esc) is pressed.")]
+        [FormerlySerializedAs("mainMenuSceneName")]
+        [SerializeField] private string backSceneName = "MainMenu";
 
-        [Tooltip("Played when entering/confirming an edit, selecting a map, or clicking a preset/Host Game.")]
+        [Tooltip("FindGamesFilter mode only: scene Find Games opens.")]
+        [SerializeField] private string gameBrowserSceneName = "GameBrowser";
+
+        [Tooltip("Played when entering/confirming an edit, selecting a map, toggling All, or clicking a preset/Host Game/Find Games.")]
         [SerializeField] private AudioClip selectSound;
 
         [Tooltip("Played when Back is selected, or an edit is cancelled.")]
@@ -118,23 +131,29 @@ namespace Blocks.Gameplay.Core
             return fallback;
         }
 
-        private static string FormatTime(int seconds) => $"{seconds / 60}:{seconds % 60:00}";
-        private static string FormatLives(int lives) => lives < 0 ? "Unlimited" : lives.ToString(CultureInfo.InvariantCulture);
-        private static string FormatDeathPenalty(int penalty) => penalty < 0 ? "All" : penalty.ToString(CultureInfo.InvariantCulture);
-        private static string FormatPayout(float payout) => payout.ToString("0.#", CultureInfo.InvariantCulture);
-
         // ----- layout -----
 
+        private const float AllToggleWidth = 80f;
         private const float LabelWidth = 200f;
         private const float ControlWidth = 550f; // ~ the 5-wide map grid's natural width, so value labels line up with the map name
         private const float ValueWidth = 300f;
         private const float RowSpacing = 8f;
         private const float ThumbnailWidth = 96f;
         private const float ThumbnailHeight = 54f;
+        private const float ColumnTop = 30f;
+        private const float BottomButtonMargin = 40f;
+        private const float BottomButtonHeight = 40f;
+        private const float GapAboveBottomButtons = 16f;
 
         // ----- state -----
 
+        private bool IsFilterMode => mode == ScreenMode.FindGamesFilter;
+
+        /// <summary>Host mode: HostGameRules.Current. Filter mode: m_Filter.Values. Every row reads/writes through this.</summary>
         private HostGameRulesData m_Rules;
+
+        /// <summary>Filter mode only (null in host mode): GameSearch.CustomFilter.</summary>
+        private GameSearchFilter m_Filter;
 
         /// <summary>How a slider, dropdown, or the map grid reads, restores, and adjusts its value in edit mode.</summary>
         private sealed class Editable
@@ -146,16 +165,22 @@ namespace Blocks.Gameplay.Core
 
         private readonly Dictionary<VisualElement, Editable> m_Editables = new Dictionary<VisualElement, Editable>();
 
+        /// <summary>Filter mode: each control's All checkbox.</summary>
+        private readonly Dictionary<VisualElement, Toggle> m_AllToggles = new Dictionary<VisualElement, Toggle>();
+
         /// <summary>The element currently in edit mode, or null.</summary>
         private VisualElement m_Editing;
 
         /// <summary>m_Editing's value right before editing started, restored on Cancel.</summary>
         private int m_ValueBeforeEdit;
 
+        /// <summary>Filter mode: the whole filter right before editing started, restored on Cancel (covers All flags and LivesMoreThan).</summary>
+        private GameSearchFilter m_FilterBeforeEdit;
+
         /// <summary>Explicit navigation grid - see the class summary's NAVIGATION section.</summary>
         private readonly List<VisualElement[]> m_NavRows = new List<VisualElement[]>();
 
-        /// <summary>Which column Up/Down lands on when entering a multi-element row.</summary>
+        /// <summary>Which column Up/Down lands on when entering a row whose shape differs from the one being left.</summary>
         private readonly List<int> m_RowEntryColumn = new List<int>();
 
         private readonly Dictionary<VisualElement, (int Row, int Col)> m_NavPositions = new Dictionary<VisualElement, (int Row, int Col)>();
@@ -172,7 +197,7 @@ namespace Blocks.Gameplay.Core
         /// <summary>The scalable settings column - see FitColumnToScreen.</summary>
         private VisualElement m_Column;
 
-        /// <summary>Re-reads m_Rules into each control without firing change callbacks - run after a preset is applied.</summary>
+        /// <summary>Re-reads m_Rules (and m_Filter's All flags) into each control without firing change callbacks - run after a preset or a cancelled edit.</summary>
         private readonly List<Action> m_RefreshFromRules = new List<Action>();
 
         private int MapCount => maps != null ? maps.Length : 0;
@@ -183,7 +208,15 @@ namespace Blocks.Gameplay.Core
             // GamepadUIBindingFix.
             GamepadUIBindingFix.Apply();
 
-            m_Rules = HostGameRules.Current;
+            if (IsFilterMode)
+            {
+                m_Filter = GameSearch.CustomFilter;
+                m_Rules = m_Filter.Values;
+            }
+            else
+            {
+                m_Rules = HostGameRules.Current;
+            }
 
             VisualElement root = GetComponent<UIDocument>().rootVisualElement;
             BuildUI(root);
@@ -197,15 +230,12 @@ namespace Blocks.Gameplay.Core
             // B (gamepad Cancel) / Esc outside edit mode = Back. Every editable's own Cancel handler runs in
             // the capture phase and stops propagation while it's being edited, so this bubble-phase handler
             // on the root only ever sees a Cancel that nothing else consumed - i.e. one pressed while not
-            // editing, on any element (including the buttons, which don't handle Cancel at all).
+            // editing, on any element (including buttons and checkboxes, which don't handle Cancel at all).
             root.RegisterCallback<NavigationCancelEvent>(evt =>
             {
                 if (m_Editing != null) return;
                 evt.StopPropagation();
-                if (cancelSound != null)
-                {
-                    AudioVolumeService.PlayOneShot(cancelSound, AudioCategory.SoundEffects, Vector3.zero);
-                }
+                PlaySound(cancelSound);
                 OnBackClicked();
             });
 
@@ -214,7 +244,7 @@ namespace Blocks.Gameplay.Core
             m_Column.style.top = ColumnTop;
             m_Column.style.left = Length.Percent(50);
             m_Column.style.translate = new Translate(Length.Percent(-50), 0);
-            m_Column.style.width = LabelWidth + ControlWidth + ValueWidth + 20f;
+            m_Column.style.width = (IsFilterMode ? AllToggleWidth : 0f) + LabelWidth + ControlWidth + ValueWidth + 20f;
             m_Column.style.flexDirection = FlexDirection.Column;
             // Scaled from its top-center, so shrinking it keeps it centered and pinned under the top margin.
             m_Column.style.transformOrigin = new TransformOrigin(Length.Percent(50), 0);
@@ -226,10 +256,10 @@ namespace Blocks.Gameplay.Core
             m_Column.RegisterCallback<GeometryChangedEvent>(_ => FitColumnToScreen(root));
 
             // Presets
-            VisualElement presetsRow = MakeRow(column, "PRESETS");
-            m_NormalPresetButton = MakeButton("Normal", () => ApplyPreset(HostGamePresets.Normal), selectSound, 160f);
-            Button hardButton = MakeButton("Hard", () => ApplyPreset(HostGamePresets.Hard), selectSound, 160f);
-            Button veryHardButton = MakeButton("Very Hard", () => ApplyPreset(HostGamePresets.VeryHard), selectSound, 160f);
+            VisualElement presetsRow = MakeRow(column, "PRESETS", out _, hasAllToggle: false);
+            m_NormalPresetButton = MakeButton("Normal", () => ApplyPreset(0), selectSound, 160f);
+            Button hardButton = MakeButton("Hard", () => ApplyPreset(1), selectSound, 160f);
+            Button veryHardButton = MakeButton("Very Hard", () => ApplyPreset(2), selectSound, 160f);
             hardButton.style.marginLeft = 20;
             veryHardButton.style.marginLeft = 20;
             presetsRow.Add(m_NormalPresetButton);
@@ -237,74 +267,97 @@ namespace Blocks.Gameplay.Core
             presetsRow.Add(veryHardButton);
             AddNavRow(0, m_NormalPresetButton, hardButton, veryHardButton);
 
-            // Visibility
-            AddNavRow(0, AddDropdownRow(column, "VISIBILITY", VisibilityChoices,
-                () => m_Rules.IsPublic ? 0 : 1,
-                i => m_Rules.IsPublic = i == 0));
+            // Visibility (hosting only - searches only ever list public games)
+            if (!IsFilterMode)
+            {
+                AddDropdownRow(column, "VISIBILITY", VisibilityChoices,
+                    () => m_Rules.IsPublic ? 0 : 1,
+                    i => m_Rules.IsPublic = i == 0,
+                    null);
+            }
 
             // Map
             BuildMapRows(column);
-            AddNavRow(0, m_MapArea);
 
-            // Sliders. The fallback index in each IndexOf is the Normal preset's value, used only if the
-            // stored value somehow isn't one of the options.
-            AddNavRow(0, AddSliderRow(column, "MAX PLAYERS", MaxPlayerOptions.Length,
+            // Sliders. The fallback index in each IndexOf is the Normal host preset's value, used only if
+            // the stored value somehow isn't one of the options.
+            AddSliderRow(column, "MAX PLAYERS", MaxPlayerOptions.Length,
                 () => IndexOf(MaxPlayerOptions, m_Rules.MaxPlayers, 6),
                 i => MaxPlayerOptions[i].ToString(CultureInfo.InvariantCulture),
-                i => m_Rules.MaxPlayers = MaxPlayerOptions[i]));
+                i => m_Rules.MaxPlayers = MaxPlayerOptions[i],
+                Flag(() => m_Filter.AllMaxPlayers, v => m_Filter.AllMaxPlayers = v));
 
-            AddNavRow(0, AddSliderRow(column, "ROUND TIME", RoundTimeOptions.Length,
+            AddSliderRow(column, "ROUND TIME", RoundTimeOptions.Length,
                 () => IndexOf(RoundTimeOptions, m_Rules.RoundTimeSeconds, 4),
-                i => FormatTime(RoundTimeOptions[i]),
-                i => m_Rules.RoundTimeSeconds = RoundTimeOptions[i]));
+                i => GameRulesFormat.Time(RoundTimeOptions[i]),
+                i => m_Rules.RoundTimeSeconds = RoundTimeOptions[i],
+                Flag(() => m_Filter.AllRoundTimes, v => m_Filter.AllRoundTimes = v));
 
-            AddNavRow(0, AddSliderRow(column, "BONUS TIME", BonusTimeOptions.Length,
+            AddSliderRow(column, "BONUS TIME", BonusTimeOptions.Length,
                 () => IndexOf(BonusTimeOptions, m_Rules.BonusTimeSeconds, 8),
-                i => FormatTime(BonusTimeOptions[i]),
-                i => m_Rules.BonusTimeSeconds = BonusTimeOptions[i]));
+                i => GameRulesFormat.Time(BonusTimeOptions[i]),
+                i => m_Rules.BonusTimeSeconds = BonusTimeOptions[i],
+                Flag(() => m_Filter.AllBonusTimes, v => m_Filter.AllBonusTimes = v));
 
-            AddNavRow(0, AddSliderRow(column, "LIVES", LivesOptions.Length,
+            // In filter mode the Hard search preset means "more than 5 lives" (GameSearchFilter.LivesMoreThan);
+            // the label says so, and any edit to this slider turns it back into an exact match.
+            AddSliderRow(column, "LIVES", LivesOptions.Length,
                 () => IndexOf(LivesOptions, m_Rules.Lives, LivesOptions.Length - 1),
-                i => FormatLives(LivesOptions[i]),
-                i => m_Rules.Lives = LivesOptions[i]));
+                i => m_Filter != null && m_Filter.LivesMoreThan
+                    ? $"More than {GameRulesFormat.Lives(LivesOptions[i])}"
+                    : GameRulesFormat.Lives(LivesOptions[i]),
+                i =>
+                {
+                    m_Rules.Lives = LivesOptions[i];
+                    if (m_Filter != null) m_Filter.LivesMoreThan = false;
+                },
+                Flag(() => m_Filter.AllLives, v => m_Filter.AllLives = v));
 
-            AddNavRow(0, AddSliderRow(column, "STARTING POINTS", StartingPointsOptions.Length,
+            AddSliderRow(column, "STARTING POINTS", StartingPointsOptions.Length,
                 () => IndexOf(StartingPointsOptions, m_Rules.StartingPoints, 10),
                 i => StartingPointsOptions[i].ToString(CultureInfo.InvariantCulture),
-                i => m_Rules.StartingPoints = StartingPointsOptions[i]));
+                i => m_Rules.StartingPoints = StartingPointsOptions[i],
+                Flag(() => m_Filter.AllStartingPoints, v => m_Filter.AllStartingPoints = v));
 
-            AddNavRow(0, AddSliderRow(column, "DEATH PENALTY", DeathPenaltyOptions.Length,
+            AddSliderRow(column, "DEATH PENALTY", DeathPenaltyOptions.Length,
                 () => IndexOf(DeathPenaltyOptions, m_Rules.DeathPenalty, 2),
-                i => FormatDeathPenalty(DeathPenaltyOptions[i]),
-                i => m_Rules.DeathPenalty = DeathPenaltyOptions[i]));
+                i => GameRulesFormat.DeathPenalty(DeathPenaltyOptions[i]),
+                i => m_Rules.DeathPenalty = DeathPenaltyOptions[i],
+                Flag(() => m_Filter.AllDeathPenalties, v => m_Filter.AllDeathPenalties = v));
 
-            AddNavRow(0, AddSliderRow(column, "WAGER PAYOUT", WagerPayoutOptions.Length,
+            AddSliderRow(column, "WAGER PAYOUT", WagerPayoutOptions.Length,
                 () => IndexOf(WagerPayoutOptions, m_Rules.WagerPayout, 1),
-                i => FormatPayout(WagerPayoutOptions[i]),
-                i => m_Rules.WagerPayout = WagerPayoutOptions[i]));
+                i => GameRulesFormat.Payout(WagerPayoutOptions[i]),
+                i => m_Rules.WagerPayout = WagerPayoutOptions[i],
+                Flag(() => m_Filter.AllWagerPayouts, v => m_Filter.AllWagerPayouts = v));
 
             // Items / Pickups
-            AddNavRow(0, AddDropdownRow(column, "ITEMS", ItemsChoices,
+            AddDropdownRow(column, "ITEMS", ItemsChoices,
                 () => m_Rules.ItemsEnabled ? 0 : 1,
-                i => m_Rules.ItemsEnabled = i == 0));
-            AddNavRow(0, AddDropdownRow(column, "PICKUPS", PickupsChoices,
+                i => m_Rules.ItemsEnabled = i == 0,
+                Flag(() => m_Filter.AllItems, v => m_Filter.AllItems = v));
+            AddDropdownRow(column, "PICKUPS", PickupsChoices,
                 () => m_Rules.PickupsEnabled ? 0 : 1,
-                i => m_Rules.PickupsEnabled = i == 0));
+                i => m_Rules.PickupsEnabled = i == 0,
+                Flag(() => m_Filter.AllPickups, v => m_Filter.AllPickups = v));
 
-            // Back (bottom-left) / Host Game (bottom-right). Not part of m_Column, so they're never scaled.
+            // Back (bottom-left) / Host Game or Find Games (bottom-right). Not part of m_Column, so they're
+            // never scaled.
             Button backButton = MakeButton("Back", OnBackClicked, cancelSound, 200f);
             backButton.style.position = Position.Absolute;
             backButton.style.left = 40;
             backButton.style.bottom = BottomButtonMargin;
             root.Add(backButton);
 
-            Button hostButton = MakeButton("Host Game", OnHostGameClicked, selectSound, 200f);
-            hostButton.style.position = Position.Absolute;
-            hostButton.style.right = 40;
-            hostButton.style.bottom = BottomButtonMargin;
-            root.Add(hostButton);
+            Button primaryButton = IsFilterMode
+                ? MakeButton("Find Games", OnFindGamesClicked, selectSound, 200f)
+                : MakeButton("Host Game", OnHostGameClicked, selectSound, 200f);
+            primaryButton.style.position = Position.Absolute;
+            primaryButton.style.right = 40;
+            primaryButton.style.bottom = BottomButtonMargin;
+            root.Add(primaryButton);
 
-            AddNavRow(1, backButton, hostButton);
+            AddNavRow(1, backButton, primaryButton);
 
             // Nothing is focused by default, and gamepad navigation needs a starting point - start at
             // the top-left element.
@@ -312,13 +365,15 @@ namespace Blocks.Gameplay.Core
             SetButtonFocusedVisual(m_NormalPresetButton, true);
         }
 
-        private const float ColumnTop = 30f;
-        private const float BottomButtonMargin = 40f;
-        private const float BottomButtonHeight = 40f;
-        private const float GapAboveBottomButtons = 16f;
+        /// <summary>Getter/setter pair for one of m_Filter's All flags, or null in host mode (no checkbox).</summary>
+        private (Func<bool> Get, Action<bool> Set)? Flag(Func<bool> get, Action<bool> set)
+        {
+            if (!IsFilterMode) return null;
+            return (get, set);
+        }
 
         /// <summary>
-        /// Uniformly scales the whole settings column (never Back/Host Game) down just enough to fit
+        /// Uniformly scales the whole settings column (never the bottom buttons) down just enough to fit
         /// between the top margin and the bottom buttons, and within the screen width - so the page fits
         /// at 1280x720 (or any other resolution/panel scale) without per-row layout changes. Never scales
         /// above 1. style.scale is a transform, so it doesn't feed back into layout (no resize loop), and
@@ -340,22 +395,67 @@ namespace Blocks.Gameplay.Core
             m_Column.style.scale = new Scale(new Vector2(scale, scale));
         }
 
-        /// <summary>Applies a preset's values to m_Rules and refreshes every control to match (visibility is left alone).</summary>
-        private void ApplyPreset(HostGameRulesData preset)
+        /// <summary>0 = Normal, 1 = Hard, 2 = Very Hard. Host mode applies HostGamePresets (visibility untouched); filter mode applies GameSearchPresets.</summary>
+        private void ApplyPreset(int presetIndex)
         {
-            m_Rules.ApplyPreset(preset);
+            if (IsFilterMode)
+            {
+                GameSearchFilter preset = presetIndex == 0 ? GameSearchPresets.Normal
+                                        : presetIndex == 1 ? GameSearchPresets.Hard
+                                        : GameSearchPresets.VeryHard;
+                m_Filter.CopyFrom(preset);
+            }
+            else
+            {
+                HostGameRulesData preset = presetIndex == 0 ? HostGamePresets.Normal
+                                         : presetIndex == 1 ? HostGamePresets.Hard
+                                         : HostGamePresets.VeryHard;
+                m_Rules.ApplyPreset(preset);
+            }
+
+            RefreshAllControls();
+        }
+
+        private void RefreshAllControls()
+        {
             foreach (Action refresh in m_RefreshFromRules)
             {
                 refresh();
             }
         }
 
-        private VisualElement MakeRow(VisualElement parent, string label)
+        /// <summary>
+        /// Adds a row to parent: in filter mode an All checkbox (or, for rows without one, an equally wide
+        /// spacer so labels line up), then the row's name label.
+        /// </summary>
+        private VisualElement MakeRow(VisualElement parent, string label, out Toggle allToggle, bool hasAllToggle)
         {
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
             row.style.marginBottom = RowSpacing;
+
+            allToggle = null;
+            if (IsFilterMode)
+            {
+                if (hasAllToggle)
+                {
+                    allToggle = new Toggle("All");
+                    allToggle.style.width = AllToggleWidth - 10f;
+                    allToggle.style.marginRight = 10;
+                    allToggle.style.flexShrink = 0;
+                    allToggle.labelElement.style.minWidth = 0;
+                    allToggle.labelElement.style.marginRight = 6;
+                    row.Add(allToggle);
+                }
+                else
+                {
+                    var spacer = new VisualElement();
+                    spacer.style.width = AllToggleWidth;
+                    spacer.style.flexShrink = 0;
+                    row.Add(spacer);
+                }
+            }
 
             var nameLabel = new Label(label);
             nameLabel.style.color = Color.white;
@@ -381,14 +481,14 @@ namespace Blocks.Gameplay.Core
         // ----- rows -----
 
         /// <summary>
-        /// Builds a label + SliderInt(0..optionCount-1) + value-label row. readIndex maps the current
-        /// m_Rules value to a slider index; it's used both for the initial value and whenever a preset is
-        /// applied (see m_RefreshFromRules).
+        /// Builds a label + SliderInt(0..optionCount-1) + value-label row (plus an All checkbox when flag
+        /// is non-null) and adds it to the navigation grid. readIndex maps the current m_Rules value to a
+        /// slider index; it's used for the initial value and whenever the controls are refreshed.
         /// </summary>
-        private SliderInt AddSliderRow(VisualElement parent, string label, int optionCount, Func<int> readIndex,
-            Func<int, string> format, Action<int> onChanged)
+        private void AddSliderRow(VisualElement parent, string label, int optionCount, Func<int> readIndex,
+            Func<int, string> format, Action<int> onChanged, (Func<bool> Get, Action<bool> Set)? flag)
         {
-            VisualElement row = MakeRow(parent, label);
+            VisualElement row = MakeRow(parent, label, out Toggle allToggle, flag.HasValue);
 
             int initialIndex = readIndex();
             var slider = new SliderInt { lowValue = 0, highValue = optionCount - 1, value = initialIndex };
@@ -399,11 +499,14 @@ namespace Blocks.Gameplay.Core
             Label valueLabel = MakeValueLabel(format(initialIndex));
             row.Add(valueLabel);
 
+            // Any change that reaches here is user-driven (mouse drag or edit-mode Left/Right) - refreshes
+            // and reverts use SetValueWithoutNotify - so it also unchecks this row's All box.
             slider.RegisterValueChangedCallback(evt =>
             {
                 if (evt.newValue == evt.previousValue) return;
-                valueLabel.text = format(evt.newValue);
                 onChanged(evt.newValue);
+                valueLabel.text = format(evt.newValue);
+                UncheckAll(slider);
             });
 
             m_RefreshFromRules.Add(() =>
@@ -419,8 +522,8 @@ namespace Blocks.Gameplay.Core
                 Set = i =>
                 {
                     slider.SetValueWithoutNotify(i);
-                    valueLabel.text = format(i);
                     onChanged(i);
+                    valueLabel.text = format(i);
                 },
                 // Setting .value fires RegisterValueChangedCallback above, same as a mouse drag would.
                 Move = direction =>
@@ -432,13 +535,13 @@ namespace Blocks.Gameplay.Core
                 }
             });
 
-            return slider;
+            FinishControlRow(slider, allToggle, flag);
         }
 
-        private DropdownField AddDropdownRow(VisualElement parent, string label, List<string> choices, Func<int> readIndex,
-            Action<int> onChanged)
+        private void AddDropdownRow(VisualElement parent, string label, List<string> choices, Func<int> readIndex,
+            Action<int> onChanged, (Func<bool> Get, Action<bool> Set)? flag)
         {
-            VisualElement row = MakeRow(parent, label);
+            VisualElement row = MakeRow(parent, label, out Toggle allToggle, flag.HasValue);
 
             var dropdown = new DropdownField(new List<string>(choices), readIndex());
             dropdown.style.width = 260;
@@ -449,6 +552,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (evt.newValue == evt.previousValue) return;
                 onChanged(dropdown.index);
+                UncheckAll(dropdown);
             });
 
             m_RefreshFromRules.Add(() => dropdown.SetValueWithoutNotify(dropdown.choices[readIndex()]));
@@ -473,12 +577,13 @@ namespace Blocks.Gameplay.Core
                 }
             });
 
-            return dropdown;
+            FinishControlRow(dropdown, allToggle, flag);
         }
 
         private void BuildMapRows(VisualElement parent)
         {
-            VisualElement row = MakeRow(parent, "MAP");
+            var flag = Flag(() => m_Filter.AllMaps, v => m_Filter.AllMaps = v);
+            VisualElement row = MakeRow(parent, "MAP", out Toggle allToggle, flag.HasValue);
 
             // Explicit row containers of MapColumns cells each, rather than one flex-wrapping container -
             // wrapping depends on the cells' exact rendered widths (theme borders/margins, panel scaling),
@@ -542,7 +647,7 @@ namespace Blocks.Gameplay.Core
             flavorRow.style.marginBottom = RowSpacing + 6;
 
             var spacer = new VisualElement();
-            spacer.style.width = LabelWidth;
+            spacer.style.width = (IsFilterMode ? AllToggleWidth : 0f) + LabelWidth;
             spacer.style.flexShrink = 0;
             flavorRow.Add(spacer);
 
@@ -564,6 +669,74 @@ namespace Blocks.Gameplay.Core
                 Set = SetSelectedMap,
                 Move = MoveMapSelection
             });
+
+            FinishControlRow(m_MapArea, allToggle, flag);
+        }
+
+        /// <summary>Wires a row's All checkbox (filter mode) and adds the row to the navigation grid: [checkbox, control] or just [control].</summary>
+        private void FinishControlRow(VisualElement control, Toggle allToggle, (Func<bool> Get, Action<bool> Set)? flag)
+        {
+            if (allToggle == null || !flag.HasValue)
+            {
+                AddNavRow(0, control);
+                return;
+            }
+
+            Func<bool> get = flag.Value.Get;
+            Action<bool> set = flag.Value.Set;
+
+            m_AllToggles[control] = allToggle;
+            allToggle.SetValueWithoutNotify(get());
+            SetAllDimmed(control, get());
+
+            allToggle.RegisterValueChangedCallback(evt =>
+            {
+                set(evt.newValue);
+                SetAllDimmed(control, evt.newValue);
+            });
+
+            m_RefreshFromRules.Add(() =>
+            {
+                allToggle.SetValueWithoutNotify(get());
+                SetAllDimmed(control, get());
+            });
+
+            SetToggleFocusedVisual(allToggle, false);
+            allToggle.RegisterCallback<FocusInEvent>(_ =>
+            {
+                CommitEditIfFocusMovedAway(allToggle);
+                SetToggleFocusedVisual(allToggle, true);
+            });
+            allToggle.RegisterCallback<FocusOutEvent>(_ => SetToggleFocusedVisual(allToggle, false));
+
+            // A toggles it. Handled here (and the Toggle's own default Submit action prevented) so it
+            // can't double-toggle, and so it plays the same select sound as everything else.
+            allToggle.RegisterCallback<NavigationSubmitEvent>(evt =>
+            {
+                evt.PreventDefault();
+                evt.StopPropagation();
+                if (m_Editing != null) return;
+                allToggle.value = !allToggle.value;
+                PlaySound(selectSound);
+            }, TrickleDown.TrickleDown);
+            allToggle.RegisterCallback<NavigationMoveEvent>(evt => OnNavigationMove(allToggle, evt), TrickleDown.TrickleDown);
+
+            AddNavRow(1, allToggle, control);
+        }
+
+        /// <summary>A checked All box dims its control, since that rule isn't being filtered on.</summary>
+        private static void SetAllDimmed(VisualElement control, bool all)
+        {
+            control.style.opacity = all ? 0.35f : 1f;
+        }
+
+        /// <summary>Called on any user-driven change to a control: in filter mode that rule is now being filtered on.</summary>
+        private void UncheckAll(VisualElement control)
+        {
+            if (m_AllToggles.TryGetValue(control, out Toggle toggle) && toggle.value)
+            {
+                toggle.value = false; // fires the toggle's callback, which updates the filter flag and dimming
+            }
         }
 
         private int FindMapIndex(string mapName)
@@ -607,7 +780,11 @@ namespace Blocks.Gameplay.Core
             }
 
             int next = Mathf.Min(row * MapColumns + col, MapCount - 1);
-            if (next != m_SelectedMapIndex) SetSelectedMap(next);
+            if (next != m_SelectedMapIndex)
+            {
+                SetSelectedMap(next);
+                UncheckAll(m_MapArea);
+            }
         }
 
         private static readonly Color SelectedMapBorder = new Color(1f, 0.85f, 0.2f);
@@ -643,15 +820,16 @@ namespace Blocks.Gameplay.Core
             if (m_Editing != null && m_Editing != m_MapArea) return;
 
             SetSelectedMap(index);
+            UncheckAll(m_MapArea);
             m_MapArea.Focus();
 
             if (m_Editing == m_MapArea)
             {
                 ExitEditMode(commit: true); // plays the select sound
             }
-            else if (selectSound != null)
+            else
             {
-                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.SoundEffects, Vector3.zero);
+                PlaySound(selectSound);
             }
         }
 
@@ -662,7 +840,11 @@ namespace Blocks.Gameplay.Core
             m_Editables[element] = editable;
 
             SetFocusedVisual(element, false);
-            element.RegisterCallback<FocusInEvent>(_ => OnEditableFocusIn(element));
+            element.RegisterCallback<FocusInEvent>(_ =>
+            {
+                CommitEditIfFocusMovedAway(element);
+                if (m_Editing != element) SetFocusedVisual(element, true);
+            });
             element.RegisterCallback<FocusOutEvent>(_ =>
             {
                 if (m_Editing != element) SetFocusedVisual(element, false);
@@ -673,18 +855,17 @@ namespace Blocks.Gameplay.Core
             element.RegisterCallback<NavigationMoveEvent>(evt => OnNavigationMove(element, evt), TrickleDown.TrickleDown);
         }
 
-        private void OnEditableFocusIn(VisualElement element)
+        /// <summary>
+        /// If the mouse moved focus to <paramref name="newlyFocused"/> while something else was mid-edit,
+        /// keep that edit rather than leaving it stuck in edit mode on an element that no longer has focus.
+        /// </summary>
+        private void CommitEditIfFocusMovedAway(VisualElement newlyFocused)
         {
-            // If the mouse moved focus away from something mid-edit, keep that edit rather than leaving it
-            // stuck in edit mode on an element that no longer has focus.
-            if (m_Editing != null && m_Editing != element)
-            {
-                VisualElement previous = m_Editing;
-                ExitEditMode(commit: true);
-                SetFocusedVisual(previous, false);
-            }
+            if (m_Editing == null || m_Editing == newlyFocused) return;
 
-            if (m_Editing != element) SetFocusedVisual(element, true);
+            VisualElement previous = m_Editing;
+            ExitEditMode(commit: true);
+            SetFocusedVisual(previous, false);
         }
 
         private void OnEditableSubmit(VisualElement element, NavigationSubmitEvent evt)
@@ -715,12 +896,9 @@ namespace Blocks.Gameplay.Core
         {
             m_Editing = element;
             m_ValueBeforeEdit = m_Editables[element].Get();
+            m_FilterBeforeEdit = m_Filter?.Clone();
             element.style.backgroundColor = EditingBackground;
-
-            if (selectSound != null)
-            {
-                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.SoundEffects, Vector3.zero);
-            }
+            PlaySound(selectSound);
         }
 
         private void ExitEditMode(bool commit)
@@ -733,17 +911,26 @@ namespace Blocks.Gameplay.Core
 
             if (!commit)
             {
-                m_Editables[element].Set(m_ValueBeforeEdit);
-
-                if (cancelSound != null)
+                if (m_FilterBeforeEdit != null)
                 {
-                    AudioVolumeService.PlayOneShot(cancelSound, AudioCategory.SoundEffects, Vector3.zero);
+                    // Filter mode: restore the whole filter (the value plus any All box / "more than"
+                    // flag the edit changed) and redraw every control from it.
+                    m_Filter.CopyFrom(m_FilterBeforeEdit);
+                    RefreshAllControls();
                 }
+                else
+                {
+                    m_Editables[element].Set(m_ValueBeforeEdit);
+                }
+
+                PlaySound(cancelSound);
             }
-            else if (selectSound != null)
+            else
             {
-                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.SoundEffects, Vector3.zero);
+                PlaySound(selectSound);
             }
+
+            m_FilterBeforeEdit = null;
         }
 
         // ----- navigation -----
@@ -779,20 +966,20 @@ namespace Blocks.Gameplay.Core
 
             switch (evt.direction)
             {
-                case NavigationMoveEvent.Direction.Up: FocusRow(pos.Row - 1); break;
-                case NavigationMoveEvent.Direction.Down: FocusRow(pos.Row + 1); break;
+                case NavigationMoveEvent.Direction.Up: FocusRow(pos.Row - 1, pos.Row, pos.Col); break;
+                case NavigationMoveEvent.Direction.Down: FocusRow(pos.Row + 1, pos.Row, pos.Col); break;
                 case NavigationMoveEvent.Direction.Left: FocusCell(pos.Row, pos.Col - 1); break;
                 case NavigationMoveEvent.Direction.Right: FocusCell(pos.Row, pos.Col + 1); break;
             }
         }
 
-        private void FocusRow(int row)
+        private void FocusRow(int row, int fromRow, int fromCol)
         {
             if (row < 0 || row >= m_NavRows.Count) return;
 
             VisualElement[] elements = m_NavRows[row];
-            int col = elements.Length == 1 ? 0 : Mathf.Clamp(m_RowEntryColumn[row], 0, elements.Length - 1);
-            elements[col].Focus();
+            int col = m_NavRows[fromRow].Length == elements.Length ? fromCol : m_RowEntryColumn[row];
+            elements[Mathf.Clamp(col, 0, elements.Length - 1)].Focus();
         }
 
         private void FocusCell(int row, int col)
@@ -828,16 +1015,26 @@ namespace Blocks.Gameplay.Core
             button.style.color = focused ? FocusedText : UnfocusedText;
         }
 
+        private static void SetToggleFocusedVisual(Toggle toggle, bool focused)
+        {
+            toggle.style.backgroundColor = focused ? FocusedBackground : Color.clear;
+            toggle.labelElement.style.color = focused ? FocusedText : Color.white;
+        }
+
+        private void PlaySound(AudioClip clip)
+        {
+            if (clip != null)
+            {
+                AudioVolumeService.PlayOneShot(clip, AudioCategory.SoundEffects, Vector3.zero);
+            }
+        }
+
         private Button MakeButton(string text, Action onClick, AudioClip clickSound, float width)
         {
             var button = new Button(() =>
             {
                 if (m_Editing != null) return; // don't act mid-edit
-
-                if (clickSound != null)
-                {
-                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.SoundEffects, Vector3.zero);
-                }
+                PlaySound(clickSound);
                 onClick();
             })
             { text = text };
@@ -848,12 +1045,7 @@ namespace Blocks.Gameplay.Core
             SetButtonFocusedVisual(button, false);
             button.RegisterCallback<FocusInEvent>(_ =>
             {
-                if (m_Editing != null)
-                {
-                    VisualElement previous = m_Editing;
-                    ExitEditMode(commit: true);
-                    SetFocusedVisual(previous, false);
-                }
+                CommitEditIfFocusMovedAway(button);
                 SetButtonFocusedVisual(button, true);
             });
             button.RegisterCallback<FocusOutEvent>(_ => SetButtonFocusedVisual(button, false));
@@ -868,9 +1060,16 @@ namespace Blocks.Gameplay.Core
             Debug.Log($"[HostGame] Host Game selected (not implemented yet). Rules: {JsonUtility.ToJson(m_Rules)}");
         }
 
+        private void OnFindGamesClicked()
+        {
+            GameSearch.CurrentFilter = m_Filter.Clone();
+            GameSearch.BrowserBackScene = SceneManager.GetActiveScene().name;
+            SceneManager.LoadScene(gameBrowserSceneName);
+        }
+
         private void OnBackClicked()
         {
-            SceneManager.LoadScene(mainMenuSceneName);
+            SceneManager.LoadScene(backSceneName);
         }
     }
 }

@@ -7,12 +7,11 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// Third screen in the boot flow: the same "Parkour Parlay Title Screen" logo as the title screen,
     /// same size and position, over a black background - with Join Game / Host Game / Single Player /
-    /// Settings / Quit Game stacked in the bottom-right corner instead of centered. Join Game calls
-    /// straight into <see cref="GameNetworkManager"/>'s own StartClientConnection - the same method
-    /// GameNetworkUI's buttons call in the gameplay test scenes. Host Game loads the Host Game rules
-    /// screen (<see cref="hostGameSceneName"/>, see HostGameController) rather than starting a host
-    /// directly; actually starting the hosted session from there isn't wired up yet (it'll be built on
-    /// Photon Fusion 2). Single Player is a placeholder for now (it just logs) - it'll also get a real
+    /// Settings / Quit Game stacked in the bottom-right corner instead of centered. Join Game loads the
+    /// Join Game menu (<see cref="joinGameSceneName"/>, see JoinGameController: Public browsing or Private
+    /// room codes) and Host Game loads the Host Game rules screen (<see cref="hostGameSceneName"/>, see
+    /// HostGameController); actually hosting/joining sessions isn't wired up yet (it'll be built on Photon
+    /// Fusion 2). Single Player is a placeholder for now (it just logs) - it'll also get a real
     /// implementation as part of the move to Fusion 2, whose own single-player mode is the natural fit.
     ///
     /// Navigable with a gamepad's left stick or d-pad plus the submit button, not just the mouse - see
@@ -26,18 +25,9 @@ namespace Blocks.Gameplay.Core
     /// screen's Master/SoundEffects sliders and plays on a DontDestroyOnLoad one-shot object, so a click
     /// sound survives the scene load its own button triggers (Host Game, Settings).
     ///
-    /// For that call to have anything to talk to, this scene needs its own GameNetworkManager - unlike
-    /// the test scenes, this one doesn't come with the gameplay content that normally carries a
-    /// NetworkManager alongside it. This scene carries its own instance of the shared
-    /// "[BB] NetworkManager" prefab for exactly that reason; GameNetworkManager.Awake() marks itself
-    /// DontDestroyOnLoad, so that same instance survives into whatever scene gets loaded next.
-    ///
-    /// This project's NetworkConfig has EnableSceneManagement on (see GameNetworkManager's NetworkConfig
-    /// in the NetworkManager prefab), which means Netcode itself is responsible for keeping every
-    /// connected client's active scene in sync with the host's - a client that called LoadScene on its
-    /// own would fight that sync instead of relying on it. That's why OnJoinClicked below does
-    /// nothing but connect: once connected, Netcode automatically brings that client into whatever
-    /// scene the host loaded, no extra code needed on the client side at all.
+    /// This scene still carries an instance of the shared "[BB] NetworkManager" prefab
+    /// (GameNetworkManager, Netcode for GameObjects) from when Host/Client connected directly from here.
+    /// Nothing on this menu uses it any more; it'll go away with the move to Fusion 2.
     ///
     /// Quit Game exits the build (Application.Quit() is a no-op in the Editor, so this stops Play Mode
     /// there instead).
@@ -51,6 +41,9 @@ namespace Blocks.Gameplay.Core
     {
         [Tooltip("Same logo as the title screen - wire this up to the same texture as TitleScreenController's titleImage.")]
         [SerializeField] private Texture2D titleImage;
+
+        [Tooltip("Scene to load when Join Game is clicked - the Public/Private join menu.")]
+        [SerializeField] private string joinGameSceneName = "JoinGame";
 
         [Tooltip("Scene to load when Host Game is clicked - the game-rules setup screen.")]
         [SerializeField] private string hostGameSceneName = "HostGame";
@@ -179,15 +172,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnJoinClicked()
         {
-            if (GameNetworkManager.Instance == null)
-            {
-                Debug.LogError("[MainMenu] No GameNetworkManager in the scene - can't start a client.");
-                return;
-            }
-
-            // No scene load here on purpose - see the class summary. Netcode's own scene management
-            // (EnableSceneManagement is on) brings this client into whatever scene the host loads.
-            GameNetworkManager.Instance.StartClientConnection();
+            SceneManager.LoadScene(joinGameSceneName);
         }
 
         private void OnSinglePlayerClicked()
