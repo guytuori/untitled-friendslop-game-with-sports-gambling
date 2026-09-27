@@ -12,6 +12,7 @@
     "com.unity.multiplayer.playmode": "2.0.2",
     "com.unity.multiplayer.tools": "2.2.10",
     "com.unity.netcode.gameobjects": "2.13.1",
+    "com.unity.nuget.mono-cecil": "1.10.2",
     "com.unity.postprocessing": "3.5.4",
     "com.unity.render-pipelines.universal": "17.5.0",
     "com.unity.services.multiplayer": "2.3.0",

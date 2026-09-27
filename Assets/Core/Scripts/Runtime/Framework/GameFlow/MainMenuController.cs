@@ -6,11 +6,13 @@ namespace Blocks.Gameplay.Core
 {
     /// <summary>
     /// Third screen in the boot flow: the same "Parkour Parlay Title Screen" logo as the title screen,
-    /// same size and position, over a black background - with Host / Client / Settings / Quit Game
-    /// stacked in the bottom-right corner instead of centered. Host and Client call straight into
-    /// <see cref="GameNetworkManager"/>'s own StartHostConnection/StartClientConnection - the exact
-    /// same methods GameNetworkUI's buttons call in the gameplay test scenes - so this reuses the
-    /// project's existing networking entry points rather than reimplementing them.
+    /// same size and position, over a black background - with Join Game / Host Game / Single Player /
+    /// Settings / Quit Game stacked in the bottom-right corner instead of centered. Join Game loads the
+    /// Join Game menu (<see cref="joinGameSceneName"/>, see JoinGameController: Public browsing or Private
+    /// room codes) and Host Game loads the Host Game rules screen (<see cref="hostGameSceneName"/>, see
+    /// HostGameController); actually hosting/joining sessions isn't wired up yet (it'll be built on Photon
+    /// Fusion 2). Single Player is a placeholder for now (it just logs) - it'll also get a real
+    /// implementation as part of the move to Fusion 2, whose own single-player mode is the natural fit.
     ///
     /// Navigable with a gamepad's left stick or d-pad plus the submit button, not just the mouse - see
     /// BuildUI for what that actually takes (an EventSystem + InputSystemUIInputModule is already
@@ -19,28 +21,13 @@ namespace Blocks.Gameplay.Core
     /// gamepad navigation has nothing to move from without a starting point).
     ///
     /// Every button plays a click sound (<see cref="selectSound"/> or <see cref="cancelSound"/>) via
-    /// AudioVolumeService.PlayOneShot (AudioCategory.SoundEffects) - a thin wrapper around
-    /// AudioSource.PlayClipAtPoint that applies the Audio Settings screen's Master/SoundEffects sliders,
-    /// still a one-shot fire-and-forget clip rather than a persistent AudioSource. That temporary
-    /// GameObject isn't marked DontDestroyOnLoad, so a sound triggered right before this button's own
-    /// scene load (Settings, or Host once connected) can get cut short by the unload; this hasn't been
-    /// flagged as an issue yet but would need a small delay-before-load, or a persistent DontDestroyOnLoad
-    /// AudioSource, to fully fix if it becomes noticeable.
+    /// AudioVolumeService.PlayOneShot (AudioCategory.SoundEffects), which applies the Audio Settings
+    /// screen's Master/SoundEffects sliders and plays on a DontDestroyOnLoad one-shot object, so a click
+    /// sound survives the scene load its own button triggers (Host Game, Settings).
     ///
-    /// For that call to have anything to talk to, this scene needs its own GameNetworkManager - unlike
-    /// the test scenes, this one doesn't come with the gameplay content that normally carries a
-    /// NetworkManager alongside it. This scene carries its own instance of the shared
-    /// "[BB] NetworkManager" prefab for exactly that reason; GameNetworkManager.Awake() marks itself
-    /// DontDestroyOnLoad, so that same instance survives into whatever scene gets loaded next.
-    ///
-    /// Once Host is clicked, this loads <see cref="gameplaySceneName"/> - but only on the host/server
-    /// side, via NetworkManager's own SceneManager rather than a plain SceneManager.LoadScene. This
-    /// project's NetworkConfig has EnableSceneManagement on (see GameNetworkManager's NetworkConfig in
-    /// the NetworkManager prefab), which means Netcode itself is responsible for keeping every
-    /// connected client's active scene in sync with the host's - a client that called LoadScene on its
-    /// own would fight that sync instead of relying on it. That's why OnClientClicked below does
-    /// nothing but connect: once connected, Netcode automatically brings that client into whatever
-    /// scene the host just loaded (or is about to load), no extra code needed on the client side at all.
+    /// This scene still carries an instance of the shared "[BB] NetworkManager" prefab
+    /// (GameNetworkManager, Netcode for GameObjects) from when Host/Client connected directly from here.
+    /// Nothing on this menu uses it any more; it'll go away with the move to Fusion 2.
     ///
     /// Quit Game exits the build (Application.Quit() is a no-op in the Editor, so this stops Play Mode
     /// there instead).
@@ -55,13 +42,16 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Same logo as the title screen - wire this up to the same texture as TitleScreenController's titleImage.")]
         [SerializeField] private Texture2D titleImage;
 
-        [Tooltip("The actual game scene to load once hosting starts. Netcode syncs every connected client to this automatically - see the class summary.")]
-        [SerializeField] private string gameplaySceneName = "[BB] Core";
+        [Tooltip("Scene to load when Join Game is clicked - the Public/Private join menu.")]
+        [SerializeField] private string joinGameSceneName = "JoinGame";
+
+        [Tooltip("Scene to load when Host Game is clicked - the game-rules setup screen.")]
+        [SerializeField] private string hostGameSceneName = "HostGame";
 
         [Tooltip("Scene to load when Settings is clicked.")]
         [SerializeField] private string settingsSceneName = "Settings";
 
-        [Tooltip("Played when Host, Client, or Settings is selected.")]
+        [Tooltip("Played when Join Game, Host Game, Single Player, or Settings is selected.")]
         [SerializeField] private AudioClip selectSound;
 
         [Tooltip("Played when Quit Game is selected.")]
@@ -109,9 +99,10 @@ namespace Blocks.Gameplay.Core
             buttonColumn.style.flexDirection = FlexDirection.Column;
             buttonColumn.style.alignItems = Align.FlexEnd;
 
-            Button hostButton = MakeButton("Host", OnHostClicked, selectSound);
-            buttonColumn.Add(hostButton);
-            buttonColumn.Add(MakeButton("Client", OnClientClicked, selectSound));
+            Button joinButton = MakeButton("Join Game", OnJoinClicked, selectSound);
+            buttonColumn.Add(joinButton);
+            buttonColumn.Add(MakeButton("Host Game", OnHostClicked, selectSound));
+            buttonColumn.Add(MakeButton("Single Player", OnSinglePlayerClicked, selectSound));
             buttonColumn.Add(MakeButton("Settings", OnSettingsClicked, selectSound));
             buttonColumn.Add(MakeButton("Quit Game", OnQuitClicked, cancelSound));
             root.Add(buttonColumn);
@@ -120,12 +111,12 @@ namespace Blocks.Gameplay.Core
             // InputSystemUIInputModule) out of the box, but nothing has focus yet at this point, and
             // gamepad Move/Submit only ever act on whatever's currently focused - with no starting
             // focus, the left stick/d-pad would do nothing until the player first clicks a button with
-            // a mouse. Focusing Host here gives gamepad-only navigation somewhere to start from
-            // immediately, matching how a controller-first menu is expected to behave.
-            hostButton.Focus();
+            // a mouse. Focusing the top button (Join Game) here gives gamepad-only navigation somewhere
+            // to start from immediately, matching how a controller-first menu is expected to behave.
+            joinButton.Focus();
             // FocusInEvent normally handles this (see MakeButton), but setting it explicitly too
             // guards against relying on that event firing synchronously the very first time.
-            SetFocusedVisual(hostButton, true);
+            SetFocusedVisual(joinButton, true);
         }
 
         // Near-black/dim gray for every button that doesn't have focus, and a bright, high-contrast
@@ -159,7 +150,7 @@ namespace Blocks.Gameplay.Core
             button.style.fontSize = 18;
 
             // Every button starts grayed out; whichever one gains focus (by gamepad navigation, mouse
-            // click, or the initial hostButton.Focus() call above) gets brightened by these same two
+            // click, or the initial joinButton.Focus() call above) gets brightened by these same two
             // callbacks, and reverts the moment focus moves elsewhere.
             SetFocusedVisual(button, false);
             button.RegisterCallback<FocusInEvent>(_ => SetFocusedVisual(button, true));
@@ -176,39 +167,18 @@ namespace Blocks.Gameplay.Core
 
         private void OnHostClicked()
         {
-            GameNetworkManager manager = GameNetworkManager.Instance;
-            if (manager == null)
-            {
-                Debug.LogError("[MainMenu] No GameNetworkManager in the scene - can't start a host.");
-                return;
-            }
-
-            manager.StartHostConnection();
-
-            // StartHost() (called inside StartHostConnection) is synchronous - by the time it returns,
-            // IsListening is already true and SceneManager is ready to use, so there's no need to wait
-            // a frame or hook a callback before loading the gameplay scene.
-            if (manager.IsListening)
-            {
-                manager.SceneManager.LoadScene(gameplaySceneName, LoadSceneMode.Single);
-            }
-            else
-            {
-                Debug.LogError("[MainMenu] StartHostConnection didn't result in a listening host - not loading the gameplay scene.");
-            }
+            SceneManager.LoadScene(hostGameSceneName);
         }
 
-        private void OnClientClicked()
+        private void OnJoinClicked()
         {
-            if (GameNetworkManager.Instance == null)
-            {
-                Debug.LogError("[MainMenu] No GameNetworkManager in the scene - can't start a client.");
-                return;
-            }
+            SceneManager.LoadScene(joinGameSceneName);
+        }
 
-            // No scene load here on purpose - see the class summary. Netcode's own scene management
-            // (EnableSceneManagement is on) brings this client into whatever scene the host loads.
-            GameNetworkManager.Instance.StartClientConnection();
+        private void OnSinglePlayerClicked()
+        {
+            // Placeholder until the Fusion 2 migration - see the class summary.
+            Debug.Log("[MainMenu] Single Player selected (not implemented yet).");
         }
 
         private void OnSettingsClicked()
