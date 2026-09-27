@@ -27,6 +27,9 @@ EditorBuildSettings:
     path: Assets/Core/Scenes/GraphicsSettings.unity
     guid: b04987c4101edf7f278d50e45c9be289
   - enabled: 1
+    path: Assets/Core/Scenes/HostGame.unity
+    guid: a0f766b1633d20a4f38f0ca9691baed2
+  - enabled: 1
     path: Assets/Core/Scenes/[BB] Core.unity
     guid: 5492879da6a8a4759a6862bcc1e31e6e
   - enabled: 1
@@ -44,6 +47,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Shooter/TestScenes/[BB] Shooter MultiplayerSession.unity
     guid: 7d42b85864099114e8d3c5e25250b013
+  - enabled: 1
+    path: Assets/Photon/FusionDemos/Fusion-Intro-Shared/Scenes/FusionIntroShared.unity
+    guid: 00000000000000000000000000000000
+  - enabled: 1
+    path: Assets/Photon/FusionMenu/FusionSampleMenu.unity
+    guid: 74c3b330900a03442806ce69f1fe5955
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
