@@ -258,14 +258,79 @@ namespace Blocks.Gameplay.Core
                 m_AirborneMomentum = Vector3.zero;
                 ExitRail();
             }
+            
         }
-
+        
         #endregion
 
         #region Grinding
 
+        public float rotationSpeed = 222f;
+        public float raycastDistance = 2.5f;
+        private Vector3 currentSurfaceNormal = Vector3.up;
+        public float targetHoverHeight = 0.1f;
+        public float stickToGroundForce = 12f;
+        private bool isGrounded;
+        public float centeringForce = 15.0f;
+        public float sideProbeDistance = 2.5f;
+        private Vector3 GetCenteringForce()
+        {
+            Vector3 rightDir = transform.right;
+            Vector3 leftDir = -transform.right;
+
+            // Raycast out to the right and left relative to character orientation
+            bool hitRight = Physics.Raycast(transform.position, rightDir, out RaycastHit rightHit, sideProbeDistance, LayerMask.GetMask("Grind"));
+            bool hitLeft = Physics.Raycast(transform.position, leftDir, out RaycastHit leftHit, sideProbeDistance, LayerMask.GetMask("Grind"));
+
+            float rightDist = hitRight ? rightHit.distance : sideProbeDistance;
+            float leftDist = hitLeft ? leftHit.distance : sideProbeDistance;
+
+            // Distance difference indicates off-center positioning in a V-shape or U-shaped surface
+            float offset = rightDist - leftDist;
+
+            // Positive offset means we are closer to the left side -> push right
+            // Negative offset means we are closer to the right side -> push left
+            return transform.right * (offset * centeringForce);
+        }
+
+        private void AlignAndStickToSurface()
+        {
+            // Cast a ray straight down relative to the character's current orientation
+            Ray ray = new Ray(transform.position, -transform.up);
+
+            if (Physics.SphereCast(transform.position + transform.forward + transform.up,1.0f, -transform.up, out RaycastHit hit, raycastDistance, LayerMask.GetMask("Grind")))
+            {
+                isGrounded = true;
+                currentSurfaceNormal = hit.normal;
+
+                // 1. Calculate rotation aligning character's UP vector with the surface normal
+                Quaternion targetRotation = Quaternion.FromToRotation(transform.up, currentSurfaceNormal);// * transform.rotation;
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.fixedDeltaTime * rotationSpeed);
+
+                // 2. Adjust position to hover precisely at targetHoverHeight
+                float currentDistance = hit.distance;
+                float distanceError = currentDistance - targetHoverHeight;
+
+                // Apply corrective force along the local down direction to stick to the surface
+                Vector3 stickForce = -transform.up * (distanceError * stickToGroundForce);
+                stickForce += transform.forward * stickToGroundForce;// + GetCenteringForce();
+                m_Controller.Move(Time.deltaTime * (hit.point - transform.position).normalized * stickToGroundForce);
+                // m_Motor.SetVerticalVelocity(m_Motor.VerticalVelocity - (Time.deltaTime * 9.81f));
+                return;
+            }
+           // ExitRail();
+        }
+
+
+
+
+
+
         private void ProcessGrinding(Vector2 rawInput, ref MovementModifier modifier)
         {
+           //AlignAndStickToSurface();
+          
+
             // A rail has no collider, so CoreMovement.IsGrounded is false the whole time we're on one -
             // without this, gravity integrates into vertical velocity every frame regardless of
             // SnapToRail placing the player exactly on the path, and the accumulated fall gets applied

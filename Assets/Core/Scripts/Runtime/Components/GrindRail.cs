@@ -105,7 +105,7 @@ namespace Blocks.Gameplay.Core
                             // Verify the hit surface normal is upward-facing
                             if (Vector3.Angle(hit.normal, Vector3.up) <= maxUpwardAngle)
                             {
-                                generatedPoints.Add(hit.point);
+                                generatedPoints.Add(hit.point - transform.position);
                             }
                         }
                     }
@@ -137,7 +137,7 @@ namespace Blocks.Gameplay.Core
                 float z = Mathf.Sin(angleInRadians) * radius;
 
                 Vector3 point = centerPosition + new Vector3(x * width,  z * width, count * 2);
-                points.Add(point);
+                points.Add(point - transform.position);
                 count++;
             }
             waypoints = points.ToArray();
@@ -200,8 +200,8 @@ namespace Blocks.Gameplay.Core
             // (centrifugal-feeling) rather than just toward a random side.
             for (int i = 1; i < n - 1; i++)
             {
-                Vector3 inDir = (waypoints[i] - waypoints[i - 1]).normalized;
-                Vector3 outDir = (waypoints[i + 1] - waypoints[i]).normalized;
+                Vector3 inDir = (waypoints[i] - waypoints[i - 1]).normalized + transform.position;
+                Vector3 outDir = (waypoints[i + 1] - waypoints[i]).normalized + transform.position;
                 m_TurnAngleAtWaypoint[i] = Vector3.SignedAngle(inDir, outDir, Vector3.up);
             }
         }
@@ -223,8 +223,8 @@ namespace Blocks.Gameplay.Core
 
             for (int i = 0; i < waypoints.Length - 1; i++)
             {
-                Vector3 a = waypoints[i];
-                Vector3 b = waypoints[i + 1];
+                Vector3 a = waypoints[i] + transform.position;
+                Vector3 b = waypoints[i + 1] + transform.position;
                 Vector3 ab = b - a;
                 float lenSqr = ab.sqrMagnitude;
                 float t = lenSqr > 0.0001f ? Mathf.Clamp01(Vector3.Dot(worldPosition - a, ab) / lenSqr) : 0f;
@@ -268,8 +268,8 @@ namespace Blocks.Gameplay.Core
             }
 
             int segment = FindSegment(arcLength);
-            Vector3 a = waypoints[segment];
-            Vector3 b = waypoints[segment + 1];
+            Vector3 a = waypoints[segment] + transform.position;
+            Vector3 b = waypoints[segment + 1] + transform.position;
             float segLen = m_CumulativeLength[segment + 1] - m_CumulativeLength[segment];
             float t = segLen > 0.0001f ? (arcLength - m_CumulativeLength[segment]) / segLen : 0f;
 
@@ -303,10 +303,10 @@ namespace Blocks.Gameplay.Core
             Gizmos.color = Color.cyan;
             for (int i = 0; i < waypoints.Length - 1; i++)
             {
-                Gizmos.DrawLine(waypoints[i] + Vector3.up * radius, waypoints[i + 1] + Vector3.up * radius);
-                Gizmos.DrawWireSphere(waypoints[i] + Vector3.up * radius, radius);
+                Gizmos.DrawLine(waypoints[i] + transform.position + Vector3.up * radius, waypoints[i + 1] + transform.position + Vector3.up * radius);
+                Gizmos.DrawWireSphere(waypoints[i] + transform.position + Vector3.up * radius, radius);
             }
-            Gizmos.DrawWireSphere(waypoints[waypoints.Length - 1] + Vector3.up * radius, radius);
+            Gizmos.DrawWireSphere(waypoints[waypoints.Length - 1] + transform.position + Vector3.up * radius, radius);
         }
     }
 }

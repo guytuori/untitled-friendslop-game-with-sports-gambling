@@ -93,7 +93,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3365733114
+  GlobalObjectIdHash: 1777126326
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -483,6 +483,10 @@ MonoBehaviour:
   barBackgroundColor: {r: 0, g: 0, b: 0, a: 0.55}
   indicatorSafeColor: {r: 1, g: 1, b: 1, a: 1}
   indicatorDangerColor: {r: 1, g: 0.25, b: 0.2, a: 1}
+  rotationSpeed: 10
+  raycastDistance: 2.5
+  targetHoverHeight: 1
+  stickToGroundForce: 15
 --- !u!114 &7901013521677120731
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -532,6 +536,7 @@ MonoBehaviour:
   wallJumpPushForce: 25
   regrabCooldown: 0.25
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+  wallJumpStyle: 0
 --- !u!114 &6234546863735232799
 MonoBehaviour:
   m_ObjectHideFlags: 0
