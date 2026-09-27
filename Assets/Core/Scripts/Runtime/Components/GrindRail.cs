@@ -59,7 +59,7 @@ namespace Blocks.Gameplay.Core
 
             if (parent == null)
             {
-                return ;
+                return;
             }
 
             // Process each child transform
@@ -73,37 +73,39 @@ namespace Blocks.Gameplay.Core
                     continue; // Skip children without a valid mesh
                 }
 
-                // Get mesh bounds in world space
-                Bounds bounds = collider != null ? collider.bounds : filter.sharedMesh.bounds;
-
-                // Calculate total depth along the child's local forward direction
+                // Get local bounds dimensions
                 Vector3 localMin = filter.sharedMesh.bounds.min;
                 Vector3 localMax = filter.sharedMesh.bounds.max;
+
+                // Calculate length and height accounting for lossy scale
                 float meshForwardLength = Mathf.Abs(localMax.z - localMin.z) * child.lossyScale.z;
+                float meshHeight = Mathf.Abs(localMax.y - localMin.y) * child.lossyScale.y;
 
-                Vector3 startPos = child.TransformPoint(new Vector3(0, 0, localMin.z));
                 Vector3 forwardDir = child.forward;
+                Vector3 upDir = child.up;
 
-                // Start raycasting slightly above the highest point of the mesh bounds
-                float rayOriginY = bounds.max.y + 1.0f;
-                float maxRayDistance = bounds.size.y + 2.0f;
+                // Max distance for the ray to cover the height of the mesh + padding
+                float maxRayDistance = meshHeight + 5.0f;
 
-                // Step along the forward direction
+                // Step along the child's local Z (forward) direction
                 for (float dist = 0f; dist <= meshForwardLength; dist += stepDistance)
                 {
-                    Vector3 samplePos = startPos + (forwardDir * dist);
+                    // Point along the local bottom/center line of the mesh
+                    Vector3 baseSamplePos = child.TransformPoint(new Vector3(0, localMin.y, localMin.z + (dist / child.lossyScale.z)));
 
-                    // Origin directly above current step point
-                    Vector3 rayOrigin = new Vector3(samplePos.x, rayOriginY, samplePos.z);
-                    Ray ray = new Ray(rayOrigin, Vector3.down);
+                    // Position ray origin slightly above the local top of the child's mesh surface
+                    Vector3 rayOrigin = baseSamplePos + (upDir * (meshHeight + 1.0f));
+
+                    // Cast ray downward along the child's local down vector (-child.up)
+                    Ray ray = new Ray(rayOrigin, -upDir);
 
                     if (collider != null)
                     {
                         // Precise hit testing using child collider
                         if (collider.Raycast(ray, out RaycastHit hit, maxRayDistance))
                         {
-                            // Verify the hit surface normal is upward-facing
-                            if (Vector3.Angle(hit.normal, Vector3.up) <= maxUpwardAngle)
+                            // Verify the hit surface normal aligns with the child's local up vector
+                            if (Vector3.Angle(hit.normal, upDir) <= maxUpwardAngle)
                             {
                                 generatedPoints.Add(hit.point - transform.position);
                             }
@@ -111,15 +113,16 @@ namespace Blocks.Gameplay.Core
                     }
                     else
                     {
-                        // Fallback to top bounds level if no collider is attached
-                        Vector3 fallbackPoint = new Vector3(samplePos.x, bounds.max.y, samplePos.z);
-                        generatedPoints.Add(fallbackPoint);
+                        // Fallback: place the point on the child's local top surface
+                        Vector3 fallbackPoint = baseSamplePos + (upDir * meshHeight);
+                        generatedPoints.Add(fallbackPoint - transform.position);
                     }
                 }
             }
+
             waypoints = generatedPoints.ToArray();
         }
-       
+
 
         public void GenerateCirclePointsXZ(int pointCount = 16,float width = 25 )
         {
@@ -295,7 +298,20 @@ namespace Blocks.Gameplay.Core
 
             return 0;
         }
+        public int FindClosestWaypoint(Vector3 _position)
+        {
+            if (waypoints == null || waypoints.Length == 0)
+            { return -1; }
+            int count = 0;
 
+            while (count < waypoints.Length)
+            {
+
+                count++;
+            }
+
+            return 0;
+        }
         private void OnDrawGizmosSelected()
         {
             if (waypoints == null || waypoints.Length < 2) return;

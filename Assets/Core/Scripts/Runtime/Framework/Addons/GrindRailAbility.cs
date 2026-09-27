@@ -74,6 +74,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float entrySpeedMultiplier = 0.6f;
         [Tooltip("How strongly slope affects speed - going downhill adds this much (scaled by how steep), uphill subtracts it.")]
         [SerializeField] private float slopeSpeedInfluence = 6f;
+        [SerializeField] private float rotateToSurfaceSpeed = 5f;
 
         [Header("Balance")]
         [Tooltip("Ambient random wobble strength (per second, at max speed) - present even on a flat, straight stretch of rail.")]
@@ -149,6 +150,8 @@ namespace Blocks.Gameplay.Core
         private Image m_IndicatorImage;
         private Camera m_MainCamera;
 
+        private Vector3 previousPosition; //for tracking the movement across a curving rail
+
         #region Unity Lifecycle
 
         private void Awake()
@@ -187,22 +190,27 @@ namespace Blocks.Gameplay.Core
 
             if (!IsOnRail)
             {
-                if (m_Motor.IsGrounded)
-                {
-                    // Landed safely without snapping to anything - don't keep sliding on carried
-                    // rail speed once you're back on solid, non-rail ground.
-                    m_AirborneMomentum = Vector3.zero;
-                    m_MomentumAirTime = 0f;
-                }
-                else
-                {
-                    ProcessAirborneMomentum(ref modifier);
-                }
-
                 if (TryDetectRail(out GrindRail rail, out float arc, out float travelSign))
                 {
                     EnterRail(rail, arc, travelSign);
                 }
+                else 
+                {
+                    if (m_Motor.IsGrounded)
+                    {
+                        // Landed safely without snapping to anything - don't keep sliding on carried
+                        // rail speed once you're back on solid, non-rail ground.
+                        m_AirborneMomentum = Vector3.zero;
+                        m_MomentumAirTime = 0f;
+                    }
+                    else
+                    {
+                        ProcessAirborneMomentum(ref modifier);
+                    }
+
+                }
+
+
 
                 return modifier;
             }
@@ -260,71 +268,12 @@ namespace Blocks.Gameplay.Core
             }
             
         }
-        
+
         #endregion
 
         #region Grinding
 
-        public float rotationSpeed = 222f;
-        public float raycastDistance = 2.5f;
-        private Vector3 currentSurfaceNormal = Vector3.up;
-        public float targetHoverHeight = 0.1f;
-        public float stickToGroundForce = 12f;
-        private bool isGrounded;
-        public float centeringForce = 15.0f;
-        public float sideProbeDistance = 2.5f;
-        private Vector3 GetCenteringForce()
-        {
-            Vector3 rightDir = transform.right;
-            Vector3 leftDir = -transform.right;
-
-            // Raycast out to the right and left relative to character orientation
-            bool hitRight = Physics.Raycast(transform.position, rightDir, out RaycastHit rightHit, sideProbeDistance, LayerMask.GetMask("Grind"));
-            bool hitLeft = Physics.Raycast(transform.position, leftDir, out RaycastHit leftHit, sideProbeDistance, LayerMask.GetMask("Grind"));
-
-            float rightDist = hitRight ? rightHit.distance : sideProbeDistance;
-            float leftDist = hitLeft ? leftHit.distance : sideProbeDistance;
-
-            // Distance difference indicates off-center positioning in a V-shape or U-shaped surface
-            float offset = rightDist - leftDist;
-
-            // Positive offset means we are closer to the left side -> push right
-            // Negative offset means we are closer to the right side -> push left
-            return transform.right * (offset * centeringForce);
-        }
-
-        private void AlignAndStickToSurface()
-        {
-            // Cast a ray straight down relative to the character's current orientation
-            Ray ray = new Ray(transform.position, -transform.up);
-
-            if (Physics.SphereCast(transform.position + transform.forward + transform.up,1.0f, -transform.up, out RaycastHit hit, raycastDistance, LayerMask.GetMask("Grind")))
-            {
-                isGrounded = true;
-                currentSurfaceNormal = hit.normal;
-
-                // 1. Calculate rotation aligning character's UP vector with the surface normal
-                Quaternion targetRotation = Quaternion.FromToRotation(transform.up, currentSurfaceNormal);// * transform.rotation;
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.fixedDeltaTime * rotationSpeed);
-
-                // 2. Adjust position to hover precisely at targetHoverHeight
-                float currentDistance = hit.distance;
-                float distanceError = currentDistance - targetHoverHeight;
-
-                // Apply corrective force along the local down direction to stick to the surface
-                Vector3 stickForce = -transform.up * (distanceError * stickToGroundForce);
-                stickForce += transform.forward * stickToGroundForce;// + GetCenteringForce();
-                m_Controller.Move(Time.deltaTime * (hit.point - transform.position).normalized * stickToGroundForce);
-                // m_Motor.SetVerticalVelocity(m_Motor.VerticalVelocity - (Time.deltaTime * 9.81f));
-                return;
-            }
-           // ExitRail();
-        }
-
-
-
-
-
+        [SerializeField] private int currentWaypoint;
 
         private void ProcessGrinding(Vector2 rawInput, ref MovementModifier modifier)
         {
@@ -399,17 +348,32 @@ namespace Blocks.Gameplay.Core
             m_Balance = Mathf.Clamp(m_Balance, -1f, 1f);
         }
 
+        
         /// <summary>Places the player at the current arc length, offset up by the rail's radius and sideways by the current balance lean.</summary>
         private void SnapToRail()
         {
             m_CurrentRail.Evaluate(m_ArcLength, out Vector3 point, out _, out Vector3 right, out _);
             Vector3 lateral = right * (Mathf.Clamp(m_Balance, -1f, 1f) * m_CurrentRail.Radius * 0.6f);
             Vector3 ridePos = point + Vector3.up * m_CurrentRail.Radius + lateral;
+            
+           
+            if (Physics.Raycast(transform.position , ridePos, out RaycastHit hit,1,LayerMask.GetMask("Grind")))
+            {
+                //previousPosition resets on enter rail, as the character moves aross the rail we can track
+                //the direction of travel if the rail is curving without referencing the waypoints a 3rd time
+                Quaternion targetRot = Quaternion.LookRotation((ridePos - previousPosition).normalized, hit.normal);
+                //Lerp here to avoid weird snapping, its alright that it never reaches 1
+                m_Motor.RotationOverride = () => Quaternion.Lerp(transform.rotation, targetRot, rotateToSurfaceSpeed * Time.deltaTime);
+                previousPosition = ridePos;
+            }
+
             m_Motor.SetPosition(ridePos, teleport: false);
+            
         }
 
         private void EnterRail(GrindRail rail, float arc, float travelSign)
         {
+            previousPosition = (transform.position - transform.forward);
             m_CurrentRail = rail;
             IsOnRail = true;
             m_ArcLength = arc;
@@ -425,7 +389,7 @@ namespace Blocks.Gameplay.Core
             SnapToRail();
             m_Motor.SetVerticalVelocity(0f);
 
-            m_Motor.RotationOverride = () => m_CurrentRail != null ? CurrentTangentRotation() : m_Motor.transform.rotation;
+           // m_Motor.RotationOverride = () => m_CurrentRail != null ? CurrentTangentRotation() : m_Motor.transform.rotation;
 
             SyncNetworkState();
         }
@@ -441,13 +405,13 @@ namespace Blocks.Gameplay.Core
         private void ExitRail()
         {
             if (!IsOnRail) return;
-
+            transform.GetChild(1).rotation = transform.rotation;
             m_LastRail = m_CurrentRail;
             m_LastRailGuardTimer = sameRailReentryGuard;
 
             IsOnRail = false;
             m_CurrentRail = null;
-
+            currentWaypoint = -1;
             if (m_Motor != null)
             {
                 m_Motor.RotationOverride = null;
