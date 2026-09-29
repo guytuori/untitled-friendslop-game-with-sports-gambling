@@ -21,7 +21,7 @@ namespace Blocks.Gameplay.Core
     /// gamepad navigation has nothing to move from without a starting point).
     ///
     /// Every button plays a click sound (<see cref="selectSound"/> or <see cref="cancelSound"/>) via
-    /// AudioVolumeService.PlayOneShot (AudioCategory.SoundEffects), which applies the Audio Settings
+    /// AudioVolumeService.PlayOneShot (AudioCategory.UISoundEffects), which applies the Audio Settings
     /// screen's Master/SoundEffects sliders and plays on a DontDestroyOnLoad one-shot object, so a click
     /// sound survives the scene load its own button triggers (Host Game, Settings).
     ///
@@ -138,7 +138,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (clickSound != null)
                 {
-                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.SoundEffects, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.UISoundEffects, Vector3.zero);
                 }
                 onClick();
             })

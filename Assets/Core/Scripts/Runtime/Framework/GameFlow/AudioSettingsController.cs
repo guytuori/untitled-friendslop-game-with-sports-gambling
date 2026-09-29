@@ -48,8 +48,9 @@ namespace Blocks.Gameplay.Core
     /// settings.json - the same config file Change Keybindings uses, via the existing
     /// InputBindingsStore/InputBindingsData.Audio field - when Save Changes is clicked.
     ///
-    /// Restore Defaults (above Save Changes, above Back - same order as Change Keybindings) resets all
-    /// four sliders back to 100% at once, live-applies that, and refreshes the slider visuals. It does
+    /// Restore Defaults (above Save Changes, above Back - same order as Change Keybindings) resets
+    /// everything to AudioSettingsData's defaults at once (Master 30%, the other three 100%, UI sound
+    /// effects on), live-applies that, and refreshes the visuals. It does
     /// NOT save by itself - same "still just a working change until Save Changes" convention as every
     /// other settings screen in this project, and Back discards any unsaved change the same way too.
     ///
@@ -97,6 +98,13 @@ namespace Blocks.Gameplay.Core
         private SliderInt m_SoundEffectsSlider;
         private SliderInt m_VoiceSlider;
 
+        /// <summary>
+        /// Enable UI Sound Effects checkbox, below Voice. Not an edit-mode control - A toggles it directly
+        /// (live-applied like the sliders, saved with Save Changes). Up returns to Voice, Right jumps to
+        /// Save Changes, Left/Down do nothing.
+        /// </summary>
+        private Toggle m_UISoundsToggle;
+
         private readonly Dictionary<SliderInt, Label> m_SliderValueLabels = new Dictionary<SliderInt, Label>();
         private readonly Dictionary<SliderInt, System.Action<int>> m_SliderOnChanged = new Dictionary<SliderInt, System.Action<int>>();
 
@@ -141,7 +149,8 @@ namespace Blocks.Gameplay.Core
                 MasterVolume = source.MasterVolume,
                 MusicVolume = source.MusicVolume,
                 SoundEffectsVolume = source.SoundEffectsVolume,
-                VoiceVolume = source.VoiceVolume
+                VoiceVolume = source.VoiceVolume,
+                UISoundEffectsEnabled = source.UISoundEffectsEnabled
             };
         }
 
@@ -180,6 +189,7 @@ namespace Blocks.Gameplay.Core
             m_SoundEffectsSlider = AddSliderRow(sliderColumn, "SOUND EFFECTS", m_Settings.SoundEffectsVolume, v => { m_Settings.SoundEffectsVolume = v; LiveApply(); });
             m_VoiceSlider = AddSliderRow(sliderColumn, "VOICE", m_Settings.VoiceVolume, v => { m_Settings.VoiceVolume = v; LiveApply(); });
             m_SlidersInOrder = new[] { m_MasterSlider, m_MusicSlider, m_SoundEffectsSlider, m_VoiceSlider };
+            AddUISoundsToggleRow(sliderColumn);
 
             // Same absolutely-positioned bottom-right column as the other GameFlow screens, with Restore
             // Defaults and Save Changes above Back - identical order to ChangeKeybindingsController.
@@ -315,7 +325,7 @@ namespace Blocks.Gameplay.Core
 
             if (selectSound != null)
             {
-                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.SoundEffects, Vector3.zero);
+                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.UISoundEffects, Vector3.zero);
             }
         }
 
@@ -340,12 +350,12 @@ namespace Blocks.Gameplay.Core
 
                 if (cancelSound != null)
                 {
-                    AudioVolumeService.PlayOneShot(cancelSound, AudioCategory.SoundEffects, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(cancelSound, AudioCategory.UISoundEffects, Vector3.zero);
                 }
             }
             else if (selectSound != null)
             {
-                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.SoundEffects, Vector3.zero);
+                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.UISoundEffects, Vector3.zero);
             }
         }
 
@@ -426,6 +436,61 @@ namespace Blocks.Gameplay.Core
             }
         }
 
+        private void AddUISoundsToggleRow(VisualElement parent)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginTop = 6;
+
+            var label = new Label("ENABLE UI SOUND EFFECTS");
+            label.style.color = Color.white;
+            label.style.fontSize = 16;
+            label.style.width = 340;
+            row.Add(label);
+
+            m_UISoundsToggle = new Toggle();
+            m_UISoundsToggle.SetValueWithoutNotify(m_Settings.UISoundEffectsEnabled);
+            m_UISoundsToggle.style.paddingLeft = 6;
+            m_UISoundsToggle.style.paddingRight = 6;
+            m_UISoundsToggle.style.paddingTop = 4;
+            m_UISoundsToggle.style.paddingBottom = 4;
+            m_UISoundsToggle.RegisterValueChangedCallback(evt =>
+            {
+                m_Settings.UISoundEffectsEnabled = evt.newValue;
+                LiveApply();
+                // After LiveApply, so it's only audible when turning UI sounds back on.
+                if (selectSound != null)
+                {
+                    AudioVolumeService.PlayOneShot(selectSound, AudioCategory.UISoundEffects, Vector3.zero);
+                }
+            });
+
+            SetFocusedVisual(m_UISoundsToggle, false);
+            m_UISoundsToggle.RegisterCallback<FocusInEvent>(_ => SetFocusedVisual(m_UISoundsToggle, true));
+            m_UISoundsToggle.RegisterCallback<FocusOutEvent>(_ => SetFocusedVisual(m_UISoundsToggle, false));
+
+            // A toggles it - handled explicitly in the capture phase with the Toggle's own default Submit
+            // action prevented, so it can't double-toggle.
+            m_UISoundsToggle.RegisterCallback<NavigationSubmitEvent>(evt =>
+            {
+                evt.PreventDefault();
+                evt.StopPropagation();
+                if (m_EditingSlider != null) return;
+                m_UISoundsToggle.value = !m_UISoundsToggle.value;
+            }, TrickleDown.TrickleDown);
+
+            m_UISoundsToggle.RegisterCallback<NavigationMoveEvent>(evt =>
+            {
+                SuppressDefaultNavigation(evt);
+                if (evt.direction == NavigationMoveEvent.Direction.Up) m_VoiceSlider.Focus();
+                else if (evt.direction == NavigationMoveEvent.Direction.Right) m_SaveButton.Focus();
+            }, TrickleDown.TrickleDown);
+
+            row.Add(m_UISoundsToggle);
+            parent.Add(row);
+        }
+
         /// <summary>Moves focus to the previous (step -1) or next (step 1) slider in m_SlidersInOrder, or does nothing if already at that end - no wraparound.</summary>
         private void FocusAdjacentSlider(SliderInt from, int step)
         {
@@ -433,6 +498,11 @@ namespace Blocks.Gameplay.Core
             if (index < 0) return;
 
             int next = index + step;
+            if (next == m_SlidersInOrder.Length && m_UISoundsToggle != null)
+            {
+                m_UISoundsToggle.Focus(); // Down from Voice
+                return;
+            }
             if (next < 0 || next >= m_SlidersInOrder.Length) return;
 
             m_SlidersInOrder[next].Focus();
@@ -542,7 +612,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (clickSound != null)
                 {
-                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.SoundEffects, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.UISoundEffects, Vector3.zero);
                 }
                 onClick();
             })
@@ -576,6 +646,7 @@ namespace Blocks.Gameplay.Core
             m_MusicSlider.SetValueWithoutNotify(m_Settings.MusicVolume);
             m_SoundEffectsSlider.SetValueWithoutNotify(m_Settings.SoundEffectsVolume);
             m_VoiceSlider.SetValueWithoutNotify(m_Settings.VoiceVolume);
+            m_UISoundsToggle.SetValueWithoutNotify(m_Settings.UISoundEffectsEnabled);
 
             m_SliderValueLabels[m_MasterSlider].text = PercentText(m_Settings.MasterVolume);
             m_SliderValueLabels[m_MusicSlider].text = PercentText(m_Settings.MusicVolume);

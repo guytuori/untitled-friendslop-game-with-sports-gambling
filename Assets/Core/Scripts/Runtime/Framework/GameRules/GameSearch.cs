@@ -126,7 +126,7 @@ namespace Blocks.Gameplay.Core
         public static string BrowserBackScene { get; set; } = "";
     }
 
-    /// <summary>One hosted game as shown in the Game Browser.</summary>
+    /// <summary>One hosted game as shown in the Game Browser. For real games SessionName is the room code.</summary>
     public class GameSessionListing
     {
         public string SessionName;
@@ -135,20 +135,65 @@ namespace Blocks.Gameplay.Core
     }
 
     /// <summary>
-    /// Where the Game Browser gets its list of hosted games. The real implementation will be a Photon
-    /// Fusion 2 session lobby (NetworkRunner.JoinSessionLobby + INetworkRunnerCallbacks.OnSessionListUpdated,
-    /// with each host's rules published as session properties). Until hosting exists, the browser uses
-    /// <see cref="SampleGameSessionSource"/> or <see cref="EmptyGameSessionSource"/>.
+    /// Where the Game Browser gets its list of hosted games: <see cref="FusionGameSessionSource"/> (real
+    /// public games through Photon Fusion 2) or <see cref="SampleGameSessionSource"/> (fake games for
+    /// testing the table). onResult may be called more than once - every time the list changes - until
+    /// <see cref="Stop"/>. onError reports a player-facing connection problem.
     /// </summary>
     public interface IGameSessionSource
     {
-        void RequestSessions(Action<IReadOnlyList<GameSessionListing>> onResult);
+        void RequestSessions(Action<IReadOnlyList<GameSessionListing>> onResult, Action<string> onError);
+        void Stop();
     }
 
     public class EmptyGameSessionSource : IGameSessionSource
     {
-        public void RequestSessions(Action<IReadOnlyList<GameSessionListing>> onResult) =>
+        public void RequestSessions(Action<IReadOnlyList<GameSessionListing>> onResult, Action<string> onError) =>
             onResult(Array.Empty<GameSessionListing>());
+
+        public void Stop() { }
+    }
+
+    /// <summary>
+    /// Real public games: joins Fusion's session lobby through FusionSessionService and passes on every
+    /// session-list update (open, visible sessions only). Stop leaves the lobby.
+    /// </summary>
+    public class FusionGameSessionSource : IGameSessionSource
+    {
+        private Action<IReadOnlyList<GameSessionListing>> m_OnResult;
+        private Action<string> m_OnError;
+        private bool m_Subscribed;
+
+        public void RequestSessions(Action<IReadOnlyList<GameSessionListing>> onResult, Action<string> onError)
+        {
+            m_OnResult = onResult;
+            m_OnError = onError;
+
+            FusionSessionService service = FusionSessionService.Instance;
+            if (!m_Subscribed)
+            {
+                service.SessionListUpdated += OnListUpdated;
+                service.LobbyError += OnLobbyError;
+                m_Subscribed = true;
+            }
+
+            if (service.HasSessionList) OnListUpdated(service.Sessions);
+            service.EnsureInLobby();
+        }
+
+        public void Stop()
+        {
+            if (!m_Subscribed) return;
+            m_Subscribed = false;
+
+            FusionSessionService service = FusionSessionService.Instance;
+            service.SessionListUpdated -= OnListUpdated;
+            service.LobbyError -= OnLobbyError;
+            service.LeaveLobby();
+        }
+
+        private void OnListUpdated(IReadOnlyList<GameSessionListing> sessions) => m_OnResult?.Invoke(sessions);
+        private void OnLobbyError(string message) => m_OnError?.Invoke(message);
     }
 
     /// <summary>
@@ -176,11 +221,13 @@ namespace Blocks.Gameplay.Core
 
         private List<GameSessionListing> m_Sessions;
 
-        public void RequestSessions(Action<IReadOnlyList<GameSessionListing>> onResult)
+        public void RequestSessions(Action<IReadOnlyList<GameSessionListing>> onResult, Action<string> onError)
         {
             m_Sessions ??= Generate();
             onResult(m_Sessions);
         }
+
+        public void Stop() { }
 
         private static List<GameSessionListing> Generate()
         {

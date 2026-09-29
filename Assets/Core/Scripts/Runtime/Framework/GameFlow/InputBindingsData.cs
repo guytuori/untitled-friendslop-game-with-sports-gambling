@@ -39,13 +39,20 @@ namespace Blocks.Gameplay.Core
         public string WagerCursorUp = "leftTrigger";
         public string WagerCursorDown = "rightTrigger";
         public string WagerSelect = "rightShoulder";
+
+        /// <summary>Change Keybindings' ENABLE RUMBLE checkbox (gamepad layout only). On by default. Read at runtime through <see cref="GamepadRumble"/>.</summary>
+        public bool RumbleEnabled = true;
     }
 
     /// <summary>
     /// The Audio Settings screen's four sliders (Master, Music, Sound Effects, Voice), each an int 0-10
     /// representing 0%-100% in 10% steps - i.e. the 11 notches from the spec, with the slider's raw
-    /// integer value directly being "tens of a percent" (7 == 70%). All default to 10 (100%), so a fresh
-    /// install plays at full volume until the player turns something down.
+    /// integer value directly being "tens of a percent" (7 == 70%). Master defaults to 3 (30%) and the
+    /// other three to 10 (100%), so a fresh install starts at a comfortable overall level.
+    ///
+    /// <see cref="UISoundEffectsEnabled"/> is the Audio screen's Enable UI Sound Effects checkbox: when
+    /// off, every menu/UI click sound (AudioCategory.UISoundEffects) is fully muted regardless of the
+    /// sliders. On by default.
     ///
     /// Music/SoundEffects/Voice apply only to sounds explicitly tagged with the matching AudioCategory
     /// when they're played (see AudioVolumeService) - NOT by detecting which folder a clip's source asset
@@ -57,10 +64,11 @@ namespace Blocks.Gameplay.Core
     [Serializable]
     public class AudioSettingsData
     {
-        public int MasterVolume = 10;
+        public int MasterVolume = 3;
         public int MusicVolume = 10;
         public int SoundEffectsVolume = 10;
         public int VoiceVolume = 10;
+        public bool UISoundEffectsEnabled = true;
     }
 
     /// <summary>
@@ -147,6 +155,38 @@ namespace Blocks.Gameplay.Core
             {
                 Debug.LogError($"[InputBindingsStore] Couldn't write {FilePath}: {e.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Runtime access to the ENABLE RUMBLE setting for whatever gameplay code adds controller rumble
+    /// later - nothing in the project rumbles yet. Route rumble through <see cref="SetMotorSpeeds"/> so
+    /// the checkbox is respected automatically. The value is read from settings.json on first use and
+    /// re-read after Change Keybindings saves (<see cref="Refresh"/>).
+    /// </summary>
+    public static class GamepadRumble
+    {
+        private static bool? s_Enabled;
+
+        public static bool Enabled => s_Enabled ??= InputBindingsStore.Load().Gamepad.RumbleEnabled;
+
+        /// <summary>Re-reads the saved setting, and stops any rumble already running if it's now off.</summary>
+        public static void Refresh()
+        {
+            s_Enabled = null;
+            if (!Enabled) Stop();
+        }
+
+        /// <summary>Same as Gamepad.current.SetMotorSpeeds, but a no-op while rumble is disabled.</summary>
+        public static void SetMotorSpeeds(float lowFrequency, float highFrequency)
+        {
+            if (!Enabled) return;
+            Gamepad.current?.SetMotorSpeeds(lowFrequency, highFrequency);
+        }
+
+        public static void Stop()
+        {
+            Gamepad.current?.ResetHaptics();
         }
     }
 

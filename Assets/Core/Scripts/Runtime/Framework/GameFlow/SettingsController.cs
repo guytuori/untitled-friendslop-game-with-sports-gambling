@@ -129,7 +129,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (clickSound != null)
                 {
-                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.SoundEffects, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.UISoundEffects, Vector3.zero);
                 }
                 onClick();
             })
@@ -164,7 +164,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (cancelSound != null)
                 {
-                    AudioVolumeService.PlayOneShot(cancelSound, AudioCategory.SoundEffects, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(cancelSound, AudioCategory.UISoundEffects, Vector3.zero);
                 }
                 OnBackClicked();
             }

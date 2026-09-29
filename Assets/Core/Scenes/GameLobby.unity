@@ -210,7 +210,7 @@ GameObject:
   - component: {fileID: 141277180}
   - component: {fileID: 955242213}
   m_Layer: 0
-  m_Name: GameBrowserUI
+  m_Name: GameLobbyUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -225,12 +225,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 371039161}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6842292fd0628abe01fbc830d589271e, type: 3}
+  m_Script: {fileID: 11500000, guid: 7e0d57f6dbaaf1ef5ef1af6893786670, type: 3}
   m_Name:
-  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GameBrowserController
-  defaultBackSceneName: JoinPublic
-  useSampleSessions: 0
-  gameLobbySceneName: GameLobby
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GameLobbyController
+  titleImage: {fileID: 2800000, guid: a6c66037b0d4c464f887ac0bb4232b9d, type: 3}
+  leaveSceneName: MainMenu
   selectSound: {fileID: 8300000, guid: 94cf81bf6cc94189874acf02a7153b02, type: 3}
   cancelSound: {fileID: 8300000, guid: 5d86e8758d304cdfb08984ec18e3857e, type: 3}
 --- !u!114 &141277180

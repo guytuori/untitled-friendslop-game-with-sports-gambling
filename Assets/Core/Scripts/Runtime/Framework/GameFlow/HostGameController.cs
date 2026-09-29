@@ -11,7 +11,8 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// The game-rules screen, used in two modes (see <see cref="mode"/>):
     ///   - HostGame (the HostGame scene): the rules a host picks before starting a session, written into
-    ///     <see cref="HostGameRules.Current"/>. Bottom-right button is Host Game (placeholder).
+    ///     <see cref="HostGameRules.Current"/>. Bottom-right button is Host Game, which creates the
+    ///     session through Photon Fusion 2 (FusionSessionService) and opens the pre-match lobby.
     ///   - FindGamesFilter (the FindGames scene, Join Game > Public > Custom): the same rows minus
     ///     Visibility, each with an "All" checkbox on the left, editing <see cref="GameSearch.CustomFilter"/>.
     ///     A checked All means that rule isn't filtered on; its control is dimmed, and changing the control
@@ -78,6 +79,9 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("FindGamesFilter mode only: scene Find Games opens.")]
         [SerializeField] private string gameBrowserSceneName = "GameBrowser";
+
+        [Tooltip("HostGame mode only: scene opened once the session has been created.")]
+        [SerializeField] private string gameLobbySceneName = "GameLobby";
 
         [Tooltip("Played when entering/confirming an edit, selecting a map, toggling All, or clicking a preset/Host Game/Find Games.")]
         [SerializeField] private AudioClip selectSound;
@@ -202,6 +206,12 @@ namespace Blocks.Gameplay.Core
 
         private int MapCount => maps != null ? maps.Length : 0;
 
+        /// <summary>Host mode: status line above the bottom buttons ("Creating game...", connection errors).</summary>
+        private Label m_StatusLabel;
+
+        /// <summary>True while Host Game is creating the session - buttons and Back are ignored meanwhile.</summary>
+        private bool m_Busy;
+
         private void Awake()
         {
             // Same gamepad Submit/Cancel fix every GameFlow screen with an EventSystem applies - see
@@ -233,7 +243,7 @@ namespace Blocks.Gameplay.Core
             // editing, on any element (including buttons and checkboxes, which don't handle Cancel at all).
             root.RegisterCallback<NavigationCancelEvent>(evt =>
             {
-                if (m_Editing != null) return;
+                if (m_Editing != null || m_Busy) return;
                 evt.StopPropagation();
                 PlaySound(cancelSound);
                 OnBackClicked();
@@ -358,6 +368,14 @@ namespace Blocks.Gameplay.Core
             root.Add(primaryButton);
 
             AddNavRow(1, backButton, primaryButton);
+
+            m_StatusLabel = new Label("");
+            m_StatusLabel.style.position = Position.Absolute;
+            m_StatusLabel.style.right = 260;
+            m_StatusLabel.style.bottom = BottomButtonMargin + 10;
+            m_StatusLabel.style.color = new Color(0.9f, 0.9f, 0.9f);
+            m_StatusLabel.style.fontSize = 16;
+            root.Add(m_StatusLabel);
 
             // Nothing is focused by default, and gamepad navigation needs a starting point - start at
             // the top-left element.
@@ -1025,7 +1043,7 @@ namespace Blocks.Gameplay.Core
         {
             if (clip != null)
             {
-                AudioVolumeService.PlayOneShot(clip, AudioCategory.SoundEffects, Vector3.zero);
+                AudioVolumeService.PlayOneShot(clip, AudioCategory.UISoundEffects, Vector3.zero);
             }
         }
 
@@ -1033,7 +1051,7 @@ namespace Blocks.Gameplay.Core
         {
             var button = new Button(() =>
             {
-                if (m_Editing != null) return; // don't act mid-edit
+                if (m_Editing != null || m_Busy) return; // don't act mid-edit or while creating the game
                 PlaySound(clickSound);
                 onClick();
             })
@@ -1054,10 +1072,23 @@ namespace Blocks.Gameplay.Core
             return button;
         }
 
-        private void OnHostGameClicked()
+        private async void OnHostGameClicked()
         {
-            // Placeholder until hosting is wired up (Fusion 2). Logs the chosen rules so they can be checked.
-            Debug.Log($"[HostGame] Host Game selected (not implemented yet). Rules: {JsonUtility.ToJson(m_Rules)}");
+            if (m_Busy) return;
+            m_Busy = true;
+            m_StatusLabel.text = "Creating game...";
+
+            string error = await FusionSessionService.Instance.HostGameAsync(m_Rules.Clone());
+            if (this == null) return; // screen closed meanwhile
+
+            if (error == null)
+            {
+                SceneManager.LoadScene(gameLobbySceneName);
+                return;
+            }
+
+            m_Busy = false;
+            m_StatusLabel.text = error;
         }
 
         private void OnFindGamesClicked()

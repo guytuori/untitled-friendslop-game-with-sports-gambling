@@ -11,13 +11,13 @@ namespace Blocks.Gameplay.Core
     /// The Game Browser: a scrollable table of hosted public games matching
     /// <see cref="GameSearch.CurrentFilter"/> (set by the Normal / Hard / Very Hard search presets or by
     /// Find Games on the Custom screen). One row per game - name, map, players, and every rule - with Back
-    /// (bottom-left) and Refresh (bottom-right). Selecting a row will join that game once joining is wired
-    /// up; for now it just reports it.
+    /// (bottom-left) and Refresh (bottom-right). Selecting a row joins that game (by its room code) and
+    /// opens the pre-match lobby (GameLobbyController).
     ///
-    /// Where the games come from is an <see cref="IGameSessionSource"/>. Until hosting exists this is
-    /// <see cref="SampleGameSessionSource"/> (fake games, so the table can be tested) when
-    /// <see cref="useSampleSessions"/> is on, or an empty list when it's off. The real source will be a
-    /// Photon Fusion 2 session lobby.
+    /// Where the games come from is an <see cref="IGameSessionSource"/>: <see cref="FusionGameSessionSource"/>
+    /// (real public games through Photon Fusion 2's session lobby, updating live as games open, fill and
+    /// start), or <see cref="SampleGameSessionSource"/> (fake games) when <see cref="useSampleSessions"/>
+    /// is on. The Fusion lobby connection is closed when this screen closes.
     ///
     /// Navigation is explicit, like the other GameFlow screens: Up/Down move through the rows (the table
     /// scrolls to keep the focused row visible), Down from the last row reaches Refresh, Left/Right move
@@ -30,8 +30,11 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Scene Back returns to if the screen that opened the browser didn't set one (see GameSearch.BrowserBackScene).")]
         [SerializeField] private string defaultBackSceneName = "JoinPublic";
 
-        [Tooltip("Show fake games so the table can be tested before real hosting exists. Turn off once the Fusion session source is in.")]
-        [SerializeField] private bool useSampleSessions = true;
+        [Tooltip("Show fake games instead of real ones from Fusion - for testing the table layout.")]
+        [SerializeField] private bool useSampleSessions = false;
+
+        [Tooltip("Scene to load once a game has been joined.")]
+        [SerializeField] private string gameLobbySceneName = "GameLobby";
 
         [SerializeField] private AudioClip selectSound;
         [SerializeField] private AudioClip cancelSound;
@@ -68,12 +71,13 @@ namespace Blocks.Gameplay.Core
         private Button m_RefreshButton;
         private readonly List<Button> m_Rows = new List<Button>();
         private int m_LastFocusedRow;
+        private bool m_Joining;
 
         private void Awake()
         {
             GamepadUIBindingFix.Apply();
 
-            m_Source = useSampleSessions ? new SampleGameSessionSource() : (IGameSessionSource)new EmptyGameSessionSource();
+            m_Source = useSampleSessions ? new SampleGameSessionSource() : (IGameSessionSource)new FusionGameSessionSource();
 
             VisualElement root = GetComponent<UIDocument>().rootVisualElement;
             root.style.flexGrow = 1;
@@ -166,36 +170,48 @@ namespace Blocks.Gameplay.Core
             return label;
         }
 
+        private void OnDestroy()
+        {
+            m_Source?.Stop();
+        }
+
         private void Refresh()
         {
-            bool rowHadFocus = m_Rows.Count > 0 && m_Rows.Exists(r => r.focusController?.focusedElement == r);
-            m_StatusLabel.text = "Searching...";
+            if (m_Joining) return;
+            m_StatusLabel.text = useSampleSessions ? "Searching..." : "Connecting...";
+            m_Source.RequestSessions(OnSessionsReceived, message => m_StatusLabel.text = message);
+        }
 
-            m_Source.RequestSessions(sessions =>
+        /// <summary>Called on every list update (repeatedly for the live Fusion list). Rebuilds the table, keeping focus on the same row position when a row had it.</summary>
+        private void OnSessionsReceived(IReadOnlyList<GameSessionListing> sessions)
+        {
+            if (m_Joining) return;
+
+            int focusedRow = m_Rows.FindIndex(r => r.focusController?.focusedElement == r);
+
+            GameSearchFilter filter = GameSearch.CurrentFilter ?? new GameSearchFilter();
+            var matches = new List<GameSessionListing>();
+            foreach (GameSessionListing session in sessions)
             {
-                GameSearchFilter filter = GameSearch.CurrentFilter ?? new GameSearchFilter();
-                var matches = new List<GameSessionListing>();
-                foreach (GameSessionListing session in sessions)
-                {
-                    if (session.Rules != null && filter.Matches(session.Rules)) matches.Add(session);
-                }
+                if (session.Rules != null && filter.Matches(session.Rules)) matches.Add(session);
+            }
 
-                BuildRows(matches);
+            BuildRows(matches);
 
-                m_StatusLabel.text = matches.Count == 0
-                    ? "No games match these filters."
-                    : matches.Count == 1 ? "1 game found." : $"{matches.Count} games found.";
+            m_StatusLabel.text = matches.Count == 0
+                ? "No games match these filters."
+                : matches.Count == 1 ? "1 game found." : $"{matches.Count} games found.";
 
+            if (m_Rows.Count > 0 && (focusedRow >= 0 || !IsAnythingFocused()))
+            {
+                m_LastFocusedRow = Mathf.Clamp(focusedRow, 0, m_Rows.Count - 1);
+                MenuUIFocusRow(m_LastFocusedRow);
+            }
+            else if (m_Rows.Count == 0 && (focusedRow >= 0 || !IsAnythingFocused()))
+            {
                 m_LastFocusedRow = 0;
-                if (m_Rows.Count > 0 && (rowHadFocus || !IsAnythingFocused()))
-                {
-                    MenuUIFocusRow(0);
-                }
-                else if (m_Rows.Count == 0)
-                {
-                    MenuUI.FocusFirst(m_RefreshButton);
-                }
-            });
+                MenuUI.FocusFirst(m_RefreshButton);
+            }
         }
 
         private bool IsAnythingFocused() => m_RefreshButton.focusController?.focusedElement != null;
@@ -300,16 +316,36 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        private void OnRowSelected(GameSessionListing session)
+        private async void OnRowSelected(GameSessionListing session)
         {
+            if (m_Joining) return;
             MenuUI.PlaySound(selectSound);
-            // Placeholder until joining is wired up (Fusion 2: StartGame with SessionName = session.SessionName).
-            m_StatusLabel.text = $"Joining \"{session.SessionName}\" isn't hooked up yet.";
-            Debug.Log($"[GameBrowser] Join '{session.SessionName}' (not implemented yet).");
+
+            if (useSampleSessions)
+            {
+                m_StatusLabel.text = $"\"{session.SessionName}\" is a sample game - it can't be joined.";
+                return;
+            }
+
+            m_Joining = true;
+            m_StatusLabel.text = $"Joining {session.SessionName}...";
+            string error = await FusionSessionService.Instance.JoinGameAsync(session.SessionName);
+            if (this == null) return; // screen closed while joining
+
+            if (error == null)
+            {
+                SceneManager.LoadScene(gameLobbySceneName);
+                return;
+            }
+
+            m_Joining = false;
+            m_StatusLabel.text = error;
+            Refresh(); // the lobby connection was dropped for the join attempt - reconnect and relist
         }
 
         private void OnBack()
         {
+            if (m_Joining) return;
             string target = string.IsNullOrEmpty(GameSearch.BrowserBackScene) ? defaultBackSceneName : GameSearch.BrowserBackScene;
             SceneManager.LoadScene(target);
         }
