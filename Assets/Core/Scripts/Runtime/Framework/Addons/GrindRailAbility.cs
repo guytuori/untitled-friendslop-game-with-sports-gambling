@@ -149,6 +149,7 @@ namespace Blocks.Gameplay.Core
         private RectTransform m_IndicatorRect;
         private Image m_IndicatorImage;
         private Camera m_MainCamera;
+        public CoreAnimator animationControls;
 
         private Vector3 previousPosition; //for tracking the movement across a curving rail
 
@@ -389,8 +390,8 @@ namespace Blocks.Gameplay.Core
             SnapToRail();
             m_Motor.SetVerticalVelocity(0f);
 
-           // m_Motor.RotationOverride = () => m_CurrentRail != null ? CurrentTangentRotation() : m_Motor.transform.rotation;
-
+            // m_Motor.RotationOverride = () => m_CurrentRail != null ? CurrentTangentRotation() : m_Motor.transform.rotation;
+            if (Animator()) { Animator().PlayAnimation(Animator().ANIMATION_grindrail_slide); }
             SyncNetworkState();
         }
 
@@ -416,7 +417,7 @@ namespace Blocks.Gameplay.Core
             {
                 m_Motor.RotationOverride = null;
             }
-
+            if (Animator()) { Animator().SetAnimationTrigger(Animator().m_AnimIDTrigger_exitAbility); }
             SyncNetworkState();
         }
 
@@ -640,5 +641,16 @@ namespace Blocks.Gameplay.Core
         }
 
         #endregion
+
+        public CoreAnimator Animator()
+        {
+            if (animationControls == null)
+            {
+                animationControls = GetComponentInChildren<CoreAnimator>();
+            }
+
+            return animationControls;
+        }
+
     }
 }

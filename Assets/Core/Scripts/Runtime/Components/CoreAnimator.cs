@@ -28,6 +28,10 @@ namespace Blocks.Gameplay.Core
         private readonly int m_AnimIDFreeFall = Animator.StringToHash("FreeFall");
         private readonly int m_AnimIDMotionSpeed = Animator.StringToHash("MotionSpeed");
 
+        public readonly int m_AnimIDTrigger_exitAbility = Animator.StringToHash("ExitAbility");
+
+        public readonly string ANIMATION_grindrail_slide = "slide";
+
         #endregion
 
         #region Unity & Network Lifecycle
@@ -146,5 +150,71 @@ namespace Blocks.Gameplay.Core
         }
 
         #endregion
+
+
+
+        #region animation parameters
+        public void PlayAnimation(string _animation)
+        {
+            if (Animator == null) { return; }
+
+            if (ContainsAnimation(Animator, _animation))
+            { Animator.Play(_animation); }
+        }
+
+
+        public void SetAnimationTrigger(string _animParameter)
+        {
+            if (Animator == null) { return; }
+
+            if (ContainsParam(Animator, _animParameter))
+            { Animator.SetTrigger(_animParameter); }
+        }
+        public void SetAnimationTrigger(int _animParameter)
+        {
+            if (Animator == null) { return; }
+
+            Animator.SetTrigger(_animParameter);
+        }
+        public void SetAnimationParameter(string _animParameter, int _animState)
+        {
+            if (Animator == null) { return; }
+
+            if (ContainsParam(Animator, _animParameter))
+            { Animator.SetInteger(_animParameter, _animState); }
+        }
+
+        public void SetAnimationParameter(string _animParameter, float _animState)
+        {
+            if (Animator == null) { return; }
+
+            if (ContainsParam(Animator, _animParameter))
+            { Animator.SetFloat(_animParameter, _animState); }
+        }
+
+        public void SetAnimationParameter(string _animParameter, bool _animState)
+        {
+            if (Animator == null) { return; }
+
+            if (ContainsParam(Animator, _animParameter))
+            { Animator.SetBool(_animParameter, _animState); }
+        }
+
+        public bool ContainsParam(Animator _Anim, string _ParamName)
+        {
+            foreach (AnimatorControllerParameter param in _Anim.parameters)
+            {
+                if (param.name.ToLower() == _ParamName.ToLower()) return true;
+            }
+            return false;
+        }
+        public bool ContainsAnimation(Animator _Anim, string _name)
+        {
+
+            return _Anim.HasState(0, Animator.StringToHash(_name));
+        }
+        #endregion
+
+
     }
 }

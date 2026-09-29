@@ -463,6 +463,7 @@ MonoBehaviour:
   minSpeedMultiplier: 0.5
   entrySpeedMultiplier: 0.6
   slopeSpeedInfluence: 6
+  rotateToSurfaceSpeed: 5
   ambientTippingStrength: 1.2
   minGustInterval: 0.2
   maxGustInterval: 0.45
@@ -483,6 +484,7 @@ MonoBehaviour:
   barBackgroundColor: {r: 0, g: 0, b: 0, a: 0.55}
   indicatorSafeColor: {r: 1, g: 1, b: 1, a: 1}
   indicatorDangerColor: {r: 1, g: 0.25, b: 0.2, a: 1}
+  animationControls: {fileID: 0}
   currentWaypoint: 0
 --- !u!114 &7901013521677120731
 MonoBehaviour:
