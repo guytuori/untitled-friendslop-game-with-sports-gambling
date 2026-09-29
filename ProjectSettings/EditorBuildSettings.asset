@@ -6,11 +6,47 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Core/Scenes/SplashScreen.unity
+    guid: 41286dbe11d830b4f88bfe717b372c03
+  - enabled: 1
+    path: Assets/Core/Scenes/TitleScreen.unity
+    guid: 93a2cdd6b949ad3498cb1e515ab7858f
+  - enabled: 1
+    path: Assets/Core/Scenes/MainMenu.unity
+    guid: 59ad9e04966a52144a3e39ac135890e5
+  - enabled: 1
+    path: Assets/Core/Scenes/Settings.unity
+    guid: f4409b707d48472b86878dae43d2f23b
+  - enabled: 1
+    path: Assets/Core/Scenes/ChangeKeybindings.unity
+    guid: 8292fabf67744114b95c2a3853538cc7
+  - enabled: 1
+    path: Assets/Core/Scenes/AudioSettings.unity
+    guid: 240a5fe0d884473eaec6882868ee8777
+  - enabled: 1
+    path: Assets/Core/Scenes/GraphicsSettings.unity
+    guid: b04987c4101edf7f278d50e45c9be289
+  - enabled: 1
+    path: Assets/Core/Scenes/HostGame.unity
+    guid: a0f766b1633d20a4f38f0ca9691baed2
+  - enabled: 1
+    path: Assets/Core/Scenes/JoinGame.unity
+    guid: f8a1799ae2d8df18c9af67ed06d6a453
+  - enabled: 1
+    path: Assets/Core/Scenes/JoinPublic.unity
+    guid: aef52de71f2fac261367197220730890
+  - enabled: 1
+    path: Assets/Core/Scenes/JoinPrivate.unity
+    guid: 7e73357ab40c8696c3165da451d81b6e
+  - enabled: 1
     path: Assets/Core/Scenes/FindGames.unity
     guid: a8f68407486bcf70b851b4b9ae2dc5d2
   - enabled: 1
     path: Assets/Core/Scenes/GameBrowser.unity
     guid: bc4bd444107c2f36c19003558b3cb114
+  - enabled: 1
+    path: Assets/Core/Scenes/GameLobby.unity
+    guid: 5a95553db14147a7151f3cc25b743aa5
   - enabled: 1
     path: Assets/_scenes/Thrash.unity
     guid: 14b94591db716494685e021bd60687c3

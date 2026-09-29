@@ -92,6 +92,10 @@ namespace Blocks.Gameplay.Core
     /// currently looking at, and vice versa. Like every other rebind here, it only touches the in-memory
     /// working copy - it's still just a working change until Save Changes is clicked. See
     /// OnRestoreDefaultsClicked for how each half (real vs cosmetic) is actually reset.
+    ///
+    /// The gamepad layout also has an ENABLE RUMBLE checkbox under OPEN MENU (GamepadBindings.RumbleEnabled,
+    /// on by default). A toggles it; Up/Down reach it like any row and Right jumps to Save Changes. Like the
+    /// bindings it's saved with Save Changes and reset by Restore Defaults.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class ChangeKeybindingsController : MonoBehaviour
@@ -126,6 +130,7 @@ namespace Blocks.Gameplay.Core
         private Button m_RestoreDefaultsButton;
         private Button m_SaveButton;
         private Button m_BackButton;
+        private Toggle m_RumbleToggle;
 
         private void Awake()
         {
@@ -192,6 +197,7 @@ namespace Blocks.Gameplay.Core
                 AddRow(list, "WAGER CURSOR DOWN", "WagerCursorDown");
                 AddRow(list, "WAGER SELECT", "WagerSelect");
                 AddRow(list, "OPEN MENU", "OpenMenu");
+                AddRumbleRow(list);
             }
             else
             {
@@ -278,6 +284,58 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
+        /// ENABLE RUMBLE checkbox row, directly under OPEN MENU in the gamepad layout. Same label column as
+        /// the binding rows, so UI Toolkit's own Up/Down navigation reaches it from OPEN MENU like any row.
+        /// </summary>
+        private void AddRumbleRow(VisualElement parent)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginBottom = 6;
+
+            var label = new Label("ENABLE RUMBLE");
+            label.style.color = Color.white;
+            label.style.fontSize = 16;
+            label.style.width = 220;
+            row.Add(label);
+
+            m_RumbleToggle = new Toggle();
+            m_RumbleToggle.SetValueWithoutNotify(m_Bindings.Gamepad.RumbleEnabled);
+            m_RumbleToggle.style.marginTop = 8;
+            m_RumbleToggle.style.marginBottom = 8;
+            m_RumbleToggle.style.paddingLeft = 6;
+            m_RumbleToggle.style.paddingRight = 6;
+            m_RumbleToggle.RegisterValueChangedCallback(evt => m_Bindings.Gamepad.RumbleEnabled = evt.newValue);
+
+            SetToggleFocusedVisual(m_RumbleToggle, false);
+            m_RumbleToggle.RegisterCallback<FocusInEvent>(_ => SetToggleFocusedVisual(m_RumbleToggle, true));
+            m_RumbleToggle.RegisterCallback<FocusOutEvent>(_ => SetToggleFocusedVisual(m_RumbleToggle, false));
+
+            // A toggles it. Handled explicitly in the capture phase (and the Toggle's own default Submit
+            // action prevented) so it can't double-toggle, and so it plays the select sound.
+            m_RumbleToggle.RegisterCallback<NavigationSubmitEvent>(evt =>
+            {
+                evt.PreventDefault();
+                evt.StopPropagation();
+                if (m_AwaitingRebindCommand != null) return;
+                m_RumbleToggle.value = !m_RumbleToggle.value;
+                if (selectSound != null)
+                {
+                    AudioVolumeService.PlayOneShot(selectSound, AudioCategory.UISoundEffects, Vector3.zero);
+                }
+            }, TrickleDown.TrickleDown);
+
+            row.Add(m_RumbleToggle);
+            parent.Add(row);
+        }
+
+        private static void SetToggleFocusedVisual(Toggle toggle, bool focused)
+        {
+            toggle.style.backgroundColor = focused ? FocusedBackground : UnfocusedBackground;
+        }
+
+        /// <summary>
         /// Wires explicit left/right gamepad-navigation between the row list and the action column,
         /// since they aren't visually aligned and UI Toolkit's automatic navigation only reliably jumps
         /// between elements that roughly line up. Pressing right from ANY row always lands on Save
@@ -294,6 +352,7 @@ namespace Blocks.Gameplay.Core
             {
                 rowButton.RegisterCallback<NavigationMoveEvent>(OnRowNavigationMove);
             }
+            m_RumbleToggle?.RegisterCallback<NavigationMoveEvent>(OnRowNavigationMove);
 
             m_RestoreDefaultsButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
             m_SaveButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
@@ -348,7 +407,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (clickSound != null)
                 {
-                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.SoundEffects, Vector3.zero);
+                    AudioVolumeService.PlayOneShot(clickSound, AudioCategory.UISoundEffects, Vector3.zero);
                 }
                 onClick();
             })
@@ -379,7 +438,7 @@ namespace Blocks.Gameplay.Core
 
             if (selectSound != null)
             {
-                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.SoundEffects, Vector3.zero);
+                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.UISoundEffects, Vector3.zero);
             }
 
             m_AwaitingRebindCommand = commandKey;
@@ -747,7 +806,7 @@ namespace Blocks.Gameplay.Core
 
             if (selectSound != null)
             {
-                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.SoundEffects, Vector3.zero);
+                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.UISoundEffects, Vector3.zero);
             }
 
             // Clears every override this screen could have applied to the real gameplay actions,
@@ -758,9 +817,13 @@ namespace Blocks.Gameplay.Core
             // since nothing else in the project applies overrides to those.
             m_GameplayActions.asset.RemoveAllBindingOverrides();
 
-            // Resets the cosmetic Wager bindings the same way - both schemes at once, not just the one
-            // on screen.
-            m_Bindings = new InputBindingsData();
+            // Resets the cosmetic Wager bindings (and the rumble checkbox) the same way - both schemes at
+            // once, not just the one on screen. Only the Keyboard/Gamepad parts: m_Bindings is the whole
+            // settings.json, so replacing it outright would also reset the Audio and Graphics settings
+            // the next time Save Changes writes it.
+            m_Bindings.Keyboard = new KeyboardBindings();
+            m_Bindings.Gamepad = new GamepadBindings();
+            m_RumbleToggle?.SetValueWithoutNotify(m_Bindings.Gamepad.RumbleEnabled);
 
             // This doesn't call Save - Restore Defaults only resets the in-memory working copy, same as
             // any other rebind on this screen. Leaving without clicking Save Changes discards it, same
@@ -782,6 +845,7 @@ namespace Blocks.Gameplay.Core
             if (m_AwaitingRebindCommand != null) return; // don't save mid-capture, see class summary
             InputBindingsStore.Save(m_Bindings);
             InputBindingOverridesStore.Save(m_GameplayActions.asset);
+            GamepadRumble.Refresh();
         }
 
         private void OnBackClicked()

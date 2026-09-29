@@ -8,15 +8,18 @@ namespace Blocks.Gameplay.Core
     /// retain an AudioClip's original import folder at runtime - there's no API for that in a built
     /// player - so "Music affects anything from Assets/Music" etc. can't be implemented as a runtime path
     /// check. Instead, whoever plays a clip tags it with the category matching where its source asset
-    /// lives (see AudioVolumeService.PlayOneShot below, and the refactored click-sound calls in
-    /// MainMenuController/SettingsController/ChangeKeybindingsController/AudioSettingsController, all
-    /// tagged SoundEffects since their clips are UI click sounds).
+    /// lives (see AudioVolumeService.PlayOneShot below).
+    ///
+    /// UISoundEffects is for menu/UI click sounds (every GameFlow screen uses it): scaled by the Sound
+    /// Effects slider like any other sound effect, and additionally fully muted when the Audio screen's
+    /// Enable UI Sound Effects checkbox is off. SoundEffects is for gameplay sound effects.
     /// </summary>
     public enum AudioCategory
     {
         Music,
         SoundEffects,
-        Voice
+        Voice,
+        UISoundEffects
     }
 
     /// <summary>
@@ -85,6 +88,7 @@ namespace Blocks.Gameplay.Core
                 AudioCategory.Music => Current.MusicVolume / 10f,
                 AudioCategory.SoundEffects => Current.SoundEffectsVolume / 10f,
                 AudioCategory.Voice => Current.VoiceVolume / 10f,
+                AudioCategory.UISoundEffects => Current.UISoundEffectsEnabled ? Current.SoundEffectsVolume / 10f : 0f,
                 _ => 1f
             };
             return master * categoryPercent;
@@ -108,6 +112,7 @@ namespace Blocks.Gameplay.Core
         public static void PlayOneShot(AudioClip clip, AudioCategory category, Vector3 position)
         {
             if (clip == null) return;
+            if (category == AudioCategory.UISoundEffects && !Current.UISoundEffectsEnabled) return; // muted - don't even spawn the one-shot
 
             var temp = new GameObject($"OneShotAudio_{clip.name}");
             temp.transform.position = position;

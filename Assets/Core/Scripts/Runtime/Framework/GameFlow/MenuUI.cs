@@ -96,7 +96,7 @@ namespace Blocks.Gameplay.Core
         {
             if (clip != null)
             {
-                AudioVolumeService.PlayOneShot(clip, AudioCategory.SoundEffects, Vector3.zero);
+                AudioVolumeService.PlayOneShot(clip, AudioCategory.UISoundEffects, Vector3.zero);
             }
         }
 

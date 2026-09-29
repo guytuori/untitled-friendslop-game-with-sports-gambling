@@ -6,8 +6,10 @@ namespace Blocks.Gameplay.Core
 {
     /// <summary>
     /// Join Game > Private: a room-code text box in the middle of the screen, with Join and Back in the
-    /// bottom-right column. Enter in the text box also joins; B/Esc goes back. Joining isn't wired up yet
-    /// (it'll join the Fusion 2 session whose name is the code) - Join just reports that.
+    /// bottom-right column. Enter in the text box also joins; B/Esc goes back. Joining connects to the
+    /// Photon Fusion 2 session whose name is the code (FusionSessionService.JoinGameAsync - codes are
+    /// case-insensitive) and opens the pre-match lobby. Typing the code needs a keyboard, which is fine
+    /// on PC even for gamepad players.
     ///
     /// Navigation is explicit (the text box is centered and the buttons are bottom-right, so UI Toolkit's
     /// nearest-neighbor navigation isn't reliable between them): Down from the text box goes to Join,
@@ -23,10 +25,13 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Scene to load when Back (or B/Esc) is pressed.")]
         [SerializeField] private string backSceneName = "JoinGame";
 
+        [Tooltip("Scene to load once the game has been joined.")]
+        [SerializeField] private string gameLobbySceneName = "GameLobby";
+
         [SerializeField] private AudioClip selectSound;
         [SerializeField] private AudioClip cancelSound;
 
-        private const int MaxCodeLength = 16;
+        private bool m_Joining;
 
         private TextField m_CodeField;
         private Label m_StatusLabel;
@@ -56,7 +61,7 @@ namespace Blocks.Gameplay.Core
             prompt.style.marginBottom = 12;
             center.Add(prompt);
 
-            m_CodeField = new TextField { maxLength = MaxCodeLength };
+            m_CodeField = new TextField { maxLength = FusionSessionService.RoomCodeLength };
             m_CodeField.style.width = 360;
             m_CodeField.style.fontSize = 24;
             center.Add(m_CodeField);
@@ -124,20 +129,36 @@ namespace Blocks.Gameplay.Core
             evt.StopPropagation();
         }
 
-        private void OnJoin()
+        private async void OnJoin()
         {
-            string code = m_CodeField.value?.Trim() ?? "";
+            if (m_Joining) return;
+
+            string code = FusionSessionService.NormalizeCode(m_CodeField.value);
             if (code.Length == 0)
             {
                 m_StatusLabel.text = "Enter a room code first.";
                 return;
             }
 
-            // Placeholder until joining is wired up (Fusion 2: StartGame with SessionName = code).
-            m_StatusLabel.text = "Joining private games isn't hooked up yet.";
-            Debug.Log($"[JoinPrivate] Join room code '{code}' (not implemented yet).");
+            m_Joining = true;
+            m_StatusLabel.text = $"Joining {code}...";
+            string error = await FusionSessionService.Instance.JoinGameAsync(code);
+            if (this == null) return; // screen closed meanwhile
+
+            if (error == null)
+            {
+                SceneManager.LoadScene(gameLobbySceneName);
+                return;
+            }
+
+            m_Joining = false;
+            m_StatusLabel.text = error;
         }
 
-        private void OnBack() => SceneManager.LoadScene(backSceneName);
+        private void OnBack()
+        {
+            if (m_Joining) return;
+            SceneManager.LoadScene(backSceneName);
+        }
     }
 }

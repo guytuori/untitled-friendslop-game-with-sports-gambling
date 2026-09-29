@@ -18,6 +18,9 @@ namespace Blocks.Gameplay.Core
     /// two images live alongside this scene at Assets/Core/Scenes/TitleScreen/ and are wired up on
     /// <see cref="backgroundImage"/> and <see cref="titleImage"/> in the Inspector - paint order there
     /// is background first, then title, then the prompt, so each layers on top of the last.
+    ///
+    /// A small copyright line sits in the bottom-left corner: "©2026-" followed by the current year,
+    /// read from the system clock at runtime (so it reads "©2026-2026" until 2027, deliberately).
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class TitleScreenController : MonoBehaviour
@@ -32,6 +35,9 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private string nextSceneName = "MainMenu";
         [SerializeField] private float promptFlashInterval = 0.5f;
         [SerializeField] private float fadeDuration = 0.4f;
+
+        [Tooltip("First year of the copyright range; the end year is always the current year.")]
+        [SerializeField] private int copyrightStartYear = 2026;
 
         private VisualElement m_Root;
         private Label m_Prompt;
@@ -90,6 +96,14 @@ namespace Blocks.Gameplay.Core
             m_Prompt.style.position = Position.Absolute;
             m_Prompt.style.bottom = 60;
             root.Add(m_Prompt);
+
+            var copyright = new Label($"\u00A9{copyrightStartYear}-{System.DateTime.Now.Year}");
+            copyright.style.color = new Color(0.85f, 0.85f, 0.85f);
+            copyright.style.fontSize = 12;
+            copyright.style.position = Position.Absolute;
+            copyright.style.left = 16;
+            copyright.style.bottom = 12;
+            root.Add(copyright);
         }
 
         /// <summary>Toggles the prompt label's visibility on a fixed interval - a flat "flash" rather than a fade.</summary>
