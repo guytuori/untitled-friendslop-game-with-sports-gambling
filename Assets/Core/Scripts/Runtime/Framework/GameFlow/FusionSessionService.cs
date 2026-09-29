@@ -227,7 +227,7 @@ namespace Blocks.Gameplay.Core
                     CustomPhotonAppSettings = CreateAppSettings(),
                 };
 
-                StartGameResult result = await StartGameRunner(args);
+                StartOutcome result = await StartGameRunner(args);
                 if (result.Ok)
                 {
                     RoomCode = code;
@@ -237,9 +237,9 @@ namespace Blocks.Gameplay.Core
                     return null;
                 }
 
-                if (result.ShutdownReason != ShutdownReason.GameIdAlreadyExists)
+                if (result.Reason != ShutdownReason.GameIdAlreadyExists)
                 {
-                    return DescribeFailure(result.ShutdownReason);
+                    return DescribeFailure(result.Reason);
                 }
                 // Code collision - try another one.
             }
@@ -267,11 +267,11 @@ namespace Blocks.Gameplay.Core
                 CustomPhotonAppSettings = CreateAppSettings(),
             };
 
-            StartGameResult result = await StartGameRunner(args);
+            StartOutcome result = await StartGameRunner(args);
             if (!result.Ok)
             {
                 if (wasInLobby) EnsureInLobby();
-                return DescribeFailure(result.ShutdownReason);
+                return DescribeFailure(result.Reason);
             }
 
             RoomCode = code;
@@ -326,31 +326,51 @@ namespace Blocks.Gameplay.Core
             return true;
         }
 
-        private async Task<StartGameResult> StartGameRunner(StartGameArgs args)
+        /// <summary>
+        /// Outcome of StartGameRunner. Our own small struct rather than Fusion's StartGameResult, since
+        /// StartGameResult can't be constructed outside Fusion (needed for the exception case).
+        /// </summary>
+        private readonly struct StartOutcome
+        {
+            public readonly bool Ok;
+            public readonly ShutdownReason Reason;
+
+            public StartOutcome(bool ok, ShutdownReason reason)
+            {
+                Ok = ok;
+                Reason = reason;
+            }
+        }
+
+        private async Task<StartOutcome> StartGameRunner(StartGameArgs args)
         {
             m_Starting = true;
             m_GameRunner = CreateRunner("[FusionGameRunner]", out NetworkSceneManagerDefault sceneManager);
             args.SceneManager = sceneManager;
 
-            StartGameResult result;
+            StartOutcome outcome;
             try
             {
-                result = await m_GameRunner.StartGame(args);
+                StartGameResult result = await m_GameRunner.StartGame(args);
+                outcome = new StartOutcome(result.Ok, result.ShutdownReason);
+                if (!result.Ok)
+                {
+                    Debug.LogWarning($"[Fusion] StartGame ({args.GameMode}, '{args.SessionName}') failed: {result.ShutdownReason} {result.ErrorMessage}");
+                }
             }
             catch (Exception e)
             {
                 Debug.LogException(e);
-                result = StartGameResult.BuildGameResultFromException(e);
+                outcome = new StartOutcome(false, ShutdownReason.Error);
             }
             m_Starting = false;
 
-            if (!result.Ok)
+            if (!outcome.Ok)
             {
-                Debug.LogWarning($"[Fusion] StartGame ({args.GameMode}, '{args.SessionName}') failed: {result.ShutdownReason} {result.ErrorMessage}");
                 ShutdownRunner(ref m_GameRunner);
             }
 
-            return result;
+            return outcome;
         }
 
         private void ResetGameState()
