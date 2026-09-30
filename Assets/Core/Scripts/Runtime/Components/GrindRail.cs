@@ -298,6 +298,7 @@ namespace Blocks.Gameplay.Core
 
             return 0;
         }
+
         public int FindClosestWaypoint(Vector3 _position)
         {
             if (waypoints == null || waypoints.Length == 0)
@@ -312,6 +313,7 @@ namespace Blocks.Gameplay.Core
 
             return 0;
         }
+
         private void OnDrawGizmosSelected()
         {
             if (waypoints == null || waypoints.Length < 2) return;

@@ -300,6 +300,7 @@ namespace Blocks.Gameplay.Core
             // you up, uphill slows you down - travelTangent.y is negative heading downhill.
             float slopeAccel = -travelTangent.y * slopeSpeedInfluence;
 
+
             m_Speed = Mathf.Clamp(m_Speed + (accel + slopeAccel) * Time.deltaTime, minSpeed, maxSpeed);
 
             float speedFactor = Mathf.Clamp01(m_Speed / Mathf.Max(0.01f, maxSpeed));
@@ -360,11 +361,19 @@ namespace Blocks.Gameplay.Core
            
             if (Physics.Raycast(transform.position , ridePos, out RaycastHit hit,1,LayerMask.GetMask("Grind")))
             {
+                
+
                 //previousPosition resets on enter rail, as the character moves aross the rail we can track
                 //the direction of travel if the rail is curving without referencing the waypoints a 3rd time
                 Quaternion targetRot = Quaternion.LookRotation((ridePos - previousPosition).normalized, hit.normal);
-                //Lerp here to avoid weird snapping, its alright that it never reaches 1
-                m_Motor.RotationOverride = () => Quaternion.Lerp(transform.rotation, targetRot, rotateToSurfaceSpeed * Time.deltaTime);
+
+                //to avoid jittering or extreme angle snapping, check that the calculated angle difference is not extreme
+                if (Quaternion.Angle(transform.rotation, targetRot) < 45.0f)
+                {
+                    //Lerp here to avoid weird snapping, its alright that it never reaches 1
+                    m_Motor.RotationOverride = () => Quaternion.Lerp(transform.rotation, targetRot, rotateToSurfaceSpeed * Time.deltaTime);
+                }
+                    
                 previousPosition = ridePos;
             }
 
@@ -406,7 +415,7 @@ namespace Blocks.Gameplay.Core
         private void ExitRail()
         {
             if (!IsOnRail) return;
-            transform.GetChild(1).rotation = transform.rotation;
+
             m_LastRail = m_CurrentRail;
             m_LastRailGuardTimer = sameRailReentryGuard;
 
@@ -417,7 +426,10 @@ namespace Blocks.Gameplay.Core
             {
                 m_Motor.RotationOverride = null;
             }
+
+            //Set the trigger on the primary animator to exit the ability state
             if (Animator()) { Animator().SetAnimationTrigger(Animator().m_AnimIDTrigger_exitAbility); }
+
             SyncNetworkState();
         }
 
@@ -483,10 +495,12 @@ namespace Blocks.Gameplay.Core
             m_CurrentRail.Evaluate(m_ArcLength, out _, out Vector3 tangent, out _, out _);
             Vector3 travelTangent = m_TravelSign >= 0f ? tangent : -tangent;
 
-            float jumpVelocity = Mathf.Sqrt(Mathf.Max(0.01f, jumpOffHeightMultiplier * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
-            m_Motor.SetVerticalVelocity(jumpVelocity);
-
-            m_AirborneMomentum = travelTangent * m_Speed;
+            float jumpVelocity = Mathf.Sqrt(Mathf.Max(01.01f, jumpOffHeightMultiplier * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
+            travelTangent = (transform.position - previousPosition).normalized;
+            
+            
+            m_AirborneMomentum = travelTangent * 15;
+            m_Motor.SetVerticalVelocity( jumpVelocity);
             m_MomentumAirTime = 0f;
 
             ExitRail();
