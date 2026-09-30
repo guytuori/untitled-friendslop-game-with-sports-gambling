@@ -240,9 +240,10 @@ namespace Blocks.Gameplay.Core
 
         public void OnPlayerSpawn()
         {
+            TryRegisterListener();
+
             if (IsOwner)
             {
-                TryRegisterListener();
             }
         }
 
@@ -452,6 +453,7 @@ namespace Blocks.Gameplay.Core
 
         private void TryRegisterListener()
         {
+            Debug.Log("TryRegisterListener grindrail");
             if (m_ListenersRegistered || onJumpPressed == null) return;
 
             onJumpPressed.RegisterListener(HandleJumpPressed);
@@ -496,10 +498,10 @@ namespace Blocks.Gameplay.Core
 
             float jumpVelocity = Mathf.Sqrt(Mathf.Max(01.01f, jumpOffHeightMultiplier * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
             travelTangent = (transform.position - previousPosition).normalized;
-            
-            
-            m_AirborneMomentum = travelTangent * 15;
-            m_Motor.SetVerticalVelocity( jumpVelocity);
+
+           
+            m_AirborneMomentum = travelTangent * 5;
+            m_Motor.SetVerticalVelocity( jumpVelocity + m_AirborneMomentum.y);
             m_MomentumAirTime = 0f;
 
             ExitRail();

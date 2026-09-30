@@ -112,15 +112,7 @@ namespace Blocks.Gameplay.Core
         public override void OnNetworkSpawn()
         {
             base.OnNetworkSpawn();
-
-            if (IsOwner)
-            {
-                RegisterEventListeners();
-            }
-            else
-            {
-                DisableOwnerOnlyComponents();
-            }
+        
 
             if (corePlayerState != null)
             {
@@ -136,10 +128,22 @@ namespace Blocks.Gameplay.Core
                 HandleLifeStateChanged(corePlayerState.LifeState);
             }
 
-            foreach (var addon in m_Addons)
+            if (IsOwner)
             {
-                addon.OnPlayerSpawn();
+                RegisterEventListeners();
+                //Because the onplayer spawn for the addons registers the input listeners
+                //only the owner needs to register them
+                foreach (var addon in m_Addons)
+                {
+                    Debug.Log($"var addon in m_Addons {addon.GetType()} ");
+                    addon.OnPlayerSpawn();
+                }
             }
+            else
+            {
+                DisableOwnerOnlyComponents();
+            }
+
 
             NetworkPlayers.Register(this);
         }
@@ -157,12 +161,13 @@ namespace Blocks.Gameplay.Core
             if (IsOwner)
             {
                 UnregisterEventListeners();
+                foreach (var addon in m_Addons)
+                {
+                    addon.OnPlayerDespawn();
+                }
             }
 
-            foreach (var addon in m_Addons)
-            {
-                addon.OnPlayerDespawn();
-            }
+         
 
             base.OnNetworkDespawn();
         }
@@ -170,7 +175,7 @@ namespace Blocks.Gameplay.Core
         private void Update()
         {
             if (!IsOwner) return;
-
+            
             UpdateCameraTargetRotation();
             HandleSprintingStamina();
         }

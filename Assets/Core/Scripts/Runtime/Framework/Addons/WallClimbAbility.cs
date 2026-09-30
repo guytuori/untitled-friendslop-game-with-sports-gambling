@@ -186,9 +186,10 @@ namespace Blocks.Gameplay.Core
 
         public void OnPlayerSpawn()
         {
+            TryRegisterListener();
             if (IsOwner)
             {
-                TryRegisterListener();
+                
             }
         }
 

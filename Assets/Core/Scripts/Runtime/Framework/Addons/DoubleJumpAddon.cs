@@ -42,7 +42,7 @@ namespace Blocks.Gameplay.Core
 
         public void OnPlayerSpawn()
         {
-            if (IsOwner)
+            if (IsOwner || true)
             {
                 RegisterEventListeners();
             }
