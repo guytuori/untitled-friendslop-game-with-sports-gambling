@@ -101,9 +101,6 @@ PrefabInstance:
       addedObject: {fileID: 847949049683067651}
     - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: f93d5c11b11bb694395395a88e1ca08c, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 7914275585213220960}
-    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: f93d5c11b11bb694395395a88e1ca08c, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 2372387047700087606}
     - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: f93d5c11b11bb694395395a88e1ca08c, type: 3}
       insertIndex: -1
@@ -171,32 +168,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 32, y: 4, z: 2}
   m_Center: {x: -16, y: 3, z: 1}
---- !u!114 &7914275585213220960
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5373290561230473508}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 860938547
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  m_InScenePlaced: 0
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
 --- !u!114 &2372387047700087606
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -209,7 +180,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dfb6f9718b2a4bceb5432996ed7dd9e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.ChallengeZone
-  ShowTopMostFoldoutHeaderGroup: 1
   definition: {fileID: 11400000, guid: af76e8f87cb72564685ae6e8bddf68c5, type: 2}
 --- !u!114 &813662707757257130
 MonoBehaviour:
@@ -406,9 +376,6 @@ PrefabInstance:
       addedObject: {fileID: 382577956982656742}
     - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: 1f1e031c067010647afc12fc468a0ef1, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 6506578588081828910}
-    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: 1f1e031c067010647afc12fc468a0ef1, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 6480859914811193767}
     - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: 1f1e031c067010647afc12fc468a0ef1, type: 3}
       insertIndex: -1
@@ -476,32 +443,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 32, y: 4, z: 32}
   m_Center: {x: -16, y: 3, z: 16}
---- !u!114 &6506578588081828910
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 385652477311001562}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2186371728
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  m_InScenePlaced: 0
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
 --- !u!114 &6480859914811193767
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -514,7 +455,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dfb6f9718b2a4bceb5432996ed7dd9e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.ChallengeZone
-  ShowTopMostFoldoutHeaderGroup: 1
   definition: {fileID: 11400000, guid: 7ad83ec6cc338a846853012e5e859a39, type: 2}
 --- !u!114 &6882606104295855315
 MonoBehaviour:

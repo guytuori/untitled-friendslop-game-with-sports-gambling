@@ -40,6 +40,24 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
+        /// Configures a scene/world NetworkObject for Shared mode: the master client (host) always owns it, and it
+        /// is NOT destroyed when its owner leaves (ownership moves to the next master client instead).
+        /// Returns true if anything changed.
+        /// </summary>
+        public static bool MakeMasterClientObject(NetworkObject networkObject)
+        {
+            NetworkObjectFlags flags = networkObject.Flags;
+            flags |= NetworkObjectFlags.MasterClientObject;
+            flags &= ~NetworkObjectFlags.DestroyWhenStateAuthorityLeaves;
+
+            if (flags == networkObject.Flags) return false;
+
+            networkObject.Flags = flags;
+            EditorUtility.SetDirty(networkObject);
+            return true;
+        }
+
+        /// <summary>
         /// Makes sure <paramref name="go"/> has a Fusion NetworkTransform configured for this project: the owner
         /// moves the transform in Update (CharacterController), so Shared-mode interpolation of the state
         /// authority's own transform is disabled. Returns true if anything changed.

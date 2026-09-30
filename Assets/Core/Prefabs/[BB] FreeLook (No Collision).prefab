@@ -14,7 +14,6 @@ GameObject:
   - component: {fileID: 8941078865338262827}
   - component: {fileID: 5622520908732185617}
   - component: {fileID: 1982895397614513425}
-  - component: {fileID: 3530690149642816919}
   m_Layer: 0
   m_Name: '[BB] FreeLook (No Collision)'
   m_TagString: Untagged
@@ -167,58 +166,3 @@ MonoBehaviour:
     FrequencyGain: 1
     Duration: 1
     m_NoiseOffsets: {x: 0, y: 0, z: 0}
---- !u!114 &3530690149642816919
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6975703217737167676}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 97cee160742e84870b04289bb321b7d6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Blocks.Gameplay.Platformer::Blocks.Gameplay.Core.PlatformerCameraFeelExtension
-  movementComponent: {fileID: 0}
-  enableSpeedFOV: 1
-  baseFOV: 60
-  maxFOVIncrease: 15
-  maxFOVSpeedThreshold: 8
-  fovCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  fovSmoothSpeed: 5
-  enableLandingImpact: 1
-  landingOffsetAmount: 0.15
-  landingRecoverySpeed: 8
-  landingVelocityThreshold: -3
-  jumpArcStartedEvent: {fileID: 11400000, guid: 1cd910a3ac6c340f49c2d9e624653ea2, type: 2}
-  jumpArcEndedEvent: {fileID: 11400000, guid: 62f2340468eda45f6bdc26c71c29dafd, type: 2}
-  chargeUpFOVDecrease: 25
-  chargeUpVerticalOffset: -0.4
-  chargeUpForwardOffset: -0.6
-  chargeUpSpeed: 3
-  releaseFOVBurst: 12
-  releaseVerticalKick: 1
-  releaseDecaySpeed: 6

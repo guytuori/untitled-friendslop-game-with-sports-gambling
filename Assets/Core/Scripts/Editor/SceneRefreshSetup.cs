@@ -199,7 +199,8 @@ namespace Blocks.Gameplay.Core
                 // master client, which needs "Is Master Client Object" set on their NetworkObject.
                 if (instance is Fusion.NetworkBehaviour)
                 {
-                    FusionEditorUtil.EnsureNetworkObject(instance.gameObject, Fusion.NetworkObjectFlags.MasterClientObject);
+                    var networkObject = FusionEditorUtil.EnsureNetworkObject(instance.gameObject, Fusion.NetworkObjectFlags.MasterClientObject);
+                    FusionEditorUtil.MakeMasterClientObject(networkObject);
                 }
 
                 summary.SiblingFieldsWired += WireSiblingFields(new[] { instance });

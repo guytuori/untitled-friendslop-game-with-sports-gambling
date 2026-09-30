@@ -46,8 +46,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7468e56717972404d9fe716754e6d5fa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GameManager
-  isUsingMultiplayerServices: 0
-  sessionSettings: {fileID: 11400000, guid: 0bf4e1684added44da254017c7fc41b2, type: 2}
+  playerPrefab: {fileID: 4416926081852918481, guid: c4414f7e7a6b54c8aad22f8437ac1f41, type: 3}
+  exitSceneName: MainMenu
   sessionUI: {fileID: 0}
   fadeDuration: 0.5
   respawnDelay: 5

@@ -278,9 +278,6 @@ PrefabInstance:
       addedObject: {fileID: 419616000}
     - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: 1f1e031c067010647afc12fc468a0ef1, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 419615999}
-    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: 1f1e031c067010647afc12fc468a0ef1, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 419616004}
     - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: 1f1e031c067010647afc12fc468a0ef1, type: 3}
       insertIndex: -1
@@ -291,32 +288,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 8771091787928289351, guid: 1f1e031c067010647afc12fc468a0ef1, type: 3}
   m_PrefabInstance: {fileID: 419615997}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &419615999
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 419615998}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4026651997
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  m_InScenePlaced: 0
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
 --- !u!65 &419616000
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -400,7 +371,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dfb6f9718b2a4bceb5432996ed7dd9e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.ChallengeZone
-  ShowTopMostFoldoutHeaderGroup: 1
   definition: {fileID: 11400000, guid: 5ab2ea177f65ea543b3c17d20ada1f75, type: 2}
 --- !u!1 &619659278
 GameObject:
@@ -596,9 +566,6 @@ PrefabInstance:
       addedObject: {fileID: 1551413987}
     - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: f93d5c11b11bb694395395a88e1ca08c, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1551413986}
-    - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: f93d5c11b11bb694395395a88e1ca08c, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 1551413991}
     - targetCorrespondingSourceObject: {fileID: 8771091787928289351, guid: f93d5c11b11bb694395395a88e1ca08c, type: 3}
       insertIndex: -1
@@ -609,32 +576,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 8771091787928289351, guid: f93d5c11b11bb694395395a88e1ca08c, type: 3}
   m_PrefabInstance: {fileID: 1551413984}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1551413986
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1551413985}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1667488178
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  m_InScenePlaced: 0
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
 --- !u!65 &1551413987
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -718,7 +659,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dfb6f9718b2a4bceb5432996ed7dd9e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.ChallengeZone
-  ShowTopMostFoldoutHeaderGroup: 1
   definition: {fileID: 11400000, guid: 4e64e75f10b85ff4793f4514b46cbd95, type: 2}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

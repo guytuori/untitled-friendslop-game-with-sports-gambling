@@ -65,6 +65,12 @@ namespace Blocks.Gameplay.Core
             "Blocks.Sessions",
         };
 
+        /// <summary>
+        /// Old gameplay-assembly components that only survive as empty placeholder classes (by name, since their
+        /// scripts are trashed at the end of the migration).
+        /// </summary>
+        private static readonly string[] ObsoleteGameplayComponents = { "GameNetworkManager", "GameNetworkUI", "AutomatedNetworkTransform" };
+
         /// <summary>Asset paths (files or folders) to move to the trash once nothing kept depends on them.</summary>
         private static readonly string[] TrashCandidates =
         {
@@ -343,17 +349,16 @@ namespace Blocks.Gameplay.Core
             var info = new LegacyInfo();
             var gameObjects = root.GetComponentsInChildren<Transform>(true).Select(t => t.gameObject).ToList();
             var reportedMissingPrefabs = new HashSet<GameObject>();
+            var missingPrefabRoots = new List<GameObject>();
 
             // ---- 1. Record what the old components were doing, and queue them for removal.
             foreach (GameObject go in gameObjects)
             {
-                if (IsInsideMissingPrefab(go, out GameObject missingRoot))
+                if (!isPrefabContents && IsInsideMissingPrefab(go, out GameObject missingRoot))
                 {
                     if (reportedMissingPrefabs.Add(missingRoot))
                     {
-                        Warn($"'{GetPath(missingRoot)}' is an instance of a prefab that no longer exists, so it can't be edited. " +
-                             "It still carries its old networking components - delete it (or restore its prefab and re-run).");
-                        changes.Add($"SKIPPED missing-prefab instance '{GetPath(missingRoot)}'");
+                        missingPrefabRoots.Add(missingRoot);
                     }
                     continue;
                 }
@@ -370,7 +375,7 @@ namespace Blocks.Gameplay.Core
                         info.HadNetworkObject.Add(go);
                         order = 3;
                     }
-                    else if (type.FullName == "Unity.Netcode.NetworkManager")
+                    else if (type.FullName == "Unity.Netcode.NetworkManager" || type.Name == "GameNetworkManager")
                     {
                         info.HadNetworkManager.Add(go);
                         order = 2;
@@ -423,7 +428,30 @@ namespace Blocks.Gameplay.Core
                     }
                 }
 
+                // Instances of prefabs that no longer exist can't be edited, and still carry their old NGO
+                // components as overrides. They can't work with Fusion (or at all), so they're removed.
+                foreach (GameObject missingRoot in missingPrefabRoots)
+                {
+                    if (missingRoot == null) continue;
+                    if (missingRoot.transform.parent != null && PrefabUtility.IsPartOfPrefabInstance(missingRoot.transform.parent))
+                    {
+                        Warn($"'{GetPath(missingRoot)}' is an instance of a prefab that no longer exists, inside another prefab instance - delete it by hand.");
+                        continue;
+                    }
+
+                    Warn($"Deleted '{GetPath(missingRoot)}': it's an instance of a prefab that no longer exists " +
+                         "(so it did nothing in-game) and still carried old NGO components. Restore it from version control if you need it.");
+                    changes.Add($"Deleted missing-prefab instance '{GetPath(missingRoot)}'");
+                    Object.DestroyImmediate(missingRoot);
+                }
+
                 gameObjects.RemoveAll(go => go == null);
+
+                // The whole hierarchy may have been a NetworkManager (e.g. a scene-root "[BB] NetworkManager").
+                if (root == null)
+                {
+                    return;
+                }
             }
 
             // ---- 3. Hand the ComponentController's "hide when eliminated" list over to VisualsAddon.
@@ -519,6 +547,20 @@ namespace Blocks.Gameplay.Core
 
                 FusionEditorUtil.EnsureNetworkObject(target, NetworkObjectFlags.MasterClientObject);
                 changes.Add($"Added Fusion NetworkObject (master client object) to '{GetPath(target)}'");
+            }
+
+            // ---- 8b. Non-player NetworkObjects are owned by the master client (host), and must survive it leaving.
+            //          (A NetworkObject added by hand or by Unity defaults to "Destroy When State Authority Leaves",
+            //          which would delete the RoundTimer/ChallengeManager for everyone when the host quits.)
+            foreach (NetworkObject networkObject in root.GetComponentsInChildren<NetworkObject>(true))
+            {
+                if (networkObject.GetComponentInParent<CorePlayerManager>(true) != null) continue;
+                if (IsInsideMissingPrefab(networkObject.gameObject, out _)) continue;
+
+                if (FusionEditorUtil.MakeMasterClientObject(networkObject))
+                {
+                    changes.Add($"NetworkObject on '{GetPath(networkObject.gameObject)}' -> Is Master Client Object, not destroyed when its owner leaves");
+                }
             }
 
             // ---- 9. NGO NetworkAnimators elsewhere -> Fusion NetworkMecanimAnimator next to the Animator.
@@ -774,7 +816,13 @@ namespace Blocks.Gameplay.Core
 
         private static bool IsLegacy(Component component)
         {
-            string assemblyName = component.GetType().Assembly.GetName().Name;
+            Type type = component.GetType();
+            if (type.Namespace == "Blocks.Gameplay.Core" && ObsoleteGameplayComponents.Contains(type.Name))
+            {
+                return true;
+            }
+
+            string assemblyName = type.Assembly.GetName().Name;
             return LegacyAssemblyPrefixes.Any(prefix => assemblyName.StartsWith(prefix, StringComparison.Ordinal));
         }
 
