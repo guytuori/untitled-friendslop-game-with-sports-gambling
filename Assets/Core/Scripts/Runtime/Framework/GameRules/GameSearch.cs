@@ -131,6 +131,9 @@ namespace Blocks.Gameplay.Core
     {
         public string SessionName;
         public int PlayerCount;
+
+        /// <summary>When the host created the game (Unix seconds, UTC) - lists are sorted oldest first. 0 if unknown.</summary>
+        public int CreatedUnixSeconds;
         public HostGameRulesData Rules;
     }
 

@@ -57,6 +57,9 @@ namespace Blocks.Gameplay.Core
 
         public const int RoomCodeLength = 5;
 
+        /// <summary>Start Match needs at least this many players in the session, host included.</summary>
+        public const int MinPlayersToStart = 2;
+
         /// <summary>
         /// The gameplay scene Start Match loads for everyone (must be in the build settings). Thrash is
         /// currently the only gameplay scene there.
@@ -80,6 +83,7 @@ namespace Blocks.Gameplay.Core
             public const string WagerPayoutTenths = "wp"; // session properties can't be floats - 2.5 is stored as 25
             public const string Items = "it";
             public const string Pickups = "pu";
+            public const string CreatedUnixSeconds = "ct"; // when the host created it - for oldest-first ordering
         }
 
         private static FusionSessionService s_Instance;
@@ -248,7 +252,9 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>Joins the session with room code <paramref name="code"/> (case-insensitive). Returns null on success, or a player-facing error message.</summary>
-        public async Task<string> JoinGameAsync(string code)
+        public Task<string> JoinGameAsync(string code) => JoinGameAsync(code, rejoinLobbyOnFailure: true);
+
+        private async Task<string> JoinGameAsync(string code, bool rejoinLobbyOnFailure)
         {
             if (m_GameRunner != null) return "Already in a game.";
 
@@ -270,7 +276,7 @@ namespace Blocks.Gameplay.Core
             StartOutcome result = await StartGameRunner(args);
             if (!result.Ok)
             {
-                if (wasInLobby) EnsureInLobby();
+                if (wasInLobby && rejoinLobbyOnFailure) EnsureInLobby();
                 return DescribeFailure(result.Reason);
             }
 
@@ -283,6 +289,75 @@ namespace Blocks.Gameplay.Core
             m_Players.Add(new LobbyPlayer { PlayerId = m_GameRunner.LocalPlayer.PlayerId, IsLocal = true });
             RosterChanged?.Invoke();
             return null;
+        }
+
+        /// <summary>
+        /// Quick match for the Join Game > Public Normal / Hard / Very Hard buttons: joins the oldest open
+        /// public game that matches <paramref name="filter"/> and isn't full, or - if there isn't one (or
+        /// every attempt fails, e.g. it filled up or started in the meantime) - hosts a new public game with
+        /// <paramref name="hostRules"/>. Returns null on success (joined or hosting; see <see cref="IsHost"/>),
+        /// or a player-facing error message.
+        /// </summary>
+        public async Task<string> QuickMatchAsync(GameSearchFilter filter, HostGameRulesData hostRules)
+        {
+            if (m_GameRunner != null) return "Already in a game.";
+
+            IReadOnlyList<GameSessionListing> sessions = await GetSessionListAsync();
+            if (sessions == null) return "Couldn't connect to the game server.";
+
+            var candidates = new List<GameSessionListing>();
+            foreach (GameSessionListing session in sessions) // already sorted oldest first
+            {
+                if (session.Rules == null || !filter.Matches(session.Rules)) continue;
+                if (session.Rules.MaxPlayers > 0 && session.PlayerCount >= session.Rules.MaxPlayers) continue;
+                candidates.Add(session);
+            }
+
+            const int MaxJoinAttempts = 3;
+            for (int i = 0; i < candidates.Count && i < MaxJoinAttempts; i++)
+            {
+                string error = await JoinGameAsync(candidates[i].SessionName, rejoinLobbyOnFailure: false);
+                if (error == null) return null;
+                Debug.Log($"[Fusion] Quick match couldn't join {candidates[i].SessionName} ({error}) - trying the next one.");
+            }
+
+            HostGameRulesData rules = hostRules.Clone();
+            rules.IsPublic = true;
+            return await HostGameAsync(rules);
+        }
+
+        /// <summary>
+        /// Joins the lobby if needed and waits for the first session list. Returns null if the lobby
+        /// couldn't be joined. If the lobby is joined but Photon never sends a list (it may not when there
+        /// are no games at all), returns an empty list after a few seconds.
+        /// </summary>
+        private async Task<IReadOnlyList<GameSessionListing>> GetSessionListAsync()
+        {
+            if (HasSessionList) return new List<GameSessionListing>(m_Sessions);
+
+            var gotList = new TaskCompletionSource<bool>();
+            void OnList(IReadOnlyList<GameSessionListing> _) => gotList.TrySetResult(true);
+            void OnError(string _) => gotList.TrySetResult(false);
+            SessionListUpdated += OnList;
+            LobbyError += OnError;
+
+            try
+            {
+                EnsureInLobby();
+                Task finished = await Task.WhenAny(gotList.Task, Task.Delay(6000));
+                if (finished == gotList.Task)
+                {
+                    return gotList.Task.Result ? new List<GameSessionListing>(m_Sessions) : null;
+                }
+
+                // Timed out: fine if we're connected to the lobby (just no games), otherwise a failure.
+                return m_LobbyRunner != null && m_LobbyRunner.IsRunning ? new List<GameSessionListing>() : null;
+            }
+            finally
+            {
+                SessionListUpdated -= OnList;
+                LobbyError -= OnError;
+            }
         }
 
         /// <summary>Leaves the current game (host: closes it for everyone).</summary>
@@ -305,10 +380,15 @@ namespace Blocks.Gameplay.Core
             m_Leaving = false;
         }
 
-        /// <summary>Host only: closes and hides the session, then loads the gameplay scene for every player.</summary>
+        /// <summary>Host only, and only with at least <see cref="MinPlayersToStart"/> players: closes and hides the session, then loads the gameplay scene for every player.</summary>
         public bool StartMatch()
         {
             if (!IsHost) return false;
+            if (m_Players.Count < MinPlayersToStart)
+            {
+                Debug.LogWarning($"[Fusion] Start Match needs at least {MinPlayersToStart} players.");
+                return false;
+            }
 
             SessionInfo info = m_GameRunner.SessionInfo;
             info.IsOpen = false;
@@ -456,9 +536,21 @@ namespace Blocks.Gameplay.Core
                 [PropertyKeys.StartingPoints] = rules.StartingPoints,
                 [PropertyKeys.DeathPenalty] = rules.DeathPenalty,
                 [PropertyKeys.WagerPayoutTenths] = Mathf.RoundToInt(rules.WagerPayout * 10f),
+                [PropertyKeys.CreatedUnixSeconds] = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 [PropertyKeys.Items] = rules.ItemsEnabled,
                 [PropertyKeys.Pickups] = rules.PickupsEnabled,
             };
+        }
+
+        private static int ReadCreatedUnixSeconds(SessionInfo info)
+        {
+            if (info.Properties != null
+                && info.Properties.TryGetValue(PropertyKeys.CreatedUnixSeconds, out SessionProperty created)
+                && created.IsInt)
+            {
+                return (int)created;
+            }
+            return 0;
         }
 
         /// <summary>Reads a session's published rules back into a HostGameRulesData (missing properties keep the Normal defaults).</summary>
@@ -566,9 +658,13 @@ namespace Blocks.Gameplay.Core
                 {
                     SessionName = info.Name,
                     PlayerCount = info.PlayerCount,
-                    Rules = ReadRules(info)
+                    Rules = ReadRules(info),
+                    CreatedUnixSeconds = ReadCreatedUnixSeconds(info)
                 });
             }
+
+            // Photon doesn't guarantee any order - oldest first, so the longest-waiting games are at the top.
+            m_Sessions.Sort((a, b) => a.CreatedUnixSeconds.CompareTo(b.CreatedUnixSeconds));
 
             HasSessionList = true;
             SessionListUpdated?.Invoke(m_Sessions);

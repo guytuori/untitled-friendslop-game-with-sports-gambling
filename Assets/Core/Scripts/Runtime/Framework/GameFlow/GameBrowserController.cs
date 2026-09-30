@@ -195,6 +195,15 @@ namespace Blocks.Gameplay.Core
             {
                 if (session.Rules != null && filter.Matches(session.Rules)) matches.Add(session);
             }
+            // Oldest first (the live Fusion list already is; this keeps any other source consistent).
+            // List.Sort isn't stable, so sort on the original position too.
+            var order = new Dictionary<GameSessionListing, int>();
+            for (int i = 0; i < matches.Count; i++) order[matches[i]] = i;
+            matches.Sort((a, b) =>
+            {
+                int byAge = a.CreatedUnixSeconds.CompareTo(b.CreatedUnixSeconds);
+                return byAge != 0 ? byAge : order[a].CompareTo(order[b]);
+            });
 
             BuildRows(matches);
 

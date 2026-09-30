@@ -11,9 +11,12 @@ namespace Blocks.Gameplay.Core
     /// count out of the max, and the list of players, all kept current by FusionSessionService (the host
     /// sends the roster to every client whenever someone joins or leaves).
     ///
-    /// The host gets Start Match (starts the match as-is, however many players are in: the session is
-    /// closed and hidden, and Fusion loads the gameplay scene for everyone) and Leave (closes the game for
-    /// everyone). Everyone else gets Leave and a "waiting for the host" line. B/Esc = Leave. If the game
+    /// The host gets Start Match (starts the match as-is: the session is closed and hidden, and Fusion
+    /// loads the gameplay scene for everyone) and Leave (closes the game for everyone). Start Match needs
+    /// at least FusionSessionService.MinPlayersToStart players (it's dimmed until then), and presses are
+    /// ignored for the first <see cref="StartMatchGraceSeconds"/> after the lobby opens - so a player
+    /// mashing A through quick match, who lands here as a brand-new host with Start Match selected,
+    /// doesn't instantly start a match by themselves. Everyone else gets Leave and a "waiting for the host" line. B/Esc = Leave. If the game
     /// ends from the other side (the host leaves, or the connection drops), the reason is shown and the
     /// button becomes Back.
     ///
@@ -44,9 +47,18 @@ namespace Blocks.Gameplay.Core
         private bool m_Leaving;
         private bool m_Starting;
 
+        /// <summary>See the class summary - Start Match presses in this window after the lobby opens are ignored.</summary>
+        private const float StartMatchGraceSeconds = 3f;
+        private float m_OpenedAt;
+
+        private bool StartMatchAllowed =>
+            Time.unscaledTime - m_OpenedAt >= StartMatchGraceSeconds &&
+            m_Service.Players.Count >= FusionSessionService.MinPlayersToStart;
+
         private void Awake()
         {
             GamepadUIBindingFix.Apply();
+            m_OpenedAt = Time.unscaledTime;
             m_Service = FusionSessionService.Instance;
 
             VisualElement root = GetComponent<UIDocument>().rootVisualElement;
@@ -85,7 +97,8 @@ namespace Blocks.Gameplay.Core
             center.Add(m_StatusLabel);
 
             VisualElement column = MenuUI.AddBottomRightColumn(root);
-            m_StartButton = MenuUI.MakeButton("Start Match", OnStartMatch, selectSound);
+            // No click sound here - OnStartMatch plays it only when the press is actually accepted.
+            m_StartButton = MenuUI.MakeButton("Start Match", OnStartMatch, null);
             m_LeaveButton = MenuUI.MakeButton("Leave", OnLeave, cancelSound);
             column.Add(m_StartButton);
             column.Add(m_LeaveButton);
@@ -146,17 +159,22 @@ namespace Blocks.Gameplay.Core
             m_PlayersLabel.text = list.ToString();
 
             bool isHost = m_Service.IsHost;
+            bool enoughPlayers = count >= FusionSessionService.MinPlayersToStart;
             m_StartButton.style.display = isHost ? DisplayStyle.Flex : DisplayStyle.None;
+            m_StartButton.style.opacity = enoughPlayers ? 1f : 0.4f;
             if (!m_Starting)
             {
-                m_StatusLabel.text = isHost ? "Start the match whenever you're ready." : "Waiting for the host to start the match...";
+                m_StatusLabel.text = !isHost ? "Waiting for the host to start the match..."
+                    : enoughPlayers ? "Start the match whenever you're ready."
+                    : "Waiting for at least one more player to join.";
             }
         }
 
         private void OnStartMatch()
         {
-            if (m_Ended || m_Starting || !m_Service.IsHost) return;
+            if (m_Ended || m_Starting || !m_Service.IsHost || !StartMatchAllowed) return;
 
+            MenuUI.PlaySound(selectSound);
             m_Starting = true;
             m_StatusLabel.text = "Starting match...";
             if (!m_Service.StartMatch())
