@@ -1,7 +1,6 @@
 using System;
 using UnityEngine;
-using Unity.Netcode;
-using Unity.Collections;
+using Fusion;
 
 namespace Blocks.Gameplay.Core
 {
@@ -29,39 +28,36 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// Manages networked state for the player, such as their name and lifecycle state.
     /// This component separates state data from the management logic in CorePlayerManager.
-    /// Network variables use Owner write permissions, allowing the owning client to set values.
-    /// Non-owners must use RPCs to request changes.
+    /// The owning client (State Authority) writes the values directly; anyone else asks the owner to
+    /// change them through an RPC.
     /// </summary>
-    public class CorePlayerState : NetworkBehaviour
+    public class CorePlayerState : CoreNetworkBehaviour
     {
         #region Fields & Properties
 
         [Tooltip("Global ScriptableObject event raised when player state changes.")]
         [SerializeField] private PlayerStateEvent onPlayerStateChangedGlobal;
 
-        // Networked variable for the player name
-        // Everyone can read, only the owner can write directly
-        private readonly NetworkVariable<FixedString64Bytes> m_NetworkedPlayerName = new NetworkVariable<FixedString64Bytes>(
-            new FixedString64Bytes(),
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Owner);
+        // Everyone can read, only the owner (State Authority) writes.
+        [Networked] private NetworkString<_64> NetPlayerName { get; set; }
+        [Networked] private PlayerLifeState NetLifeState { get; set; }
 
-        // Networked variable for the Life State
-        // Everyone can read, only the owner can write directly
-        private readonly NetworkVariable<PlayerLifeState> m_LifeState = new NetworkVariable<PlayerLifeState>(
-            PlayerLifeState.InitialSpawn,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Owner);
+        // Last values seen by this client - used to raise the change events (see DetectChanges).
+        private string m_LastName = string.Empty;
+        private PlayerLifeState m_LastLifeState = PlayerLifeState.InitialSpawn;
+
+        // Set before the object finished spawning; applied in OnNetworkSpawn.
+        private string m_PendingName;
 
         /// <summary>
         /// Gets the current player name string.
         /// </summary>
-        public string PlayerName => m_NetworkedPlayerName.Value.ToString();
+        public string PlayerName => IsSpawned ? NetPlayerName.ToString() : string.Empty;
 
         /// <summary>
         /// Gets the current Life State.
         /// </summary>
-        public PlayerLifeState LifeState => m_LifeState.Value;
+        public PlayerLifeState LifeState => IsSpawned ? NetLifeState : PlayerLifeState.InitialSpawn;
 
         /// <summary>
         /// Helper to check if the player is currently considered "Active" (Not eliminated).
@@ -84,29 +80,33 @@ namespace Blocks.Gameplay.Core
 
         #endregion
 
-        #region Unity Methods
+        #region Network Lifecycle
 
         public override void OnNetworkSpawn()
         {
-            // Subscribe to value changes to trigger the local event
-            m_NetworkedPlayerName.OnValueChanged += HandleNameChanged;
-            m_LifeState.OnValueChanged += HandleLifeStateChanged;
-
-            // For late-joining clients, network variables may already have values set
-            // Trigger events immediately to ensure subscribers receive the current state
-            if (!m_NetworkedPlayerName.Value.IsEmpty)
+            if (IsOwner && !string.IsNullOrEmpty(m_PendingName))
             {
-                OnNameChanged?.Invoke(m_NetworkedPlayerName.Value.ToString());
+                NetPlayerName = m_PendingName;
+            }
+            m_PendingName = null;
+
+            m_LastName = NetPlayerName.ToString();
+            m_LastLifeState = NetLifeState;
+
+            // For late-joining clients, the values may already be set
+            // Trigger events immediately to ensure subscribers receive the current state
+            if (!string.IsNullOrEmpty(m_LastName))
+            {
+                OnNameChanged?.Invoke(m_LastName);
             }
 
             // Always broadcast initial life state to ensure all systems are synchronized
-            OnLifeStateChanged?.Invoke(m_LifeState.Value);
+            OnLifeStateChanged?.Invoke(m_LastLifeState);
         }
 
-        public override void OnNetworkDespawn()
+        public override void Render()
         {
-            m_NetworkedPlayerName.OnValueChanged -= HandleNameChanged;
-            m_LifeState.OnValueChanged -= HandleLifeStateChanged;
+            DetectChanges();
         }
 
         #endregion
@@ -116,20 +116,27 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Sets the player name.
         /// If called by the Owner, it sets the value directly.
-        /// If called by non-Owner (e.g., Server), it sends an RPC to the Owner to set it.
+        /// If called by non-Owner, it sends an RPC to the Owner to set it.
         /// </summary>
         /// <param name="newName">The new name to set for the player.</param>
         public void SetPlayerName(string newName)
         {
             if (string.IsNullOrEmpty(newName)) return;
 
+            if (!IsSpawned)
+            {
+                m_PendingName = newName;
+                return;
+            }
+
             if (IsOwner)
             {
-                m_NetworkedPlayerName.Value = new FixedString64Bytes(newName);
+                NetPlayerName = newName;
+                DetectChanges();
             }
             else
             {
-                // Server or other clients must request the owner to set the value via RPC
+                // Other clients must request the owner to set the value via RPC
                 SetPlayerNameRpc(newName);
             }
         }
@@ -137,18 +144,21 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Sets the player's life state.
         /// If called by the Owner, it sets the value directly.
-        /// If called by non-Owner (e.g., Server), it sends an RPC to the Owner to set it.
+        /// If called by non-Owner, it sends an RPC to the Owner to set it.
         /// </summary>
         /// <param name="newState">The new state to transition to.</param>
         public void SetLifeState(PlayerLifeState newState)
         {
+            if (!IsSpawned) return;
+
             if (IsOwner)
             {
-                m_LifeState.Value = newState;
+                NetLifeState = newState;
+                DetectChanges();
             }
             else
             {
-                // Server or other clients must request the owner to set the value via RPC
+                // Other clients must request the owner to set the value via RPC
                 SetLifeStateRpc(newState);
             }
         }
@@ -159,45 +169,59 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>
         /// RPC sent to the owner to set the player name.
-        /// Required because network variables with Owner write permission can only be set by the owner.
         /// </summary>
-        /// <param name="newName">The new name to set for the player.</param>
-        [Rpc(SendTo.Owner)]
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         private void SetPlayerNameRpc(string newName)
         {
-            m_NetworkedPlayerName.Value = new FixedString64Bytes(newName);
+            NetPlayerName = newName;
+            DetectChanges();
         }
 
         /// <summary>
         /// RPC sent to the owner to set the life state.
-        /// Required because network variables with Owner write permission can only be set by the owner.
         /// </summary>
-        /// <param name="newState">The new state to transition to.</param>
-        [Rpc(SendTo.Owner)]
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         private void SetLifeStateRpc(PlayerLifeState newState)
         {
-            m_LifeState.Value = newState;
+            NetLifeState = newState;
+            DetectChanges();
         }
 
         #endregion
 
         #region Private Methods
 
-        private void HandleNameChanged(FixedString64Bytes oldName, FixedString64Bytes newName)
+        /// <summary>
+        /// Raises OnNameChanged / OnLifeStateChanged for any value that changed since this client last
+        /// looked. Runs every frame (Render) on every client, and immediately after the owner writes a new
+        /// value, so the owner's own listeners react in the same frame (like NGO's OnValueChanged did).
+        /// </summary>
+        private void DetectChanges()
         {
-            OnNameChanged?.Invoke(newName.ToString());
-        }
+            if (!IsSpawned) return;
 
-        private void HandleLifeStateChanged(PlayerLifeState oldState, PlayerLifeState newState)
-        {
-            // Trigger local C# event for components on this GameObject (e.g., abilities, visual effects)
-            OnLifeStateChanged?.Invoke(newState);
-
-            // Trigger global ScriptableObject event for systems elsewhere in the scene
-            // This allows managers, UI, and other decoupled systems to respond to state changes
-            if (onPlayerStateChangedGlobal != null)
+            string currentName = NetPlayerName.ToString();
+            if (currentName != m_LastName)
             {
-                onPlayerStateChangedGlobal.Raise(new PlayerStatePayload { playerId = OwnerClientId, newState = newState, oldState = oldState });
+                m_LastName = currentName;
+                OnNameChanged?.Invoke(currentName);
+            }
+
+            PlayerLifeState currentState = NetLifeState;
+            if (currentState != m_LastLifeState)
+            {
+                PlayerLifeState oldState = m_LastLifeState;
+                m_LastLifeState = currentState;
+
+                // Trigger local C# event for components on this GameObject (e.g., abilities, visual effects)
+                OnLifeStateChanged?.Invoke(currentState);
+
+                // Trigger global ScriptableObject event for systems elsewhere in the scene
+                // This allows managers, UI, and other decoupled systems to respond to state changes
+                if (onPlayerStateChangedGlobal != null)
+                {
+                    onPlayerStateChangedGlobal.Raise(new PlayerStatePayload { playerId = OwnerClientId, newState = currentState, oldState = oldState });
+                }
             }
         }
 

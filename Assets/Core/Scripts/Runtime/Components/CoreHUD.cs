@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode;
 using System.Collections;
 using UnityEngine.UIElements;
 using System.Collections.Generic;
@@ -12,7 +11,7 @@ namespace Blocks.Gameplay.Core
     /// Only active for the local player (owner).
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class CoreHUD : NetworkBehaviour
+    public class CoreHUD : CoreNetworkBehaviour
     {
         #region Fields & Properties
 
@@ -54,6 +53,10 @@ namespace Blocks.Gameplay.Core
         // Scoreboard System
         private readonly Dictionary<ulong, ScoreboardRow> m_ScoreboardRows = new Dictionary<ulong, ScoreboardRow>();
 
+        // Scene singletons this HUD subscribed to (kept so the exact same instances are unsubscribed)
+        private RoundTimer m_SubscribedRoundTimer;
+        private ChallengeManager m_SubscribedChallengeManager;
+
         // Lifecycle Management
         private Coroutine m_EliminatedCoroutine;
         private Coroutine m_ScoreboardRefreshCoroutine;
@@ -81,7 +84,7 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>
         /// One displayed row of the scoreboard: its UI element, the score label within it, and the specific
-        /// player's PlayerScore it's bound to (so its NetworkVariable subscription can be cleanly removed later).
+        /// player's PlayerScore it's bound to (so its ScoreChanged subscription can be cleanly removed later).
         /// </summary>
         private class ScoreboardRow
         {
@@ -120,21 +123,22 @@ namespace Blocks.Gameplay.Core
             RegisterEventListeners();
             StartCoroutine(InitialHUDUpdate());
 
-            NetworkManager.Singleton.OnClientConnectedCallback += HandleScoreboardRosterChanged;
-            NetworkManager.Singleton.OnClientDisconnectCallback += HandleScoreboardRosterChanged;
+            NetworkPlayers.RosterChanged += HandleScoreboardRosterChanged;
             RequestScoreboardRefresh();
 
-            if (RoundTimer.Instance != null)
+            m_SubscribedRoundTimer = RoundTimer.Instance;
+            if (m_SubscribedRoundTimer != null)
             {
-                RoundTimer.Instance.TimeRemaining.OnValueChanged += HandleRoundTimerChanged;
-                UpdateTimerLabel(RoundTimer.Instance.TimeRemaining.Value);
+                m_SubscribedRoundTimer.TimeRemainingChanged += HandleRoundTimerChanged;
+                UpdateTimerLabel(m_SubscribedRoundTimer.TimeRemaining);
             }
 
-            if (ChallengeManager.Instance != null)
+            m_SubscribedChallengeManager = ChallengeManager.Instance;
+            if (m_SubscribedChallengeManager != null)
             {
-                ChallengeManager.Instance.IsBettingWindowActive.OnValueChanged += HandleBettingWindowActiveChanged;
-                ChallengeManager.Instance.BettingTimeRemaining.OnValueChanged += HandleBettingTimeRemainingChanged;
-                ChallengeManager.Instance.ActiveBettorClientIds.OnListChanged += HandleActiveBettorsChanged;
+                m_SubscribedChallengeManager.BettingWindowActiveChanged += HandleBettingWindowActiveChanged;
+                m_SubscribedChallengeManager.BettingTimeRemainingChanged += HandleBettingTimeRemainingChanged;
+                m_SubscribedChallengeManager.ActiveBettorsChanged += HandleActiveBettorsChanged;
                 RefreshChallengeOverlay();
             }
         }
@@ -157,22 +161,20 @@ namespace Blocks.Gameplay.Core
                 UnregisterEventListeners();
                 ClearAllNotifications();
 
-                if (NetworkManager.Singleton != null)
+                NetworkPlayers.RosterChanged -= HandleScoreboardRosterChanged;
+
+                if (m_SubscribedRoundTimer != null)
                 {
-                    NetworkManager.Singleton.OnClientConnectedCallback -= HandleScoreboardRosterChanged;
-                    NetworkManager.Singleton.OnClientDisconnectCallback -= HandleScoreboardRosterChanged;
+                    m_SubscribedRoundTimer.TimeRemainingChanged -= HandleRoundTimerChanged;
+                    m_SubscribedRoundTimer = null;
                 }
 
-                if (RoundTimer.Instance != null)
+                if (m_SubscribedChallengeManager != null)
                 {
-                    RoundTimer.Instance.TimeRemaining.OnValueChanged -= HandleRoundTimerChanged;
-                }
-
-                if (ChallengeManager.Instance != null)
-                {
-                    ChallengeManager.Instance.IsBettingWindowActive.OnValueChanged -= HandleBettingWindowActiveChanged;
-                    ChallengeManager.Instance.BettingTimeRemaining.OnValueChanged -= HandleBettingTimeRemainingChanged;
-                    ChallengeManager.Instance.ActiveBettorClientIds.OnListChanged -= HandleActiveBettorsChanged;
+                    m_SubscribedChallengeManager.BettingWindowActiveChanged -= HandleBettingWindowActiveChanged;
+                    m_SubscribedChallengeManager.BettingTimeRemainingChanged -= HandleBettingTimeRemainingChanged;
+                    m_SubscribedChallengeManager.ActiveBettorsChanged -= HandleActiveBettorsChanged;
+                    m_SubscribedChallengeManager = null;
                 }
 
                 ClearScoreboardRows();
@@ -607,23 +609,11 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Gets a player name by ID, looking up from CorePlayerState.
         /// </summary>
-        /// <param name="playerId">The player's network client ID.</param>
+        /// <param name="playerId">The player's id (see NetworkPlayers).</param>
         /// <returns>The player's display name or a fallback format.</returns>
         private string GetPlayerName(ulong playerId)
         {
-            if (NetworkManager.Singleton != null && NetworkManager.Singleton.SpawnManager != null)
-            {
-                var playerObject = NetworkManager.Singleton.SpawnManager.GetPlayerNetworkObject(playerId);
-                if (playerObject != null && playerObject.TryGetComponent<CorePlayerState>(out var playerState))
-                {
-                    string playerName = playerState.PlayerName;
-                    if (!string.IsNullOrEmpty(playerName))
-                    {
-                        return playerName;
-                    }
-                }
-            }
-            return $"Player-{playerId}";
+            return NetworkPlayers.GetDisplayName(playerId);
         }
 
         #endregion
@@ -631,12 +621,12 @@ namespace Blocks.Gameplay.Core
         #region Scoreboard & Round Timer
 
         /// <summary>
-        /// Called whenever any client connects or disconnects, to keep the scoreboard's rows in sync with who's
-        /// actually in the game. Just rebuilds from scratch rather than tracking the specific client - simplest
-        /// way to stay correct across joins/leaves, and cheap enough given expected player counts.
+        /// Called whenever any player avatar spawns or despawns (NetworkPlayers.RosterChanged), to keep the
+        /// scoreboard's rows in sync with who's actually in the game. Just rebuilds from scratch rather than
+        /// tracking the specific player - simplest way to stay correct across joins/leaves, and cheap enough
+        /// given expected player counts.
         /// </summary>
-        /// <param name="clientId">The client that connected or disconnected (unused - a full rebuild covers both).</param>
-        private void HandleScoreboardRosterChanged(ulong clientId)
+        private void HandleScoreboardRosterChanged()
         {
             RequestScoreboardRefresh();
         }
@@ -671,10 +661,8 @@ namespace Blocks.Gameplay.Core
             {
                 RefreshScoreboard();
 
-                if (NetworkManager.Singleton == null) yield break;
-
                 bool everyoneHasARow = true;
-                foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+                foreach (ulong clientId in NetworkPlayers.Ids)
                 {
                     if (!m_ScoreboardRows.ContainsKey(clientId))
                     {
@@ -694,14 +682,13 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void RefreshScoreboard()
         {
-            if (m_ScoreboardContainer == null || NetworkManager.Singleton == null) return;
+            if (m_ScoreboardContainer == null) return;
 
             ClearScoreboardRows();
 
-            foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+            foreach (ulong clientId in NetworkPlayers.Ids)
             {
-                var playerObject = NetworkManager.Singleton.SpawnManager.GetPlayerNetworkObject(clientId);
-                if (playerObject == null || !playerObject.TryGetComponent<PlayerScore>(out var playerScore)) continue;
+                if (!NetworkPlayers.TryGetComponent(clientId, out PlayerScore playerScore)) continue;
 
                 var row = new VisualElement();
                 row.AddToClassList("scoreboard-row");
@@ -710,7 +697,7 @@ namespace Blocks.Gameplay.Core
                 nameLabel.AddToClassList("scoreboard-name");
                 row.Add(nameLabel);
 
-                var scoreLabel = new Label(playerScore.Score.Value.ToString());
+                var scoreLabel = new Label(playerScore.Score.ToString());
                 scoreLabel.AddToClassList("scoreboard-score");
                 row.Add(scoreLabel);
 
@@ -722,7 +709,7 @@ namespace Blocks.Gameplay.Core
                     ScoreLabel = scoreLabel,
                     PlayerScoreComponent = playerScore
                 };
-                playerScore.Score.OnValueChanged += scoreboardRow.HandleScoreChanged;
+                playerScore.ScoreChanged += scoreboardRow.HandleScoreChanged;
                 m_ScoreboardRows[clientId] = scoreboardRow;
             }
         }
@@ -736,7 +723,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (row.PlayerScoreComponent != null)
                 {
-                    row.PlayerScoreComponent.Score.OnValueChanged -= row.HandleScoreChanged;
+                    row.PlayerScoreComponent.ScoreChanged -= row.HandleScoreChanged;
                 }
                 m_ScoreboardContainer?.Remove(row.Element);
             }
@@ -787,7 +774,7 @@ namespace Blocks.Gameplay.Core
             if (ChallengeManager.Instance == null) return;
 
             m_HasPlacedBetThisWindow = true;
-            ChallengeManager.Instance.PlaceBetRpc(choice);
+            ChallengeManager.Instance.PlaceBet(choice);
 
             UpdateChallengeBetControlsVisibility();
             if (m_ChallengeBetStatusLabel != null)
@@ -805,6 +792,12 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void HandleBettingWindowActiveChanged(bool previousValue, bool isActive)
         {
+            if (isActive)
+            {
+                // A new window - this player hasn't bet in it yet (see RefreshChallengeOverlay).
+                m_HasPlacedBetThisWindow = false;
+            }
+
             if (isActive && m_ChallengeBetStatusLabel != null)
             {
                 m_ChallengeBetStatusLabel.style.display = DisplayStyle.None;
@@ -836,7 +829,7 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Rebuilds the "so-and-so has bet" announcements whenever the server's bettor list changes.
         /// </summary>
-        private void HandleActiveBettorsChanged(NetworkListEvent<ulong> changeEvent)
+        private void HandleActiveBettorsChanged()
         {
             RefreshBettorAnnouncements();
         }
@@ -851,19 +844,19 @@ namespace Blocks.Gameplay.Core
         {
             if (m_ChallengeOverlay == null || ChallengeManager.Instance == null) return;
 
-            bool isActive = ChallengeManager.Instance.IsBettingWindowActive.Value;
+            bool isActive = ChallengeManager.Instance.IsBettingWindowActive;
             m_ChallengeOverlay.style.display = isActive ? DisplayStyle.Flex : DisplayStyle.None;
             if (!isActive) return;
 
-            string challengeName = ChallengeManager.Instance.ActiveChallengeName.Value.ToString();
-            ulong challengerId = ChallengeManager.Instance.ActiveChallengerClientId.Value;
+            string challengeName = ChallengeManager.Instance.ActiveChallengeName;
+            ulong challengerId = ChallengeManager.Instance.ActiveChallengerClientId;
 
             if (m_ChallengeTitleLabel != null) m_ChallengeTitleLabel.text = challengeName;
             if (m_ChallengeSubtitleLabel != null) m_ChallengeSubtitleLabel.text = $"{GetPlayerName(challengerId)} is attempting this challenge";
             if (m_ChallengeTimerBar != null)
             {
                 m_ChallengeTimerBar.highValue = ChallengeManager.Instance.BettingWindowSeconds;
-                m_ChallengeTimerBar.value = ChallengeManager.Instance.BettingTimeRemaining.Value;
+                m_ChallengeTimerBar.value = ChallengeManager.Instance.BettingTimeRemaining;
             }
 
             UpdateChallengeBetControlsVisibility();
@@ -878,8 +871,7 @@ namespace Blocks.Gameplay.Core
         {
             if (m_ChallengeBetButtons == null || ChallengeManager.Instance == null) return;
 
-            bool isLocalPlayerTheChallenger = NetworkManager.Singleton != null &&
-                NetworkManager.Singleton.LocalClientId == ChallengeManager.Instance.ActiveChallengerClientId.Value;
+            bool isLocalPlayerTheChallenger = OwnerClientId == ChallengeManager.Instance.ActiveChallengerClientId;
             bool showButtons = !isLocalPlayerTheChallenger && !m_HasPlacedBetThisWindow;
             m_ChallengeBetButtons.style.display = showButtons ? DisplayStyle.Flex : DisplayStyle.None;
         }
@@ -893,7 +885,7 @@ namespace Blocks.Gameplay.Core
             if (m_ChallengeBetAnnouncements == null || ChallengeManager.Instance == null) return;
 
             m_ChallengeBetAnnouncements.Clear();
-            string challengeName = ChallengeManager.Instance.ActiveChallengeName.Value.ToString();
+            string challengeName = ChallengeManager.Instance.ActiveChallengeName;
 
             foreach (ulong bettorId in ChallengeManager.Instance.ActiveBettorClientIds)
             {

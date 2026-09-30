@@ -1,4 +1,4 @@
-using Unity.Netcode;
+using UnityEngine;
 
 namespace Blocks.Gameplay.Core
 {
@@ -8,10 +8,12 @@ namespace Blocks.Gameplay.Core
     /// extension point WallClimbAbility, JumpAbility etc. use) purely so it can sit on the player prefab as
     /// an independent, optional add-on: CorePlayerManager and CoreMovement need no changes at all to
     /// support pausing, and removing this component removes pausing with nothing else to touch.
+    /// Only does anything on the player's own client (the owner).
     /// </summary>
-    public class ChallengePauseGate : NetworkBehaviour, IPlayerAddon
+    public class ChallengePauseGate : MonoBehaviour, IPlayerAddon
     {
         private CorePlayerManager m_PlayerManager;
+        private ChallengeManager m_Subscribed;
 
         public void Initialize(CorePlayerManager playerManager)
         {
@@ -20,19 +22,20 @@ namespace Blocks.Gameplay.Core
 
         public void OnPlayerSpawn()
         {
-            if (!IsOwner) return;
+            if (m_PlayerManager == null || !m_PlayerManager.IsOwner) return;
             if (ChallengeManager.Instance == null) return;
 
-            ChallengeManager.Instance.IsPaused.OnValueChanged += HandlePausedChanged;
-            HandlePausedChanged(false, ChallengeManager.Instance.IsPaused.Value);
+            m_Subscribed = ChallengeManager.Instance;
+            m_Subscribed.PausedChanged += HandlePausedChanged;
+            HandlePausedChanged(false, m_Subscribed.IsPaused);
         }
 
         public void OnPlayerDespawn()
         {
-            if (!IsOwner) return;
-            if (ChallengeManager.Instance == null) return;
+            if (m_Subscribed == null) return;
 
-            ChallengeManager.Instance.IsPaused.OnValueChanged -= HandlePausedChanged;
+            m_Subscribed.PausedChanged -= HandlePausedChanged;
+            m_Subscribed = null;
         }
 
         public void OnLifeStateChanged(PlayerLifeState previousState, PlayerLifeState newState)

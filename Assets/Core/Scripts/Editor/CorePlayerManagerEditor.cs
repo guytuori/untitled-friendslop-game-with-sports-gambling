@@ -2,7 +2,6 @@ using System;
 using UnityEngine;
 using UnityEditor;
 using System.Linq;
-using Unity.Netcode;
 using System.Collections.Generic;
 
 namespace Blocks.Gameplay.Core
@@ -40,7 +39,7 @@ namespace Blocks.Gameplay.Core
 
         public override void OnInspectorGUI()
         {
-            DrawNetworkHeader();
+            UniversalEditorSharedLogic.DrawNetworkHeader(target);
             serializedObject.Update();
 
             InitializeStyles();
@@ -55,51 +54,17 @@ namespace Blocks.Gameplay.Core
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
             EditorGUILayout.Space(5);
-            UniversalEditorSharedLogic.DrawDerivedProperties(serializedObject, typeof(CorePlayerManager), typeof(NetworkBehaviour));
+            UniversalEditorSharedLogic.DrawDerivedProperties(serializedObject, typeof(CorePlayerManager), typeof(CoreNetworkBehaviour));
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
-            EditorGUILayout.LabelField("Base Network Behaviour Properties", EditorStyles.boldLabel);
+            UniversalEditorSharedLogic.DrawScriptField(serializedObject);
 
             serializedObject.ApplyModifiedProperties();
-            DrawBaseNetworkBehaviourProperties();
         }
 
         #endregion
 
         #region Private Methods
-
-        private void DrawNetworkHeader()
-        {
-            EditorGUILayout.BeginVertical("helpBox");
-            EditorGUILayout.LabelField($"{target.GetType().Name}", EditorStyles.boldLabel);
-
-            if (Application.isPlaying && target is NetworkBehaviour networkBehaviourTarget && networkBehaviourTarget.IsSpawned)
-            {
-                EditorGUILayout.LabelField($"Network Object ID: {networkBehaviourTarget.NetworkObjectId}", EditorStyles.miniLabel);
-
-                if (networkBehaviourTarget.IsOwner)
-                {
-                    EditorGUILayout.LabelField("Is Owner: Yes", EditorStyles.miniLabel);
-                }
-
-                if (networkBehaviourTarget.IsServer)
-                {
-                    EditorGUILayout.LabelField("Is Server: Yes", EditorStyles.miniLabel);
-                }
-
-                if (networkBehaviourTarget.IsHost)
-                {
-                    EditorGUILayout.LabelField("Is Host: Yes", EditorStyles.miniLabel);
-                }
-            }
-            else
-            {
-                EditorGUILayout.LabelField("Network Object ID: Not Spawned", EditorStyles.miniLabel);
-            }
-
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space();
-        }
 
         private void InitializeStyles()
         {
@@ -192,18 +157,6 @@ namespace Blocks.Gameplay.Core
                 if (GUI.Button(buttonRect, "Add"))
                 {
                     Undo.AddComponent(playerManager.gameObject, selectedType);
-                }
-            }
-        }
-
-        private void DrawBaseNetworkBehaviourProperties()
-        {
-            SerializedProperty scriptProp = serializedObject.FindProperty("m_Script");
-            if (scriptProp != null)
-            {
-                using (new EditorGUI.DisabledScope(true))
-                {
-                    EditorGUILayout.PropertyField(scriptProp);
                 }
             }
         }

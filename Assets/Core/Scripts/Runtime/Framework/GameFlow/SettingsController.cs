@@ -38,8 +38,7 @@ namespace Blocks.Gameplay.Core
     /// Navigable with a gamepad's left stick/d-pad plus the submit button, the same way
     /// MainMenuController is - see that class's comment for what that takes. This scene carries its own
     /// EventSystem for the same reason MainMenu does: buttons need one to receive clicks and gamepad
-    /// navigation at all, and nothing carries an EventSystem across scene loads the way
-    /// GameNetworkManager does for itself.
+    /// navigation at all, and nothing carries an EventSystem across scene loads.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class SettingsController : MonoBehaviour

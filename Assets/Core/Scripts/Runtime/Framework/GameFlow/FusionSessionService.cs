@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using Fusion;
 using Fusion.Photon.Realtime;
@@ -19,32 +18,47 @@ namespace Blocks.Gameplay.Core
     }
 
     /// <summary>
-    /// Everything Photon Fusion 2 for the menus: hosting a game, joining one, the public game list the
-    /// Game Browser shows, and the pre-match lobby roster. A single DontDestroyOnLoad object created on
-    /// first use (<see cref="Instance"/>) - nothing needs to be placed in a scene.
+    /// Everything Photon Fusion 2 for the game: hosting a game, joining one, the public game list the
+    /// Game Browser shows, the pre-match lobby roster, starting the match, and the running session the
+    /// gameplay scene uses (<see cref="GameRunner"/>). A single DontDestroyOnLoad object created on first
+    /// use (<see cref="Instance"/>) - nothing needs to be placed in a scene.
+    ///
+    /// SHARED MODE: every session runs in Fusion's Shared mode. Each player's own client has State
+    /// Authority over their own player object (that's how the gameplay code was written - it was built on
+    /// Netcode for GameObjects' Distributed Authority mode, which works the same way), and the session's
+    /// master client owns the scene objects (RoundTimer, ChallengeManager, ...). "Host" in the menus is
+    /// simply the master client: whoever created the game, or - if they leave - whoever Photon promotes
+    /// next, so a game never dies just because its host quit.
     ///
     /// Two separate NetworkRunners, since a runner can only be used for one thing:
-    ///   - The lobby runner joins Fusion's ClientServer session lobby purely to receive the list of open,
+    ///   - The lobby runner joins Fusion's Shared session lobby purely to receive the list of open,
     ///     visible games (OnSessionListUpdated). Used by the Game Browser; shut down when it closes.
-    ///   - The game runner is the actual hosted/joined session (GameMode.Host / GameMode.Client).
+    ///   - The game runner is the actual session (<see cref="GameRunner"/>), kept through the lobby and
+    ///     into the match.
     ///
     /// ROOM CODES: the session's name is its room code - 5 characters from an alphabet without look-alike
-    /// characters (no 0/O, 1/I/L). Uniqueness is checked by Photon itself: creating a Host session whose
-    /// name already exists fails with ShutdownReason.GameIdAlreadyExists, in which case a new code is
-    /// generated and it tries again. Joining by code (private games) is just joining a session by name,
-    /// and public games are joined the same way from the browser.
+    /// characters (no 0/O, 1/I/L). In Shared mode, starting a session by name joins it if it exists and
+    /// creates it otherwise, so both directions are checked afterwards with the host's random
+    /// "hn" (host nonce) session property: a host that finds someone else's nonce hit an existing code and
+    /// retries with a new one, and a joiner that finds no nonce at all created an empty session by mistake
+    /// (a typo'd code) and leaves it again - that accidental session is created closed and hidden, so
+    /// nobody else can ever end up in it.
     ///
     /// Public/Private is the session's IsVisible flag: private games never appear in the lobby list but
-    /// can still be joined by code. The host's rules are published as session properties (see
-    /// <see cref="PropertyKeys"/>) so the browser can show and filter them.
+    /// can still be joined by code. The host's rules are published as session properties so the browser
+    /// can show and filter them, and so every player in the match can read them (<see cref="SessionRules"/>).
     ///
-    /// ROSTER: the host sees every player through OnPlayerJoined/OnPlayerLeft and, on every change, sends
-    /// the roster to each client as a small reliable data message (<see cref="RosterKey"/>) - so clients
-    /// see the same player list without any networked objects (which would need Fusion's code weaving and
-    /// prefab setup this menu flow doesn't otherwise need).
+    /// ROSTER: in Shared mode every client sees every player (Runner.ActivePlayers, OnPlayerJoined/Left),
+    /// so each client builds the lobby roster itself.
     ///
     /// START MATCH (host only): closes and hides the session so nobody else can find or join it, then loads
     /// <see cref="GameplaySceneName"/> through Fusion's scene manager, which brings every client along.
+    /// The gameplay scene's GameManager then spawns each player's own avatar.
+    ///
+    /// PLAYING A GAMEPLAY SCENE DIRECTLY (editor testing): GameManager calls <see cref="StartDevSessionAsync"/>,
+    /// which starts a private Shared session named after this machine and the scene, so every instance
+    /// on this machine (e.g. Multiplayer Play Mode virtual players) that plays the same scene ends up in
+    /// the same session - no menus needed.
     ///
     /// REGION: fixed to <see cref="Region"/> for now. Photon sessions only exist within one region, and
     /// "best region" can pick different regions for players who are in the same country, which would
@@ -68,8 +82,7 @@ namespace Blocks.Gameplay.Core
 
         private const string RoomCodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 31 chars, no 0/O/1/I/L
         private const int MaxHostAttempts = 5;
-
-        private static readonly ReliableKey RosterKey = ReliableKey.FromInts(0x5050, 1, 0, 0); // "PP" roster, v1
+        private const int DevSessionMaxPlayers = 8;
 
         /// <summary>Session property keys (kept short - they're sent to every player browsing the lobby).</summary>
         private static class PropertyKeys
@@ -84,6 +97,7 @@ namespace Blocks.Gameplay.Core
             public const string Items = "it";
             public const string Pickups = "pu";
             public const string CreatedUnixSeconds = "ct"; // when the host created it - for oldest-first ordering
+            public const string HostNonce = "hn";         // random number from the creating host - see the class summary
         }
 
         private static FusionSessionService s_Instance;
@@ -101,6 +115,9 @@ namespace Blocks.Gameplay.Core
                 return s_Instance;
             }
         }
+
+        /// <summary>Whether the service exists yet - lets code check for a running session without creating it.</summary>
+        public static bool HasInstance => s_Instance != null;
 
         // ----- lobby (game list) -----
 
@@ -121,24 +138,56 @@ namespace Blocks.Gameplay.Core
         private NetworkRunner m_GameRunner;
         private bool m_Starting;
         private bool m_Leaving;
+        private int m_RosterMasterId = -1;
         private readonly List<LobbyPlayer> m_Players = new List<LobbyPlayer>();
 
+        /// <summary>The running game session's runner (null when not in a game, and while one is still starting).</summary>
+        public NetworkRunner GameRunner => m_GameRunner != null && !m_Starting ? m_GameRunner : null;
+
+        /// <summary>True while a session is being started (host, join, quick match or dev session).</summary>
+        public bool IsStarting => m_Starting;
+
         public bool InGame => m_GameRunner != null && m_GameRunner.IsRunning && !m_Starting;
-        public bool IsHost => InGame && m_GameRunner.IsServer;
+
+        /// <summary>This player is the session's master client - the host, as far as the menus are concerned.</summary>
+        public bool IsHost => InGame && m_GameRunner.IsSharedModeMasterClient;
+
         public string RoomCode { get; private set; } = "";
         public bool IsPublic { get; private set; }
         public int MaxPlayers { get; private set; }
         public IReadOnlyList<LobbyPlayer> Players => m_Players;
 
-        /// <summary>Raised whenever the lobby roster changes (join/leave, or a roster message from the host).</summary>
+        /// <summary>True while in a session started by <see cref="StartDevSessionAsync"/> (a gameplay scene played directly).</summary>
+        public bool IsDevSession { get; private set; }
+
+        /// <summary>The rules the host published for the current session (Normal defaults if none).</summary>
+        public HostGameRulesData SessionRules
+        {
+            get
+            {
+                SessionInfo info = InGame ? m_GameRunner.SessionInfo : null;
+                return info != null && info.IsValid ? ReadRules(info) : new HostGameRulesData();
+            }
+        }
+
+        /// <summary>Raised whenever the lobby roster changes (join/leave, or a new host).</summary>
         public event Action RosterChanged;
 
-        /// <summary>Raised when the game session ends without this player choosing to leave (host left, connection lost), with a player-facing message.</summary>
+        /// <summary>Raised when the game session ends without this player choosing to leave (connection lost, kicked), with a player-facing message.</summary>
         public event Action<string> GameEnded;
 
         private void OnDestroy()
         {
             if (s_Instance == this) s_Instance = null;
+        }
+
+        private void Update()
+        {
+            // Host migration: when the master client leaves, Photon promotes someone else, which isn't
+            // necessarily visible yet in the OnPlayerLeft callback - rebuild the roster once it is.
+            if (!InGame) return;
+            int masterId = m_GameRunner.GetMasterClient().PlayerId;
+            if (masterId != m_RosterMasterId) RebuildRoster();
         }
 
         // =====================================================================================
@@ -151,13 +200,13 @@ namespace Blocks.Gameplay.Core
             if (m_LobbyRunner != null || m_GameRunner != null) return;
 
             HasSessionList = false;
-            NetworkRunner runner = CreateRunner("[FusionLobbyRunner]", out _);
+            NetworkRunner runner = CreateRunner("[FusionLobbyRunner]", out _, out _);
             m_LobbyRunner = runner;
 
             StartGameResult result;
             try
             {
-                result = await runner.JoinSessionLobby(SessionLobby.ClientServer, null, null, CreateAppSettings());
+                result = await runner.JoinSessionLobby(SessionLobby.Shared, null, null, CreateAppSettings());
             }
             catch (Exception e)
             {
@@ -209,7 +258,7 @@ namespace Blocks.Gameplay.Core
         // =====================================================================================
 
         /// <summary>
-        /// Creates a new Host session with <paramref name="rules"/>. Returns null on success (the room code
+        /// Creates a new session with <paramref name="rules"/>. Returns null on success (the room code
         /// is then <see cref="RoomCode"/>), or a player-facing error message.
         /// </summary>
         public async Task<string> HostGameAsync(HostGameRulesData rules)
@@ -220,32 +269,36 @@ namespace Blocks.Gameplay.Core
             for (int attempt = 0; attempt < MaxHostAttempts; attempt++)
             {
                 string code = NewRoomCode();
+                int nonce = NewNonce();
                 var args = new StartGameArgs
                 {
-                    GameMode = GameMode.Host,
+                    GameMode = GameMode.Shared,
                     SessionName = code,
                     PlayerCount = rules.MaxPlayers,
                     IsVisible = rules.IsPublic,
                     IsOpen = true,
-                    SessionProperties = BuildSessionProperties(rules),
+                    SessionProperties = BuildSessionProperties(rules, nonce),
                     CustomPhotonAppSettings = CreateAppSettings(),
                 };
 
                 StartOutcome result = await StartGameRunner(args);
-                if (result.Ok)
+                if (!result.Ok)
+                {
+                    return DescribeFailure(result.Reason);
+                }
+
+                if (ReadNonce(m_GameRunner.SessionInfo) == nonce)
                 {
                     RoomCode = code;
                     IsPublic = rules.IsPublic;
                     MaxPlayers = rules.MaxPlayers;
-                    RebuildHostRoster();
+                    RebuildRoster();
                     return null;
                 }
 
-                if (result.Reason != ShutdownReason.GameIdAlreadyExists)
-                {
-                    return DescribeFailure(result.Reason);
-                }
-                // Code collision - try another one.
+                // Code collision - we joined someone else's session. Leave it and try another code.
+                Debug.Log($"[Fusion] Room code {code} was already taken - trying another one.");
+                await LeaveGameAsync();
             }
 
             return "Couldn't create a unique room code. Try again.";
@@ -268,8 +321,12 @@ namespace Blocks.Gameplay.Core
 
             var args = new StartGameArgs
             {
-                GameMode = GameMode.Client,
+                GameMode = GameMode.Shared,
                 SessionName = code,
+                // Only used if no session with this code exists and Shared mode creates one - see the
+                // class summary. Closed and hidden, so nobody else can join it before we leave it again.
+                IsOpen = false,
+                IsVisible = false,
                 CustomPhotonAppSettings = CreateAppSettings(),
             };
 
@@ -280,14 +337,19 @@ namespace Blocks.Gameplay.Core
                 return DescribeFailure(result.Reason);
             }
 
-            RoomCode = code;
             SessionInfo info = m_GameRunner.SessionInfo;
+            if (ReadNonce(info) == 0)
+            {
+                // No real game has this code - Shared mode just created an empty one for us.
+                await LeaveGameAsync();
+                if (wasInLobby && rejoinLobbyOnFailure) EnsureInLobby();
+                return DescribeFailure(ShutdownReason.GameNotFound);
+            }
+
+            RoomCode = code;
             IsPublic = info != null && info.IsVisible;
             MaxPlayers = info != null ? info.MaxPlayers : 0;
-            // The host sends the roster as soon as it sees this player join; until then show just us.
-            m_Players.Clear();
-            m_Players.Add(new LobbyPlayer { PlayerId = m_GameRunner.LocalPlayer.PlayerId, IsLocal = true });
-            RosterChanged?.Invoke();
+            RebuildRoster();
             return null;
         }
 
@@ -360,7 +422,52 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        /// <summary>Leaves the current game (host: closes it for everyone).</summary>
+        /// <summary>
+        /// Gameplay scene played directly (editor testing - see the class summary): starts or joins this
+        /// machine's private dev session for <paramref name="scene"/>, taking over the already-loaded scene
+        /// so its scene objects are networked. Returns null on success, or an error message.
+        /// </summary>
+        public async Task<string> StartDevSessionAsync(Scene scene)
+        {
+            if (m_GameRunner != null) return m_Starting ? "Already starting." : null;
+            await ShutdownLobbyAsync();
+
+            var sceneInfo = new NetworkSceneInfo();
+            if (scene.buildIndex >= 0 && scene.buildIndex < SceneManager.sceneCountInBuildSettings)
+            {
+                sceneInfo.AddSceneRef(SceneRef.FromIndex(scene.buildIndex), LoadSceneMode.Additive);
+            }
+            else
+            {
+                Debug.LogWarning($"[Fusion] '{scene.name}' isn't in the Build Settings, so its scene objects (RoundTimer, " +
+                    "ChallengeManager, ...) won't be networked when it's played directly. Players still spawn and move.");
+            }
+
+            string machine = ((uint)SystemInfo.deviceUniqueIdentifier.GetHashCode()).ToString("X8");
+            string sessionName = $"DEV-{machine}-{scene.name}";
+            var args = new StartGameArgs
+            {
+                GameMode = GameMode.Shared,
+                SessionName = sessionName,
+                PlayerCount = DevSessionMaxPlayers,
+                IsVisible = false,
+                IsOpen = true,
+                Scene = sceneInfo,
+                CustomPhotonAppSettings = CreateAppSettings(),
+            };
+
+            StartOutcome result = await StartGameRunner(args);
+            if (!result.Ok) return DescribeFailure(result.Reason);
+
+            IsDevSession = true;
+            RoomCode = sessionName;
+            IsPublic = false;
+            MaxPlayers = DevSessionMaxPlayers;
+            RebuildRoster();
+            return null;
+        }
+
+        /// <summary>Leaves the current game. If this player was the host, another player becomes the host.</summary>
         public async Task LeaveGameAsync()
         {
             if (m_GameRunner == null) return;
@@ -390,10 +497,6 @@ namespace Blocks.Gameplay.Core
                 return false;
             }
 
-            SessionInfo info = m_GameRunner.SessionInfo;
-            info.IsOpen = false;
-            info.IsVisible = false;
-
             var sceneManager = m_GameRunner.GetComponent<NetworkSceneManagerDefault>();
             SceneRef scene = sceneManager != null ? sceneManager.GetSceneRef(GameplaySceneName) : SceneRef.None;
             if (!scene.IsValid)
@@ -401,6 +504,10 @@ namespace Blocks.Gameplay.Core
                 Debug.LogError($"[Fusion] '{GameplaySceneName}' isn't in the build settings - can't start the match.");
                 return false;
             }
+
+            SessionInfo info = m_GameRunner.SessionInfo;
+            info.IsOpen = false;
+            info.IsVisible = false;
 
             m_GameRunner.LoadScene(scene, LoadSceneMode.Single, LocalPhysicsMode.None, true);
             return true;
@@ -425,8 +532,13 @@ namespace Blocks.Gameplay.Core
         private async Task<StartOutcome> StartGameRunner(StartGameArgs args)
         {
             m_Starting = true;
-            m_GameRunner = CreateRunner("[FusionGameRunner]", out NetworkSceneManagerDefault sceneManager);
+            m_GameRunner = CreateRunner("[FusionGameRunner]", out NetworkSceneManagerDefault sceneManager, out NetworkObjectProviderDefault objectProvider);
             args.SceneManager = sceneManager;
+            args.ObjectProvider = objectProvider;
+
+            // Keep simulating (and stay connected) while the window isn't focused - needed for testing
+            // several instances on one machine. NGO's NetworkManager used to set this ("Run In Background").
+            Application.runInBackground = true;
 
             StartOutcome outcome;
             try
@@ -458,6 +570,8 @@ namespace Blocks.Gameplay.Core
             RoomCode = "";
             IsPublic = false;
             MaxPlayers = 0;
+            IsDevSession = false;
+            m_RosterMasterId = -1;
             m_Players.Clear();
         }
 
@@ -465,7 +579,7 @@ namespace Blocks.Gameplay.Core
         // Helpers
         // =====================================================================================
 
-        private NetworkRunner CreateRunner(string name, out NetworkSceneManagerDefault sceneManager)
+        private NetworkRunner CreateRunner(string name, out NetworkSceneManagerDefault sceneManager, out NetworkObjectProviderDefault objectProvider)
         {
             var go = new GameObject(name);
             DontDestroyOnLoad(go);
@@ -473,6 +587,7 @@ namespace Blocks.Gameplay.Core
             runner.ProvideInput = false;
             runner.AddCallbacks(this);
             sceneManager = go.AddComponent<NetworkSceneManagerDefault>();
+            objectProvider = go.AddComponent<NetworkObjectProviderDefault>();
             return runner;
         }
 
@@ -503,6 +618,13 @@ namespace Blocks.Gameplay.Core
             return new string(chars);
         }
 
+        /// <summary>A random non-zero number (0 means "no nonce" - see ReadNonce).</summary>
+        private static int NewNonce()
+        {
+            int nonce = BitConverter.ToInt32(Guid.NewGuid().ToByteArray(), 0) & int.MaxValue;
+            return nonce == 0 ? 1 : nonce;
+        }
+
         public static string NormalizeCode(string code) => (code ?? "").Trim().ToUpperInvariant();
 
         private static string DescribeFailure(ShutdownReason reason)
@@ -525,7 +647,7 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        private static Dictionary<string, SessionProperty> BuildSessionProperties(HostGameRulesData rules)
+        private static Dictionary<string, SessionProperty> BuildSessionProperties(HostGameRulesData rules, int nonce)
         {
             return new Dictionary<string, SessionProperty>
             {
@@ -539,6 +661,7 @@ namespace Blocks.Gameplay.Core
                 [PropertyKeys.CreatedUnixSeconds] = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 [PropertyKeys.Items] = rules.ItemsEnabled,
                 [PropertyKeys.Pickups] = rules.PickupsEnabled,
+                [PropertyKeys.HostNonce] = nonce,
             };
         }
 
@@ -549,6 +672,18 @@ namespace Blocks.Gameplay.Core
                 && created.IsInt)
             {
                 return (int)created;
+            }
+            return 0;
+        }
+
+        /// <summary>The creating host's nonce, or 0 if the session has none (it wasn't created by HostGameAsync).</summary>
+        private static int ReadNonce(SessionInfo info)
+        {
+            if (info != null && info.IsValid && info.Properties != null
+                && info.Properties.TryGetValue(PropertyKeys.HostNonce, out SessionProperty nonce)
+                && nonce.IsInt)
+            {
+                return (int)nonce;
             }
             return 0;
         }
@@ -576,9 +711,10 @@ namespace Blocks.Gameplay.Core
         // Roster
         // =====================================================================================
 
-        private void RebuildHostRoster()
+        /// <summary>Rebuilds the lobby roster from the session's players (every client sees everyone in Shared mode).</summary>
+        private void RebuildRoster()
         {
-            if (m_GameRunner == null || !m_GameRunner.IsServer) return;
+            if (m_GameRunner == null || !m_GameRunner.IsRunning) return;
 
             var ids = new List<int>();
             foreach (PlayerRef player in m_GameRunner.ActivePlayers)
@@ -587,59 +723,16 @@ namespace Blocks.Gameplay.Core
             }
             ids.Sort();
 
-            int hostId = m_GameRunner.LocalPlayer.PlayerId;
-            ApplyRoster(hostId, MaxPlayers, ids);
+            int localId = m_GameRunner.LocalPlayer.PlayerId;
+            int masterId = m_GameRunner.GetMasterClient().PlayerId;
+            m_RosterMasterId = masterId;
 
-            // Send the roster to every client.
-            byte[] message = EncodeRoster(hostId, MaxPlayers, ids);
-            foreach (PlayerRef player in m_GameRunner.ActivePlayers)
-            {
-                if (player == m_GameRunner.LocalPlayer) continue;
-                m_GameRunner.SendReliableDataToPlayer(player, RosterKey, message);
-            }
-        }
-
-        private void ApplyRoster(int hostId, int maxPlayers, List<int> ids)
-        {
-            int localId = m_GameRunner != null ? m_GameRunner.LocalPlayer.PlayerId : -1;
-            MaxPlayers = maxPlayers;
             m_Players.Clear();
             foreach (int id in ids)
             {
-                m_Players.Add(new LobbyPlayer { PlayerId = id, IsHost = id == hostId, IsLocal = id == localId });
+                m_Players.Add(new LobbyPlayer { PlayerId = id, IsHost = id == masterId, IsLocal = id == localId });
             }
             RosterChanged?.Invoke();
-        }
-
-        private static byte[] EncodeRoster(int hostId, int maxPlayers, List<int> ids)
-        {
-            using var stream = new MemoryStream();
-            using var writer = new BinaryWriter(stream);
-            writer.Write(hostId);
-            writer.Write(maxPlayers);
-            writer.Write(ids.Count);
-            foreach (int id in ids) writer.Write(id);
-            writer.Flush();
-            return stream.ToArray();
-        }
-
-        private void DecodeAndApplyRoster(ReadOnlySpan<byte> data)
-        {
-            try
-            {
-                using var stream = new MemoryStream(data.ToArray());
-                using var reader = new BinaryReader(stream);
-                int hostId = reader.ReadInt32();
-                int maxPlayers = reader.ReadInt32();
-                int count = reader.ReadInt32();
-                var ids = new List<int>(count);
-                for (int i = 0; i < count; i++) ids.Add(reader.ReadInt32());
-                ApplyRoster(hostId, maxPlayers, ids);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[Fusion] Bad roster message: {e.Message}");
-            }
         }
 
         // =====================================================================================
@@ -654,6 +747,7 @@ namespace Blocks.Gameplay.Core
             foreach (SessionInfo info in sessionList)
             {
                 if (info == null || !info.IsValid || !info.IsOpen || !info.IsVisible) continue;
+                if (ReadNonce(info) == 0) continue; // not a game created through Host Game
                 m_Sessions.Add(new GameSessionListing
                 {
                     SessionName = info.Name,
@@ -672,18 +766,12 @@ namespace Blocks.Gameplay.Core
 
         public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
         {
-            if (runner == m_GameRunner && runner.IsServer && !m_Starting) RebuildHostRoster();
+            if (runner == m_GameRunner && !m_Starting) RebuildRoster();
         }
 
         public void OnPlayerLeft(NetworkRunner runner, PlayerRef player)
         {
-            if (runner == m_GameRunner && runner.IsServer) RebuildHostRoster();
-        }
-
-        public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ReadOnlySpan<byte> data)
-        {
-            if (runner != m_GameRunner || runner.IsServer) return;
-            if (key == RosterKey) DecodeAndApplyRoster(data);
+            if (runner == m_GameRunner && !m_Starting) RebuildRoster();
         }
 
         public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
@@ -702,7 +790,7 @@ namespace Blocks.Gameplay.Core
             if (!m_Leaving)
             {
                 GameEnded?.Invoke(shutdownReason == ShutdownReason.Ok || shutdownReason == ShutdownReason.DisconnectedByPluginLogic
-                    ? "The host closed the game."
+                    ? "The game was closed."
                     : $"Disconnected from the game ({shutdownReason}).");
             }
         }
@@ -712,6 +800,7 @@ namespace Blocks.Gameplay.Core
             // Followed by OnShutdown, which handles cleanup.
         }
 
+        public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ReadOnlySpan<byte> data) { }
         public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
         public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
         public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }

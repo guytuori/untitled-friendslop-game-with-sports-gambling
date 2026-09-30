@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode;
 
 namespace Blocks.Gameplay.Core
 {
@@ -26,7 +25,7 @@ namespace Blocks.Gameplay.Core
     /// listener and life-state cleanup).
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public class PoleGrabAbility : NetworkBehaviour, IMovementAbility, IPlayerAddon
+    public class PoleGrabAbility : CoreNetworkBehaviour, IMovementAbility, IPlayerAddon
     {
         #region IMovementAbility
 

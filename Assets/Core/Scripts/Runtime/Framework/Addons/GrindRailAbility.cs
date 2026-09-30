@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using Unity.Netcode;
+using Fusion;
 
 namespace Blocks.Gameplay.Core
 {
@@ -52,7 +52,7 @@ namespace Blocks.Gameplay.Core
     /// built in code rather than from a prefab).
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public class GrindRailAbility : NetworkBehaviour, IMovementAbility, IPlayerAddon
+    public class GrindRailAbility : CoreNetworkBehaviour, IMovementAbility, IPlayerAddon
     {
         #region IMovementAbility
 
@@ -117,13 +117,12 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private Color indicatorDangerColor = new Color(1f, 0.25f, 0.2f);
 
         public bool IsOnRail { get; private set; }
-        public bool IsOnRailNetworked => m_NetIsOnRail.Value;
-        public float BalanceNetworked => m_NetBalance.Value;
+        public bool IsOnRailNetworked => IsSpawned && NetIsOnRail;
+        public float BalanceNetworked => IsSpawned ? NetBalance : 0f;
 
-        private readonly NetworkVariable<bool> m_NetIsOnRail = new NetworkVariable<bool>(
-            false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-        private readonly NetworkVariable<float> m_NetBalance = new NetworkVariable<float>(
-            0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        // Written by the owner (State Authority), read by everyone - see SyncNetworkState.
+        [Networked] private NetworkBool NetIsOnRail { get; set; }
+        [Networked] private float NetBalance { get; set; }
 
         private CoreMovement m_Motor;
         private CharacterController m_Controller;
@@ -577,8 +576,8 @@ namespace Blocks.Gameplay.Core
         {
             if (!IsOwner) return;
 
-            if (m_NetIsOnRail.Value != IsOnRail) m_NetIsOnRail.Value = IsOnRail;
-            m_NetBalance.Value = m_Balance;
+            if (NetIsOnRail != IsOnRail) NetIsOnRail = IsOnRail;
+            NetBalance = m_Balance;
         }
 
         #endregion

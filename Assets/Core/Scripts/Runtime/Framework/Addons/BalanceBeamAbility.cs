@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
-using Unity.Netcode;
+using Fusion;
 
 namespace Blocks.Gameplay.Core
 {
@@ -42,12 +42,12 @@ namespace Blocks.Gameplay.Core
     ///
     /// The balance meter is a small world-space UI bar built entirely in code in Awake (no prefab
     /// dependency) and positioned above the player's head, billboarded to the camera like
-    /// NamePlateAddon. Two NetworkVariables mirror the on-beam state and balance value so remote
+    /// NamePlateAddon. Two [Networked] properties mirror the on-beam state and balance value so remote
     /// clients can see it too, since the movement logic itself only ever runs on the owner (mirroring
     /// how CorePlayerState syncs name/life-state).
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public class BalanceBeamAbility : NetworkBehaviour, IMovementAbility, IPlayerAddon
+    public class BalanceBeamAbility : CoreNetworkBehaviour, IMovementAbility, IPlayerAddon
     {
         #region IMovementAbility
 
@@ -94,15 +94,14 @@ namespace Blocks.Gameplay.Core
         public bool IsOnBeam { get; private set; }
 
         /// <summary>Networked, read-anywhere version of <see cref="IsOnBeam"/> - what the UI actually displays from.</summary>
-        public bool IsOnBeamNetworked => m_NetIsOnBeam.Value;
+        public bool IsOnBeamNetworked => IsSpawned && NetIsOnBeam;
 
         /// <summary>Networked, read-anywhere balance value, -1 (fully left) to 1 (fully right).</summary>
-        public float BalanceNetworked => m_NetBalance.Value;
+        public float BalanceNetworked => IsSpawned ? NetBalance : 0f;
 
-        private readonly NetworkVariable<bool> m_NetIsOnBeam = new NetworkVariable<bool>(
-            false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-        private readonly NetworkVariable<float> m_NetBalance = new NetworkVariable<float>(
-            0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        // Written by the owner (State Authority), read by everyone - see SyncNetworkState.
+        [Networked] private NetworkBool NetIsOnBeam { get; set; }
+        [Networked] private float NetBalance { get; set; }
 
         private CoreMovement m_Motor;
         private CharacterController m_Controller;
@@ -427,8 +426,8 @@ namespace Blocks.Gameplay.Core
         {
             if (!IsOwner) return;
 
-            if (m_NetIsOnBeam.Value != IsOnBeam) m_NetIsOnBeam.Value = IsOnBeam;
-            m_NetBalance.Value = m_Balance;
+            if (NetIsOnBeam != IsOnBeam) NetIsOnBeam = IsOnBeam;
+            NetBalance = m_Balance;
         }
 
         #endregion

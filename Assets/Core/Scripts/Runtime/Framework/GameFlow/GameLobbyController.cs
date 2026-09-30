@@ -8,17 +8,17 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// The pre-match lobby, shown to the host after Host Game and to everyone who joins (from the Game
     /// Browser or by room code). Shows the room code, whether the game is public or private, the player
-    /// count out of the max, and the list of players, all kept current by FusionSessionService (the host
-    /// sends the roster to every client whenever someone joins or leaves).
+    /// count out of the max, and the list of players, all kept current by FusionSessionService (every
+    /// client sees the session's players directly in Fusion's Shared mode).
     ///
-    /// The host gets Start Match (starts the match as-is: the session is closed and hidden, and Fusion
-    /// loads the gameplay scene for everyone) and Leave (closes the game for everyone). Start Match needs
+    /// The host (the session's master client) gets Start Match (starts the match as-is: the session is
+    /// closed and hidden, and Fusion loads the gameplay scene for everyone) and Leave (if the host leaves,
+    /// Photon makes another player the host, who then gets Start Match). Start Match needs
     /// at least FusionSessionService.MinPlayersToStart players (it's dimmed until then), and presses are
     /// ignored for the first <see cref="StartMatchGraceSeconds"/> after the lobby opens - so a player
     /// mashing A through quick match, who lands here as a brand-new host with Start Match selected,
     /// doesn't instantly start a match by themselves. Everyone else gets Leave and a "waiting for the host" line. B/Esc = Leave. If the game
-    /// ends from the other side (the host leaves, or the connection drops), the reason is shown and the
-    /// button becomes Back.
+    /// ends from the other side (the connection drops), the reason is shown and the button becomes Back.
     ///
     /// There are no player names yet, so players are numbered in join order, with the host and "you"
     /// marked.

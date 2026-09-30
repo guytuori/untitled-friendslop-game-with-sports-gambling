@@ -1,7 +1,6 @@
 using System;
 using UnityEngine;
-using Unity.Netcode;
-using Unity.Netcode.Components;
+using Fusion;
 using System.Collections.Generic;
 
 namespace Blocks.Gameplay.Core
@@ -10,10 +9,16 @@ namespace Blocks.Gameplay.Core
     /// Handles player movement, including walking, sprinting, jumping, and gravity.
     /// This component is built upon a CharacterController and uses a system of <see cref="IMovementAbility"/>
     /// to modularly handle different movement actions like walking, jumping and dashing.
-    /// It is responsible for processing inputs, applying movement and rotation, and syncing state over the network.
+    /// It is responsible for processing inputs and applying movement and rotation.
+    ///
+    /// Networking (Photon Fusion, Shared mode): only the owning client (State Authority) runs the movement,
+    /// in Update, exactly as before. The position/rotation reach everyone else through the Fusion
+    /// NetworkTransform on the same object (with "Disable Shared Mode Interpolation" on, since this
+    /// component moves the object in Update rather than FixedUpdateNetwork) - this component used to be a
+    /// Netcode for GameObjects NetworkTransform itself.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public class CoreMovement : NetworkTransform
+    public class CoreMovement : CoreNetworkBehaviour
     {
         #region Enums
 
@@ -98,6 +103,9 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private bool isMovementEnabled = true;
         [Tooltip("Optional transform to apply rotation to. If null, rotation is applied to this transform. Useful for root motion animations.")]
         [SerializeField] private Transform rotationTransform;
+
+        // The Fusion NetworkTransform that syncs this character's position/rotation (see the class summary).
+        private NetworkTransform m_NetworkTransform;
 
         /// <summary>
         /// Allows external scripts to override the character's rotation logic.
@@ -252,10 +260,10 @@ namespace Blocks.Gameplay.Core
 
         #region Unity Methods
 
-        protected override void Awake()
+        private void Awake()
         {
-            base.Awake();
             m_CharacterController = GetComponent<CharacterController>();
+            m_NetworkTransform = GetComponent<NetworkTransform>();
             m_InitialGravity = gravity;
 
             // Discover and initialize all movement abilities
@@ -381,7 +389,7 @@ namespace Blocks.Gameplay.Core
         /// Sets the character's position, disabling and re-enabling the CharacterController to avoid issues.
         /// </summary>
         /// <param name="position">The target position.</param>
-        /// <param name="teleport">If true, uses NetworkTransform's Teleport method for network synchronization.</param>
+        /// <param name="teleport">If true, tells the Fusion NetworkTransform this is a teleport, so other clients snap instead of interpolating.</param>
         public void SetPosition(Vector3 position, bool teleport = true)
         {
             if (m_CharacterController != null && m_CharacterController.enabled)
@@ -395,9 +403,9 @@ namespace Blocks.Gameplay.Core
                 transform.position = position;
             }
 
-            if (CanCommitToTransform && teleport)
+            if (IsOwner && teleport && m_NetworkTransform != null)
             {
-                Teleport(position, transform.rotation, transform.localScale);
+                m_NetworkTransform.Teleport(position, transform.rotation);
             }
         }
 
@@ -509,9 +517,9 @@ namespace Blocks.Gameplay.Core
         /// <param name="newParent">The NetworkObject to parent to, or null to clear the parent.</param>
         public void SetParent(NetworkObject newParent)
         {
-            // Only the owner can change parenting.
-            // CanCommitToTransform is the correct check as it's true on the authority.
-            if (!CanCommitToTransform)
+            // Only the owner can change parenting. (The Fusion NetworkTransform syncs the parent when its
+            // "Sync Parent" option is on and the new parent is itself a networked object.)
+            if (!IsOwner)
             {
                 return;
             }
@@ -519,12 +527,12 @@ namespace Blocks.Gameplay.Core
             if (newParent != null)
             {
                 Debug.Log("Setting parent to: " + newParent.name, this);
-                NetworkObject.TrySetParent(newParent);
+                transform.SetParent(newParent.transform, true);
                 isMovementEnabled = false;
             }
             else
             {
-                NetworkObject.TryRemoveParent();
+                transform.SetParent(null, true);
             }
         }
 

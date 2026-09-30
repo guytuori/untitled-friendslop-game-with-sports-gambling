@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Netcode;
 
 namespace Blocks.Gameplay.Core
 {
@@ -16,9 +15,13 @@ namespace Blocks.Gameplay.Core
     /// "Friendslop > Split Selected Map Collider By Material" (which adds one of these and wires up its
     /// start/finish triggers automatically - see MapColliderSetup), then tweak its ChallengeDefinition
     /// asset. No code changes, no changes to ChallengeManager.
+    ///
+    /// Not a networked object itself: the entering player's client reports the entry to ChallengeManager
+    /// (a single scene object owned by the master client), which identifies the zone by its stable index
+    /// among the scene's zones (ChallengeManager.GetZoneIndex). All the per-attempt data below is only
+    /// ever used on the master client.
     /// </summary>
-    [RequireComponent(typeof(NetworkObject))]
-    public class ChallengeZone : NetworkBehaviour
+    public class ChallengeZone : MonoBehaviour
     {
         #region Fields & Properties
 
@@ -73,7 +76,7 @@ namespace Blocks.Gameplay.Core
 
         #endregion
 
-        #region Server API (called only from ChallengeManager, which is itself IsServer-gated)
+        #region Master-client API (called only from ChallengeManager, which is itself authority-gated)
 
         /// <summary>Marks this challenge as owned by the given player. Does not start the timed attempt yet.</summary>
         public void Claim(ulong challengerId)
@@ -179,17 +182,15 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>
         /// Called by <see cref="ChallengeZoneTrigger"/> on the entering player's own machine when they walk
-        /// (or jump) into this challenge's start or finish volume. Routed to the server, which asks
+        /// (or jump) into this challenge's start or finish volume. Routed to the master client, which asks
         /// <see cref="ChallengeManager"/> to decide what happens - claiming the challenge, or resolving it,
         /// are both global decisions (only one betting window can run at a time), not this zone's alone.
         /// </summary>
-        [Rpc(SendTo.Server)]
-        public void RequestEnterRpc(ChallengeZoneKind kind, RpcParams rpcParams = default)
+        public void ReportLocalPlayerEntered(ChallengeZoneKind kind)
         {
-            ulong enteringClientId = rpcParams.Receive.SenderClientId;
             if (ChallengeManager.Instance != null)
             {
-                ChallengeManager.Instance.HandleZoneEntry(this, kind, enteringClientId);
+                ChallengeManager.Instance.RequestZoneEntry(this, kind);
             }
         }
 

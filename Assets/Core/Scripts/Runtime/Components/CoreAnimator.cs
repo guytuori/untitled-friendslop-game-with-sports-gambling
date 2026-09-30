@@ -1,5 +1,5 @@
 using UnityEngine;
-using Unity.Netcode.Components;
+using Fusion;
 
 namespace Blocks.Gameplay.Core
 {
@@ -7,12 +7,28 @@ namespace Blocks.Gameplay.Core
     /// Controls the player's Animator component based on the state of the <see cref="CoreMovement"/> controller.
     /// This component is responsible for setting locomotion parameters (speed, grounded, jump, etc.)
     /// and handling Animation Events to trigger sound effects like footsteps and landing sounds.
-    /// It inherits from <see cref="NetworkAnimator"/> to automatically synchronize animation states across the network.
+    ///
+    /// Networking (Photon Fusion, Shared mode): only the owning client drives the Animator; the Fusion
+    /// NetworkMecanimAnimator on the player's root replicates the parameters and states to everyone else.
+    /// Triggers go through that NetworkMecanimAnimator so they reach other clients too. (This component
+    /// used to be a Netcode for GameObjects NetworkAnimator itself.)
     /// </summary>
     [RequireComponent(typeof(AudioSource))]
-    public class CoreAnimator : NetworkAnimator
+    public class CoreAnimator : MonoBehaviour
     {
         #region Fields & Properties
+
+        [Tooltip("The Animator this component drives (on this GameObject).")]
+        [SerializeField] private Animator m_Animator;
+
+        /// <summary>The Animator this component drives.</summary>
+        public Animator Animator => m_Animator;
+
+        private CorePlayerManager m_PlayerManager;
+        private NetworkMecanimAnimator m_NetworkAnimator;
+
+        /// <summary>True on the client that owns this player (the only one that drives the Animator).</summary>
+        private bool IsOwner => m_PlayerManager != null && m_PlayerManager.IsOwner;
 
         [Header("Component Dependencies")]
         [Tooltip("Reference to the CoreMovement component to get movement state information.")]
@@ -36,9 +52,12 @@ namespace Blocks.Gameplay.Core
 
         #region Unity & Network Lifecycle
 
-        protected override void Awake()
+        private void Awake()
         {
-            base.Awake();
+            if (m_Animator == null) m_Animator = GetComponent<Animator>();
+            m_PlayerManager = GetComponentInParent<CorePlayerManager>();
+            m_NetworkAnimator = GetComponentInParent<NetworkMecanimAnimator>();
+
             if (coreMovement == null)
             {
                 Debug.LogError("[Core Animator] needs a CoreMovement component.");
@@ -52,8 +71,8 @@ namespace Blocks.Gameplay.Core
 
         private void Update()
         {
-            // We only want the owner to send animation state updates.
-            // NetworkAnimator will handle propagating these changes to other clients.
+            // We only want the owner to drive the Animator.
+            // The NetworkMecanimAnimator propagates these changes to other clients.
             if (!IsOwner || coreMovement == null) return;
 
             UpdateLocomotionParameters();
@@ -168,13 +187,29 @@ namespace Blocks.Gameplay.Core
             if (Animator == null) { return; }
 
             if (ContainsParam(Animator, _animParameter))
-            { Animator.SetTrigger(_animParameter); }
+            { SetTriggerNetworked(Animator.StringToHash(_animParameter)); }
         }
         public void SetAnimationTrigger(int _animParameter)
         {
             if (Animator == null) { return; }
 
-            Animator.SetTrigger(_animParameter);
+            SetTriggerNetworked(_animParameter);
+        }
+
+        /// <summary>
+        /// Animator triggers aren't picked up by NetworkMecanimAnimator unless they go through it - so the
+        /// owner sets them there (it forwards to the local Animator too); everyone else just sets them locally.
+        /// </summary>
+        private void SetTriggerNetworked(int triggerHash)
+        {
+            if (IsOwner && m_NetworkAnimator != null && m_NetworkAnimator.Object != null && m_NetworkAnimator.Object.IsValid)
+            {
+                m_NetworkAnimator.SetTrigger(triggerHash);
+            }
+            else
+            {
+                Animator.SetTrigger(triggerHash);
+            }
         }
         public void SetAnimationParameter(string _animParameter, int _animState)
         {

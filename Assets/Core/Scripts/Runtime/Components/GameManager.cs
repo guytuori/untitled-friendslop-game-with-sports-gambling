@@ -1,36 +1,47 @@
 using UnityEngine;
-using Unity.Netcode;
+using Fusion;
 using System.Collections;
 using UnityEngine.UIElements;
-using Blocks.Sessions.Common;
-using Unity.Services.Multiplayer;
+using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using Cursor = UnityEngine.Cursor;
 
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// Manages the game session, UI, and local player lifecycle rules.
-    /// Provides a centralized system for handling player spawning, respawning, and session management.
-    /// Supports both standard NetworkManager and Unity Multiplayer Services integration.
+    /// Manages the gameplay scene's local player lifecycle: spawning this client's own player avatar
+    /// (Photon Fusion, Shared mode - see FusionSessionService), picking spawn points, and the death /
+    /// respawn rules. One per gameplay scene (it lives on the "[BB] GameManager" prefab placed in the scene).
+    ///
+    /// Spawning: once the scene is part of a running Fusion session, this spawns the local player's avatar
+    /// (<see cref="playerPrefab"/>) at a random <see cref="PlayerSpawnPoint"/> with this client as its State
+    /// Authority. Every client does this for itself, so every player ends up with exactly one avatar that
+    /// they own - the Fusion replacement for NGO's automatic player-prefab spawning.
+    ///
+    /// Playing the scene directly in the editor (no session from the menus): starts this machine's dev
+    /// session first (FusionSessionService.StartDevSessionAsync), so testing still needs no menus -
+    /// Multiplayer Play Mode virtual players playing the same scene join the same session.
+    ///
+    /// If the session ends underneath the player (connection lost), returns to <see cref="exitSceneName"/>.
     /// </summary>
     public class GameManager : MonoBehaviour
     {
         #region Fields & Properties
 
         /// <summary>
-        /// Gets the singleton instance of the GameManager.
+        /// Gets the instance of the GameManager for the current gameplay scene.
         /// </summary>
         public static GameManager Instance { get; private set; }
 
-        [Tooltip("If true, uses Unity Multiplayer Services for session management. If false, uses NetworkManager callbacks.")]
-        [SerializeField] private bool isUsingMultiplayerServices = false;
+        [Header("Players")]
+        [Tooltip("The player avatar prefab (must have a Fusion NetworkObject). Each client spawns its own.")]
+        [SerializeField] private GameObject playerPrefab;
 
-        [Header("Session Setup")]
-        [Tooltip("Configuration settings for the multiplayer session.")]
-        [SerializeField] private SessionSettings sessionSettings;
+        [Tooltip("Scene to return to if the session ends (connection lost) while in this scene.")]
+        [SerializeField] private string exitSceneName = "MainMenu";
 
-        [Tooltip("UI Document that displays session/lobby interface.")]
+        [Header("Session UI")]
+        [Tooltip("Optional UI Document shown until the local player has spawned (e.g. a 'connecting' overlay). Faded out on spawn.")]
         [SerializeField] private UIDocument sessionUI;
 
         [Tooltip("Duration in seconds for the session UI fade-out animation.")]
@@ -61,304 +72,174 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Sound effect played during respawn countdown timer ticks.")]
         [SerializeField] private SoundDef respawnTimerSFX;
 
-        private SessionObserver m_SessionObserver;
-        private const string k_PlayerNameKey = "_player_name";
+        private bool m_HasSpawnedLocalPlayer;
+        private bool m_ListeningForDeath;
+        private bool m_Exiting;
 
         #endregion
 
         #region Unity Methods
 
-        /// <summary>
-        /// Called when the GameManager is destroyed.
-        /// Cleans up all event subscriptions and observers to prevent memory leaks.
-        /// </summary>
-        private void OnDestroy()
-        {
-            // Cleanup NetworkManager callbacks
-            if (NetworkManager.Singleton != null)
-            {
-                NetworkManager.Singleton.OnClientConnectedCallback -= ClientConnected;
-                NetworkManager.Singleton.OnClientDisconnectCallback -= ClientDisconnected;
-            }
-
-            // Cleanup SessionObserver
-            if (m_SessionObserver != null)
-            {
-                m_SessionObserver.SessionAdded -= OnSessionAdded;
-                m_SessionObserver.Dispose();
-                m_SessionObserver = null;
-            }
-        }
-
-        /// <summary>
-        /// Initializes the singleton instance and sets up session observer if using Multiplayer Services.
-        /// Prevents duplicate GameManager instances using the singleton pattern with DontDestroyOnLoad.
-        /// </summary>
         private void Awake()
         {
-            // Enforce singleton pattern
+            // One per gameplay scene. (It used to be a DontDestroyOnLoad singleton, which made a second
+            // match after returning to the menus keep the first match's stale instance.)
             if (Instance != null && Instance != this)
             {
-                Debug.LogWarning("[GameManager] Duplicate GameManager instance detected. Destroying self.");
+                Debug.LogWarning("[GameManager] Duplicate GameManager in the scene. Destroying this one.", this);
                 Destroy(gameObject);
                 return;
             }
 
             Instance = this;
-            DontDestroyOnLoad(gameObject);
 
             // Pick up every PlayerSpawnPoint marker in the scene (see MapObstacleSetup, which generates
             // one per "player_spawn_point" map tile/cluster), so the spawn point set stays in sync with
             // the map without needing to hand-wire the Inspector list every time a map changes.
             RefreshSpawnPointsFromMarkers();
 
-            // Validate required references
-            if (sessionUI == null)
+            if (playerPrefab == null)
             {
-                Debug.LogError("[GameManager] SessionUI is not assigned.", this);
-            }
-            if (sessionSettings == null)
-            {
-                Debug.LogError("[GameManager] SessionSettings is not assigned.", this);
-            }
-            if (sessionUI == null || sessionSettings == null)
-            {
-                return;
-            }
-
-            // Initialize Multiplayer Services session observer if enabled
-            if (isUsingMultiplayerServices)
-            {
-                m_SessionObserver = new SessionObserver(sessionSettings.sessionType);
-                m_SessionObserver.SessionAdded += OnSessionAdded;
+                Debug.LogError("[GameManager] Player Prefab is not assigned - no player will spawn.", this);
             }
         }
 
-        /// <summary>
-        /// Subscribes to NetworkManager callbacks when using standard NetworkManager mode.
-        /// Skipped if using Multiplayer Services.
-        /// </summary>
         private void Start()
         {
-            if (isUsingMultiplayerServices) return;
+            NetworkPlayers.LocalPlayerSpawned += HandleLocalPlayerSpawned;
+            FusionSessionService.Instance.GameEnded += HandleGameEnded;
+            StartCoroutine(SpawnLocalPlayerWhenReady());
+        }
 
-            if (NetworkManager.Singleton == null)
+        private void OnDestroy()
+        {
+            NetworkPlayers.LocalPlayerSpawned -= HandleLocalPlayerSpawned;
+            if (FusionSessionService.HasInstance)
             {
-                Debug.LogError("[GameManager] NetworkManager.Singleton is null. Cannot subscribe to network callbacks.", this);
-                return;
+                FusionSessionService.Instance.GameEnded -= HandleGameEnded;
             }
 
-            NetworkManager.Singleton.OnClientConnectedCallback += ClientConnected;
-            NetworkManager.Singleton.OnClientDisconnectCallback += ClientDisconnected;
+            if (m_ListeningForDeath && onStatDepleted != null)
+            {
+                onStatDepleted.UnregisterListener(HandleStatDepleted);
+            }
+
+            if (Instance == this) Instance = null;
         }
 
         #endregion
 
-        #region NetworkManager Callbacks
+        #region Session & Spawning
 
         /// <summary>
-        /// Handles client disconnection events.
-        /// Unregisters from stat depletion events when the local client disconnects.
+        /// Waits for this scene to be part of a running session (starting a dev session first if the
+        /// scene was played directly), then spawns this client's own player avatar.
         /// </summary>
-        /// <param name="clientId">The ID of the client that disconnected.</param>
-        private void ClientDisconnected(ulong clientId)
+        private IEnumerator SpawnLocalPlayerWhenReady()
         {
-            // Only process local client disconnection
-            if (clientId != NetworkManager.Singleton.LocalClientId) return;
+            FusionSessionService service = FusionSessionService.Instance;
 
-            if (onStatDepleted != null)
+            if (service.GameRunner == null && !service.IsStarting)
             {
-                onStatDepleted.UnregisterListener(HandleStatDepleted);
+                // Played directly (not reached through Start Match) - see the class summary.
+                var devStart = service.StartDevSessionAsync(gameObject.scene);
+                while (!devStart.IsCompleted) yield return null;
+                if (devStart.Result != null)
+                {
+                    Debug.LogError($"[GameManager] Couldn't start a dev session: {devStart.Result}", this);
+                    yield break;
+                }
+            }
+
+            // Wait until the runner is up and has finished loading (and registering) this scene.
+            NetworkRunner runner = null;
+            while (true)
+            {
+                if (this == null) yield break;
+                runner = service.GameRunner;
+                if (runner != null && runner.IsRunning && !runner.IsSceneManagerBusy && runner.CanSpawn) break;
+                if (runner == null && !service.IsStarting) yield break; // session ended while waiting
+                yield return null;
+            }
+
+            if (m_HasSpawnedLocalPlayer || playerPrefab == null) yield break;
+            m_HasSpawnedLocalPlayer = true;
+
+            int index = GetRandomSpawnIndex();
+            Vector3 position = GetSpawnPositionForIndex(index);
+            Quaternion rotation = TryGetSpawnTransform(index, out Transform spawnTransform) ? spawnTransform.rotation : Quaternion.identity;
+
+            NetworkObject avatar = runner.Spawn(playerPrefab, position, rotation, runner.LocalPlayer,
+                flags: NetworkSpawnFlags.SharedModeStateAuthLocalPlayer);
+            if (avatar != null)
+            {
+                runner.SetPlayerObject(runner.LocalPlayer, avatar);
+            }
+            else
+            {
+                Debug.LogError("[GameManager] Spawning the player avatar failed - does the player prefab have a Fusion NetworkObject?", this);
             }
         }
 
         /// <summary>
-        /// Handles client connection events.
-        /// Sets up the local player when they connect, including registering event listeners,
-        /// hiding the session UI, setting player name, spawning at initial position, and restoring health.
+        /// Runs once this client's own avatar has spawned (see NetworkPlayers): names it, gives it full
+        /// health, starts listening for its death, and switches the cursor to gameplay mode.
         /// </summary>
-        /// <param name="clientId">The ID of the client that connected.</param>
-        private void ClientConnected(ulong clientId)
+        private void HandleLocalPlayerSpawned(CorePlayerManager localPlayer)
         {
-            // Only process when the local client connects
-            if (clientId != NetworkManager.Singleton.LocalClientId) return;
+            if (localPlayer == null) return;
+            StartCoroutine(SetUpLocalPlayer(localPlayer));
+        }
 
-            // Register for stat depletion events (e.g., player death)
-            if (onStatDepleted != null)
+        private IEnumerator SetUpLocalPlayer(CorePlayerManager localPlayer)
+        {
+            // Fusion calls Spawned() on the avatar's components one after another - give the rest of
+            // them (CorePlayerState, CoreStatsHandler, ...) a moment to finish spawning first.
+            for (int frame = 0; frame < 30; frame++)
+            {
+                if (localPlayer == null) yield break;
+                bool stateReady = localPlayer.PlayerState == null || localPlayer.PlayerState.IsSpawned;
+                bool statsReady = localPlayer.CoreStats == null || localPlayer.CoreStats.IsSpawned;
+                if (stateReady && statsReady) break;
+                yield return null;
+            }
+            if (localPlayer == null) yield break;
+
+            if (!m_ListeningForDeath && onStatDepleted != null)
             {
                 onStatDepleted.RegisterListener(HandleStatDepleted);
+                m_ListeningForDeath = true;
             }
 
-            // Hide session UI and lock cursor for gameplay
             StartCoroutine(FadeOutAndDisable());
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
 
-            StartCoroutine(SetupLocalPlayerWhenReady());
-        }
-
-        /// <summary>
-        /// A newly-connected client's own LocalClient.PlayerObject isn't always populated the instant
-        /// OnClientConnectedCallback fires locally. For the host this reference is normally already set
-        /// (its own player object spawns essentially instantly), but a joining client goes through a real
-        /// network round-trip first, so the reference can still be null for a frame or more right when its
-        /// own "connected" callback fires. The previous code checked once and silently bailed (just a
-        /// warning) if it wasn't ready yet - naming, spawn positioning and health restore all got skipped
-        /// for that client, most visibly as a joining player showing up nameless ("Player-N" fallback) on
-        /// the scoreboard. Retry for a few seconds instead of assuming the first check is enough - mirrors
-        /// CoreHUD.RefreshScoreboardUntilComplete's fix for the same class of race.
-        /// </summary>
-        private IEnumerator SetupLocalPlayerWhenReady()
-        {
-            const int maxAttempts = 20;
-            const float retryDelaySeconds = 0.25f;
-
-            NetworkObject localPlayer = null;
-            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            if (localPlayer.PlayerState != null)
             {
-                if (NetworkManager.Singleton == null || NetworkManager.Singleton.LocalClient == null) yield break;
-
-                localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject;
-                if (localPlayer != null) break;
-
-                yield return new WaitForSeconds(retryDelaySeconds);
+                localPlayer.PlayerState.SetPlayerName($"Player {localPlayer.OwnerClientId}");
             }
 
-            if (localPlayer == null)
+            if (localPlayer.CoreMovement != null)
             {
-                Debug.LogWarning("[GameManager] LocalClient.PlayerObject never became available. Cannot setup player.", this);
-                yield break;
+                localPlayer.CoreMovement.ResetMovementForces();
             }
 
-            // Generate and assign player name based on client ID
-            string playerPrefix = "Player";
-            string playerNumber = NetworkManager.Singleton.LocalClient.ClientId.ToString();
-            string playerName = playerPrefix + playerNumber;
-
-            if (localPlayer.TryGetComponent<CorePlayerState>(out var playerState))
+            if (localPlayer.CoreStats != null)
             {
-                playerState.SetPlayerName(playerName);
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] CorePlayerState component not found on local player. Cannot set player name.", this);
-            }
-
-            // Set spawn position and rotation - a random spawn point, same as respawning.
-            if (localPlayer.TryGetComponent<CoreMovement>(out var movement))
-            {
-                int index = GetRandomSpawnIndex();
-                Vector3 spawnPos = GetSpawnPositionForIndex(index);
-                if (TryGetSpawnTransform(index, out Transform spawnTransform))
-                {
-                    movement.transform.rotation = spawnTransform.rotation;
-                }
-
-                movement.SetPosition(spawnPos);
-                movement.ResetMovementForces();
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] CoreMovement component not found on local player. Cannot set spawn position.", this);
-            }
-
-            // Restore full health on spawn
-            if (localPlayer.TryGetComponent<CoreStatsHandler>(out var coreStats))
-            {
-                coreStats.ModifyStat(StatKeys.Health, 100, NetworkManager.Singleton.LocalClientId, ModificationSource.Regeneration);
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] CoreStatsHandler component not found on local player. Cannot restore health.", this);
+                localPlayer.CoreStats.ModifyStat(StatKeys.Health, 100, localPlayer.OwnerClientId, ModificationSource.Regeneration);
             }
         }
 
-        #endregion
-
-        #region Multiplayer Services Callbacks
-
-        /// <summary>
-        /// Handles session added events from Unity Multiplayer Services.
-        /// Performs the same player setup as <see cref="ClientConnected"/> but for Multiplayer Services workflow.
-        /// </summary>
-        /// <param name="session">The session that was added.</param>
-        private void OnSessionAdded(ISession session)
+        private void HandleGameEnded(string message)
         {
-            if (session == null)
-            {
-                Debug.LogError("[GameManager] OnSessionAdded called with null session.", this);
-                return;
-            }
+            if (m_Exiting) return;
+            m_Exiting = true;
 
-            // Subscribe to session removal events
-            session.RemovedFromSession += OnRemovedFromSession;
-
-            // Register for stat depletion events
-            if (onStatDepleted != null)
-            {
-                onStatDepleted.RegisterListener(HandleStatDepleted);
-            }
-
-            // Hide session UI and lock cursor for gameplay
-            StartCoroutine(FadeOutAndDisable());
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-
-            // Set player name from session properties
-            SetupLocalPlayerName(session);
-
-            if (NetworkManager.Singleton == null || NetworkManager.Singleton.LocalClient == null)
-            {
-                Debug.LogWarning("[GameManager] NetworkManager.Singleton or LocalClient is null during session setup.", this);
-                return;
-            }
-
-            var localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject;
-            if (localPlayer == null)
-            {
-                Debug.LogWarning("[GameManager] LocalClient.PlayerObject is null. Cannot setup player.", this);
-                return;
-            }
-
-            // Set spawn position and rotation - a random spawn point, same as respawning.
-            if (localPlayer.TryGetComponent<CoreMovement>(out var movement))
-            {
-                int index = GetRandomSpawnIndex();
-                Vector3 spawnPos = GetSpawnPositionForIndex(index);
-                if (TryGetSpawnTransform(index, out Transform spawnTransform))
-                {
-                    movement.transform.rotation = spawnTransform.rotation;
-                }
-
-                movement.SetPosition(spawnPos);
-                movement.ResetMovementForces();
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] CoreMovement component not found on local player. Cannot set spawn position.", this);
-            }
-
-            // Restore full health on spawn
-            if (localPlayer.TryGetComponent<CoreStatsHandler>(out var coreStats))
-            {
-                coreStats.ModifyStat(StatKeys.Health, 100, NetworkManager.Singleton.LocalClientId, ModificationSource.Regeneration);
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] CoreStatsHandler component not found on local player. Cannot restore health.", this);
-            }
-        }
-
-        /// <summary>
-        /// Handles removal from a Multiplayer Services session.
-        /// Unregisters from stat depletion events when removed from the session.
-        /// </summary>
-        private void OnRemovedFromSession()
-        {
-            if (onStatDepleted != null)
-            {
-                onStatDepleted.UnregisterListener(HandleStatDepleted);
-            }
+            Debug.Log($"[GameManager] {message} Returning to {exitSceneName}.");
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            SceneManager.LoadScene(exitSceneName);
         }
 
         #endregion
@@ -373,52 +254,33 @@ namespace Blocks.Gameplay.Core
         /// <param name="payload">The stat depletion event payload containing player ID and stat information.</param>
         private void HandleStatDepleted(StatDepletedPayload payload)
         {
-            if (NetworkManager.Singleton == null || NetworkManager.Singleton.LocalClient == null)
+            CorePlayerManager localPlayer = NetworkPlayers.Local;
+            if (localPlayer == null) return;
+
+            // Only handle local player's stat depletion
+            if (payload.playerId != localPlayer.OwnerClientId) return;
+
+            // Only process health depletion (death)
+            if (payload.statID != StatKeys.Health) return;
+
+            CorePlayerState playerState = localPlayer.PlayerState;
+            if (playerState == null)
             {
-                Debug.LogWarning("[GameManager] Cannot handle stat depletion: NetworkManager.Singleton or LocalClient is null.", this);
+                Debug.LogWarning("[GameManager] CorePlayerState component not found on local player. Cannot handle death.", this);
                 return;
             }
 
-            // Only handle local player's stat depletion
-            if (payload.playerId != NetworkManager.Singleton.LocalClientId) return;
-
-            // Only process health depletion (death)
-            if (payload.statID == StatKeys.Health)
+            // Only set state if CorePlayerManager isn't handling lifecycle automatically
+            // This prevents duplicate lifecycle management
+            if (!localPlayer.AutoHandleLifecycle)
             {
-                var localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject;
-                if (localPlayer == null)
-                {
-                    Debug.LogWarning("[GameManager] Cannot handle player death: LocalClient.PlayerObject is null.", this);
-                    return;
-                }
+                playerState.SetLifeState(PlayerLifeState.Eliminated);
+            }
 
-                if (localPlayer.TryGetComponent<CorePlayerState>(out var playerState))
-                {
-                    // Only set state if CorePlayerManager isn't handling lifecycle automatically
-                    // This prevents duplicate lifecycle management
-                    if (localPlayer.TryGetComponent<CorePlayerManager>(out var playerManager))
-                    {
-                        if (!playerManager.AutoHandleLifecycle)
-                        {
-                            playerState.SetLifeState(PlayerLifeState.Eliminated);
-                        }
-                    }
-                    else
-                    {
-                        // No CorePlayerManager, handle it ourselves
-                        playerState.SetLifeState(PlayerLifeState.Eliminated);
-                    }
-
-                    // Start respawn countdown if auto-respawn is enabled
-                    if (autoRespawn)
-                    {
-                        StartCoroutine(RespawnRoutine(playerState));
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning("[GameManager] CorePlayerState component not found on local player. Cannot handle death.", this);
-                }
+            // Start respawn countdown if auto-respawn is enabled
+            if (autoRespawn)
+            {
+                StartCoroutine(RespawnRoutine(playerState));
             }
         }
 
@@ -436,14 +298,8 @@ namespace Blocks.Gameplay.Core
                 yield break;
             }
 
-            if (NetworkManager.Singleton == null)
-            {
-                Debug.LogError("[GameManager] Cannot respawn: NetworkManager.Singleton is null.", this);
-                yield break;
-            }
-
             float timer = respawnDelay;
-            ulong localId = NetworkManager.Singleton.LocalClientId;
+            ulong localId = playerState.OwnerClientId;
 
             // Countdown loop: update UI every second
             while (timer > 0)
@@ -457,6 +313,9 @@ namespace Blocks.Gameplay.Core
                 yield return new WaitForSeconds(1.0f);
                 timer -= 1.0f;
             }
+
+            // The avatar may have despawned during the countdown (left the session).
+            if (playerState == null || !playerState.IsSpawned) yield break;
 
             // Clear respawn UI
             if (onRespawnStatus != null)
@@ -526,15 +385,9 @@ namespace Blocks.Gameplay.Core
         /// sync with the map automatically, since PlayerSpawnPoint markers are generated straight from
         /// each map's "player_spawn_point" tiles (see MapObstacleSetup.BuildSpawnPoint). Leaves the
         /// Inspector-assigned list untouched if no markers are found, so a scene that hasn't been
-        /// migrated to markers yet keeps working exactly as before.
-        ///
-        /// Called from GetRandomSpawnIndex (i.e. right before every spawn/respawn), not just once from
-        /// Awake - GameManager is a DontDestroyOnLoad singleton that can Awake in a boot/lobby scene
-        /// well before the actual map (and its PlayerSpawnPoint markers) has loaded, so an Awake-only
-        /// refresh would find zero markers and silently keep whatever stale list was serialized on the
-        /// GameManager instance (including entries pointing at spawn objects that have since been
-        /// deleted from the map). Refreshing at spawn time instead means this always reflects whatever
-        /// map is actually loaded when a player needs a spawn position.
+        /// migrated to markers yet keeps working exactly as before. Called right before every
+        /// spawn/respawn (from GetRandomSpawnIndex) as well as from Awake, so it always reflects the map
+        /// that's actually loaded.
         /// </summary>
         private void RefreshSpawnPointsFromMarkers()
         {
@@ -571,9 +424,7 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Safely resolves the spawn point Transform at the given index, without throwing on an invalid
         /// index or on a list entry that was never assigned (or was assigned to something since
-        /// destroyed) - either of those used to surface as an UnassignedReferenceException/
-        /// NullReferenceException that aborted spawn positioning partway through, leaving the player
-        /// wherever they happened to already be instead of at a fallback position.
+        /// destroyed).
         /// </summary>
         /// <param name="index">The spawn point index to resolve.</param>
         /// <param name="spawnTransform">The resolved Transform, or null if unavailable.</param>
@@ -608,49 +459,6 @@ namespace Blocks.Gameplay.Core
             }
 
             return spawnTransform.position;
-        }
-
-        /// <summary>
-        /// Sets up the local player's name from the Multiplayer Services session properties.
-        /// Retrieves the player name from session data and assigns it to <see cref="CorePlayerState"/>.
-        /// </summary>
-        /// <param name="session">The active multiplayer session.</param>
-        private void SetupLocalPlayerName(ISession session)
-        {
-            if (session == null || session.CurrentPlayer == null)
-            {
-                Debug.LogWarning("[GameManager] Cannot setup player name: session or CurrentPlayer is null.", this);
-                return;
-            }
-
-            var player = session.CurrentPlayer;
-            string playerName = "Player";
-            if (player.Properties.TryGetValue(k_PlayerNameKey, out var nameProp))
-            {
-                playerName = nameProp.Value;
-            }
-
-            if (NetworkManager.Singleton == null || NetworkManager.Singleton.LocalClient == null)
-            {
-                Debug.LogWarning("[GameManager] Cannot setup player name: NetworkManager.Singleton or LocalClient is null.", this);
-                return;
-            }
-
-            if (NetworkManager.Singleton.LocalClient.PlayerObject == null)
-            {
-                Debug.LogWarning("[GameManager] Cannot setup player name: LocalClient.PlayerObject is null.", this);
-                return;
-            }
-
-            var playerState = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<CorePlayerState>();
-            if (playerState != null)
-            {
-                playerState.SetPlayerName(playerName);
-            }
-            else
-            {
-                Debug.LogWarning("[GameManager] CorePlayerState component not found on local player. Cannot set player name.", this);
-            }
         }
 
         /// <summary>

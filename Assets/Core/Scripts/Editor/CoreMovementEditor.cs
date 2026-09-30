@@ -2,20 +2,17 @@ using System;
 using System.Linq;
 using UnityEngine;
 using UnityEditor;
-using Unity.Netcode;
-using Unity.Netcode.Editor;
-using Unity.Netcode.Components;
 using System.Collections.Generic;
 
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
     /// Custom editor for <see cref="CoreMovement"/> that allows dynamic management of <see cref="IMovementAbility"/> components
-    /// and displays real-time network state during play mode.
+    /// and displays real-time (Photon Fusion) network state during play mode.
     /// </summary>
     [CustomEditor(typeof(CoreMovement))]
     [CanEditMultipleObjects]
-    public class CoreMovementEditor : NetworkTransformEditor
+    public class CoreMovementEditor : Editor
     {
         #region Fields & Properties
 
@@ -34,19 +31,18 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Discovers all available <see cref="IMovementAbility"/> implementations and prepares dropdown data.
         /// </summary>
-        public override void OnEnable()
+        private void OnEnable()
         {
-            base.OnEnable();
             FindAllAbilityImplementations();
             PrepareDropdownArrays();
         }
 
         /// <summary>
-        /// Renders the custom inspector with network state, ability management, and NetworkTransform properties.
+        /// Renders the custom inspector with network state, ability management, and CoreMovement's own properties.
         /// </summary>
         public override void OnInspectorGUI()
         {
-            DrawNetworkHeader();
+            UniversalEditorSharedLogic.DrawNetworkHeader(target);
             serializedObject.Update();
             InitializeStyles();
 
@@ -63,57 +59,18 @@ namespace Blocks.Gameplay.Core
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
             EditorGUILayout.Space(5);
 
-            if (target.GetType() != typeof(NetworkTransform))
-            {
-                UniversalEditorSharedLogic.DrawDerivedProperties(serializedObject, target.GetType(), typeof(NetworkTransform));
-            }
+            UniversalEditorSharedLogic.DrawDerivedProperties(serializedObject, target.GetType(), typeof(CoreNetworkBehaviour));
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+            UniversalEditorSharedLogic.DrawScriptField(serializedObject);
 
             serializedObject.ApplyModifiedProperties();
-            base.OnInspectorGUI();
         }
 
         #endregion
 
         #region Private Methods
-
-        /// <summary>
-        /// Displays network state information. Only meaningful during play mode when spawned.
-        /// </summary>
-        private void DrawNetworkHeader()
-        {
-            EditorGUILayout.BeginVertical("helpBox");
-            EditorGUILayout.LabelField($"{target.GetType().Name}", EditorStyles.boldLabel);
-
-            if (Application.isPlaying && target is NetworkBehaviour networkBehaviourTarget && networkBehaviourTarget.IsSpawned)
-            {
-                EditorGUILayout.LabelField($"Network Object ID: {networkBehaviourTarget.NetworkObjectId}", EditorStyles.miniLabel);
-
-                if (networkBehaviourTarget.IsOwner)
-                {
-                    EditorGUILayout.LabelField("Is Owner: Yes", EditorStyles.miniLabel);
-                }
-
-                if (networkBehaviourTarget.IsServer)
-                {
-                    EditorGUILayout.LabelField("Is Server: Yes", EditorStyles.miniLabel);
-                }
-
-                if (networkBehaviourTarget.IsHost)
-                {
-                    EditorGUILayout.LabelField("Is Host: Yes", EditorStyles.miniLabel);
-                }
-            }
-            else
-            {
-                EditorGUILayout.LabelField("Network Object ID: Not Spawned", EditorStyles.miniLabel);
-            }
-
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space();
-        }
 
         private void InitializeStyles()
         {

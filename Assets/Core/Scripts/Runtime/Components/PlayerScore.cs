@@ -1,5 +1,6 @@
+using System;
 using UnityEngine;
-using Unity.Netcode;
+using Fusion;
 
 namespace Blocks.Gameplay.Core
 {
@@ -8,75 +9,140 @@ namespace Blocks.Gameplay.Core
     /// Every connected player has one of these on their player object; CoreHUD reads every connected player's copy
     /// to build the scoreboard.
     ///
-    /// Unlike most per-player state in this project (CorePlayerState's name/life-state, CoreStatsHandler's
-    /// health/stamina), Score is deliberately Server-write rather than Owner-write. Health and stamina only ever
-    /// need to be trusted by their own owner - a client cheating its own stamina doesn't affect anyone else. Score
-    /// is different: it's a currency that gets wagered and won *between* players, so an Owner-write score would
-    /// let a compromised client simply grant itself infinite winnings. Only the server may change it; every client
-    /// (Everyone read permission) can still see everyone's current score, which is exactly what the scoreboard needs.
+    /// Networking (Photon Fusion, Shared mode): the score lives on the player's own avatar, so the player's
+    /// own client (its State Authority) is the one that writes it. Anyone else - normally the master
+    /// client's ChallengeManager, which decides payouts and penalties - changes it through
+    /// <see cref="AddScore"/> / <see cref="SetScore"/>, which forward the change to the owner as an RPC.
+    /// Every client can read everyone's current score, which is exactly what the scoreboard needs.
+    ///
+    /// The starting score is the session's Starting Points rule from the Host Game screen (falling back to
+    /// <see cref="gameRulesConfig"/> when the scene is played directly for testing).
     /// </summary>
-    [RequireComponent(typeof(NetworkObject))]
-    public class PlayerScore : NetworkBehaviour, IPlayerRequiredComponent
+    public class PlayerScore : CoreNetworkBehaviour, IPlayerRequiredComponent
     {
         #region Fields & Properties
 
         private const int DefaultStartingScore = 1000;
 
         [Header("Configuration")]
-        [Tooltip("Where the starting score comes from. Falls back to a hardcoded default if left unassigned.")]
+        [Tooltip("Starting score when the scene is played directly (no Host Game rules). Falls back to a hardcoded default if left unassigned.")]
         [SerializeField] private GameRulesConfig gameRulesConfig;
 
+        [Networked] private int NetScore { get; set; }
+
+        private int m_LastScore;
+
         /// <summary>
-        /// The player's current score. Everyone can read it (for the scoreboard); only the server can write it.
+        /// The player's current score. Everyone can read it (for the scoreboard); 0 until spawned.
         /// </summary>
-        public NetworkVariable<int> Score = new NetworkVariable<int>(
-            0,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server);
+        public int Score => IsSpawned ? NetScore : 0;
+
+        /// <summary>Raised on every client whenever this player's score changes (previous value, new value).</summary>
+        public event Action<int, int> ScoreChanged;
 
         #endregion
 
-        #region Unity & Network Lifecycle
+        #region Network Lifecycle
 
         public override void OnNetworkSpawn()
         {
-            if (!IsServer) return;
+            if (IsOwner)
+            {
+                NetScore = GetStartingScore();
+            }
+            m_LastScore = NetScore;
+        }
 
-            Score.Value = gameRulesConfig != null ? gameRulesConfig.startingScore : DefaultStartingScore;
+        public override void Render()
+        {
+            DetectChanges();
         }
 
         #endregion
 
-        #region Server API
+        #region Public API
 
         /// <summary>
-        /// Server-only: sets this player's score directly. Intended for the future wagering/gambling system -
-        /// never call this from client code.
+        /// Sets this player's score. Intended for the wagering/gambling system (ChallengeManager, on the
+        /// master client). Applied by the player's own client - directly if that's this client, otherwise
+        /// through an RPC.
         /// </summary>
-        public void ServerSetScore(int newScore)
+        public void SetScore(int newScore)
         {
-            if (!IsServer)
-            {
-                Debug.LogError("PlayerScore.ServerSetScore was called on a non-server instance. Ignoring.", this);
-                return;
-            }
+            if (!IsSpawned) return;
 
-            Score.Value = newScore;
+            if (IsOwner)
+            {
+                NetScore = newScore;
+                DetectChanges();
+            }
+            else
+            {
+                SetScoreRpc(newScore);
+            }
         }
 
         /// <summary>
-        /// Server-only: adds (or subtracts, with a negative amount) to this player's score. Intended for the
-        /// future wagering/gambling system and end-of-round bonus points - never call this from client code.
+        /// Adds (or subtracts, with a negative amount) to this player's score. Intended for the
+        /// wagering/gambling system and end-of-round bonus points (ChallengeManager, on the master client).
+        /// Applied by the player's own client - directly if that's this client, otherwise through an RPC.
         /// </summary>
-        public void ServerAddScore(int amount)
+        public void AddScore(int amount)
         {
-            if (!IsServer)
-            {
-                Debug.LogError("PlayerScore.ServerAddScore was called on a non-server instance. Ignoring.", this);
-                return;
-            }
+            if (!IsSpawned || amount == 0) return;
 
-            Score.Value += amount;
+            if (IsOwner)
+            {
+                NetScore += amount;
+                DetectChanges();
+            }
+            else
+            {
+                AddScoreRpc(amount);
+            }
+        }
+
+        #endregion
+
+        #region RPCs
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void SetScoreRpc(int newScore)
+        {
+            NetScore = newScore;
+            DetectChanges();
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void AddScoreRpc(int amount)
+        {
+            NetScore += amount;
+            DetectChanges();
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        private int GetStartingScore()
+        {
+            if (FusionSessionService.HasInstance && FusionSessionService.Instance.InGame && !FusionSessionService.Instance.IsDevSession)
+            {
+                return FusionSessionService.Instance.SessionRules.StartingPoints;
+            }
+            return gameRulesConfig != null ? gameRulesConfig.startingScore : DefaultStartingScore;
+        }
+
+        private void DetectChanges()
+        {
+            if (!IsSpawned) return;
+
+            int current = NetScore;
+            if (current == m_LastScore) return;
+
+            int previous = m_LastScore;
+            m_LastScore = current;
+            ScoreChanged?.Invoke(previous, current);
         }
 
         #endregion

@@ -25,10 +25,6 @@ namespace Blocks.Gameplay.Core
     /// screen's Master/SoundEffects sliders and plays on a DontDestroyOnLoad one-shot object, so a click
     /// sound survives the scene load its own button triggers (Host Game, Settings).
     ///
-    /// This scene still carries an instance of the shared "[BB] NetworkManager" prefab
-    /// (GameNetworkManager, Netcode for GameObjects) from when Host/Client connected directly from here.
-    /// Nothing on this menu uses it any more; it'll go away with the move to Fusion 2.
-    ///
     /// Quit Game exits the build (Application.Quit() is a no-op in the Editor, so this stops Play Mode
     /// there instead).
     ///

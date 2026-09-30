@@ -195,6 +195,13 @@ namespace Blocks.Gameplay.Core
                     instance = go.AddComponent(type);
                 }
 
+                // Networked scene singletons (RoundTimer, ChallengeManager) are owned by the Fusion Shared-mode
+                // master client, which needs "Is Master Client Object" set on their NetworkObject.
+                if (instance is Fusion.NetworkBehaviour)
+                {
+                    FusionEditorUtil.EnsureNetworkObject(instance.gameObject, Fusion.NetworkObjectFlags.MasterClientObject);
+                }
+
                 summary.SiblingFieldsWired += WireSiblingFields(new[] { instance });
                 summary.SingletonAssetsWired += AutoWireSingletonAssets(instance, summary);
 

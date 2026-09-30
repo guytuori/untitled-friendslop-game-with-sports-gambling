@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode;
 
 namespace Blocks.Gameplay.Core
 {
@@ -9,7 +8,7 @@ namespace Blocks.Gameplay.Core
     /// same as walking through it. See MapColliderSetup, which creates one of these alongside the normal
     /// walkable collider for any submesh whose material is named "start" or "finish".
     ///
-    /// Only reports the LOCAL player's own entry (checks NetworkObject.IsOwner) - every machine simulates
+    /// Only reports the LOCAL player's own entry (checks CorePlayerManager.IsOwner) - every machine simulates
     /// every player's collider, so without that check this would fire once per observing machine instead
     /// of once, for the wrong player half the time.
     /// </summary>
@@ -29,10 +28,10 @@ namespace Blocks.Gameplay.Core
         private void OnTriggerEnter(Collider other)
         {
             if (zone == null) return;
-            if (!other.TryGetComponent(out NetworkObject networkObject)) return;
-            if (!networkObject.IsOwner) return;
+            if (!other.TryGetComponent(out CorePlayerManager player)) return;
+            if (!player.IsOwner) return;
 
-            zone.RequestEnterRpc(kind);
+            zone.ReportLocalPlayerEntered(kind);
         }
     }
 }

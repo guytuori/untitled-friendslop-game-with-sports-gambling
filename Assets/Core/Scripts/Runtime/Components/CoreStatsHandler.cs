@@ -1,5 +1,5 @@
 using UnityEngine;
-using Unity.Netcode;
+using Fusion;
 using System.Collections.Generic;
 
 namespace Blocks.Gameplay.Core
@@ -7,13 +7,16 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// Manages a character's stats (e.g., Health, Stamina) based on a <see cref="StatsConfig"/> asset.
     /// It handles stat initialization, modification, consumption, and regeneration.
-    /// Stats are synchronized over the network using a <see cref="NetworkList{T}"/>.
+    /// Stats are synchronized over the network in a Fusion networked array written by the owning client
+    /// (State Authority); every client raises the stat events when it sees a value change.
     /// It also determines the "alive" state of the character based on a designated primary stat (e.g., Health).
     /// </summary>
-    [RequireComponent(typeof(NetworkObject))]
-    public class CoreStatsHandler : NetworkBehaviour
+    public class CoreStatsHandler : CoreNetworkBehaviour
     {
         #region Fields & Properties
+
+        /// <summary>How many stats one character can have (size of the networked array).</summary>
+        public const int MaxStats = 8;
 
         [Header("Configuration")]
         [Tooltip("The ScriptableObject defining the stats for this character.")]
@@ -31,14 +34,21 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public bool IsAlive { get; private set; } = true;
 
-        // Networked list that synchronizes stat values across all clients
-        private NetworkList<RuntimeStat> m_RuntimeStats;
+        // Networked stat values - everyone reads, only the owner writes.
+        [Networked, Capacity(MaxStats)] private NetworkArray<RuntimeStat> NetStats => default;
+        [Networked] private int NetStatCount { get; set; }
+
+        // The values this client last saw, to raise change events when they change (see DetectChanges).
+        private readonly RuntimeStat[] m_LastSeen = new RuntimeStat[MaxStats];
+        private int m_LastSeenCount;
 
         // Tracks the last time each stat was consumed to enforce regeneration delays
         private readonly Dictionary<int, float> m_LastStatUseTime = new Dictionary<int, float>();
 
         // Caches stat definitions by hash for fast lookup without config access
         private readonly Dictionary<int, StatDefinition> m_StatDefinitions = new Dictionary<int, StatDefinition>();
+
+        private int StatCount => IsSpawned ? Mathf.Clamp(NetStatCount, 0, MaxStats) : 0;
 
         #endregion
 
@@ -53,9 +63,6 @@ namespace Blocks.Gameplay.Core
                 return;
             }
 
-            // Owner can write, everyone can read the stat values
-            m_RuntimeStats = new NetworkList<RuntimeStat>(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
             // Populate the definitions dictionary from the config for fast lookups
             foreach (var def in statsConfig.stats)
             {
@@ -65,46 +72,52 @@ namespace Blocks.Gameplay.Core
 
         public override void OnNetworkSpawn()
         {
-            if (IsOwner)
+            if (statsConfig == null) return;
+
+            if (IsOwner && NetStatCount == 0)
             {
                 // The owner is responsible for initializing the stats for their character
                 // This ensures that stats are set only once and then synchronized to other clients
-                if (m_RuntimeStats.Count == 0)
+                if (statsConfig.stats == null || statsConfig.stats.Count == 0)
                 {
-                    if (statsConfig.stats == null || statsConfig.stats.Count == 0)
+                    Debug.LogWarning($"[CoreStatsHandler] No stats defined in StatsConfig on {gameObject.name}", this);
+                }
+                else
+                {
+                    if (statsConfig.stats.Count > MaxStats)
                     {
-                        Debug.LogWarning($"[CoreStatsHandler] No stats defined in StatsConfig on {gameObject.name}", this);
-                        return;
+                        Debug.LogWarning($"[CoreStatsHandler] StatsConfig has {statsConfig.stats.Count} stats; only the first {MaxStats} are networked.", this);
                     }
 
-                    foreach (var def in statsConfig.stats)
+                    int count = Mathf.Min(statsConfig.stats.Count, MaxStats);
+                    for (int i = 0; i < count; i++)
                     {
-                        m_RuntimeStats.Add(new RuntimeStat
+                        var def = statsConfig.stats[i];
+                        NetStats.Set(i, new RuntimeStat
                         {
                             StatHash = Animator.StringToHash(def.statName),
                             CurrentValue = def.startingValue
                         });
                     }
+                    NetStatCount = count;
                 }
             }
 
-            // Subscribe to changes in the stat list to update UI and game logic
-            m_RuntimeStats.OnListChanged += OnStatsListChanged;
-
             // Broadcast the initial state of all stats for late-joining clients or initialization
-            foreach (var stat in m_RuntimeStats)
+            m_LastSeenCount = StatCount;
+            for (int i = 0; i < m_LastSeenCount; i++)
             {
-                BroadcastStatChange(stat);
+                m_LastSeen[i] = NetStats[i];
+                BroadcastStatChange(m_LastSeen[i], raiseDepleted: m_LastSeen[i].CurrentValue <= 0);
             }
 
             // Set the initial alive state
             UpdateAliveState();
         }
 
-        public override void OnNetworkDespawn()
+        public override void Render()
         {
-            // Unsubscribe to prevent memory leaks
-            m_RuntimeStats.OnListChanged -= OnStatsListChanged;
+            DetectChanges();
         }
 
         private void Update()
@@ -161,7 +174,7 @@ namespace Blocks.Gameplay.Core
                 return false;
             }
 
-            if (m_RuntimeStats[statIndex].CurrentValue >= amount)
+            if (NetStats[statIndex].CurrentValue >= amount)
             {
                 ModifyStat(statIndex, -amount, true, sourcePlayerId, ModificationSource.Consumption);
                 return true;
@@ -189,8 +202,10 @@ namespace Blocks.Gameplay.Core
         /// <returns>An IEnumerable of tuples containing the stat name, current value, and max value.</returns>
         public IEnumerable<(string name, float current, float max)> GetAllStats()
         {
-            foreach (var runtimeStat in m_RuntimeStats)
+            int count = StatCount;
+            for (int i = 0; i < count; i++)
             {
+                RuntimeStat runtimeStat = NetStats[i];
                 if (m_StatDefinitions.TryGetValue(runtimeStat.StatHash, out var def))
                 {
                     yield return (def.statName, runtimeStat.CurrentValue, def.maxValue);
@@ -199,16 +214,22 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Gets the current value of a specific stat.
+        /// Gets the current value of a specific stat. Before the object has spawned this is the stat's
+        /// starting value.
         /// </summary>
         /// <param name="statHash">The hash of the stat (use StatKeys).</param>
         /// <returns>The current value, or 0 if the stat is not found.</returns>
         public float GetCurrentValue(int statHash)
         {
+            if (!IsSpawned)
+            {
+                return m_StatDefinitions.TryGetValue(statHash, out var definition) ? definition.startingValue : 0f;
+            }
+
             int index = FindStatIndex(statHash);
             if (index != -1)
             {
-                return m_RuntimeStats[index].CurrentValue;
+                return NetStats[index].CurrentValue;
             }
 
             Debug.LogWarning($"[CoreStatsHandler] GetCurrentValue: Stat with hash {statHash} not found on {gameObject.name}, returning 0", this);
@@ -234,14 +255,39 @@ namespace Blocks.Gameplay.Core
         #region Private Methods
 
         /// <summary>
-        /// Called when the NetworkList of stats changes. This can be an add, remove, or value change.
-        /// Runs on all clients when the owner modifies a stat value.
+        /// Compares the networked stats with the values this client last saw and raises the stat events for
+        /// every stat that changed. Runs every frame (Render) on every client, and right after the owner
+        /// changes a value, so the owner's listeners react in the same frame (like NGO's OnListChanged).
+        /// "Depleted" is raised when a stat drops to zero from above zero (not again for further changes
+        /// while it's still at zero).
         /// </summary>
-        private void OnStatsListChanged(NetworkListEvent<RuntimeStat> changeEvent)
+        private void DetectChanges()
         {
-            UpdateAliveState();
-            var stat = changeEvent.Value;
-            BroadcastStatChange(stat, stat.SourcePlayerId, stat.SourceType);
+            if (!IsSpawned) return;
+
+            int count = StatCount;
+            bool anyChanged = false;
+            for (int i = 0; i < count; i++)
+            {
+                RuntimeStat current = NetStats[i];
+                bool isNew = i >= m_LastSeenCount;
+                if (!isNew && current.Equals(m_LastSeen[i])) continue;
+
+                bool wasAboveZero = isNew || m_LastSeen[i].CurrentValue > 0;
+                m_LastSeen[i] = current;
+                anyChanged = true;
+
+                UpdateAliveState();
+                BroadcastStatChange(current, raiseDepleted: wasAboveZero && current.CurrentValue <= 0);
+            }
+
+            if (count != m_LastSeenCount)
+            {
+                m_LastSeenCount = count;
+                anyChanged = true;
+            }
+
+            if (anyChanged) UpdateAliveState();
         }
 
         /// <summary>
@@ -249,14 +295,10 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void HandleRegeneration()
         {
-            if (m_RuntimeStats == null || m_RuntimeStats.Count == 0)
+            int count = StatCount;
+            for (int i = 0; i < count; i++)
             {
-                return;
-            }
-
-            for (int i = 0; i < m_RuntimeStats.Count; i++)
-            {
-                var stat = m_RuntimeStats[i];
+                var stat = NetStats[i];
                 if (m_StatDefinitions.TryGetValue(stat.StatHash, out var def))
                 {
                     if (def.regenRate > 0 && stat.CurrentValue < def.maxValue)
@@ -285,14 +327,13 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>
         /// Raises the appropriate events with a payload containing the updated stat information.
-        /// This runs on all clients when the NetworkList updates, not just the owner.
+        /// This runs on all clients when a stat changes, not just the owner.
         /// Use the OwnerClientId in the payload to identify which player the stat change belongs to.
         /// For local player updates, listeners can filter using IsOwner.
         /// </summary>
-        /// <param name="stat">The stat that has changed.</param>
-        /// <param name="sourcePlayerId">The player who caused this stat change.</param>
-        /// <param name="sourceType">The type of modification that occurred.</param>
-        private void BroadcastStatChange(RuntimeStat stat, ulong sourcePlayerId = 0, ModificationSource sourceType = ModificationSource.Unknown)
+        /// <param name="stat">The stat that has changed (including who caused it and how).</param>
+        /// <param name="raiseDepleted">Whether to also raise the depleted event (if the stat's flags ask for it).</param>
+        private void BroadcastStatChange(RuntimeStat stat, bool raiseDepleted)
         {
             if (m_StatDefinitions.TryGetValue(stat.StatHash, out var def))
             {
@@ -301,8 +342,8 @@ namespace Blocks.Gameplay.Core
                     var statPayload = new StatChangePayload
                     {
                         targetPlayerId = OwnerClientId,
-                        sourcePlayerId = sourcePlayerId,
-                        sourceType = sourceType,
+                        sourcePlayerId = stat.SourcePlayerId,
+                        sourceType = stat.SourceType,
                         statName = def.statName,
                         statID = stat.StatHash,
                         currentValue = stat.CurrentValue,
@@ -311,18 +352,15 @@ namespace Blocks.Gameplay.Core
                     onStatChangedEvent?.Raise(statPayload);
                 }
 
-                if (def.eventFlags.HasFlag(StatEventFlags.OnDepleted))
+                if (raiseDepleted && def.eventFlags.HasFlag(StatEventFlags.OnDepleted))
                 {
-                    if (stat.CurrentValue <= 0)
+                    var depletedPayload = new StatDepletedPayload
                     {
-                        var depletedPayload = new StatDepletedPayload
-                        {
-                            playerId = OwnerClientId,
-                            statName = def.statName,
-                            statID = stat.StatHash
-                        };
-                        onStatDepletedEvent?.Raise(depletedPayload);
-                    }
+                        playerId = OwnerClientId,
+                        statName = def.statName,
+                        statID = stat.StatHash
+                    };
+                    onStatDepletedEvent?.Raise(depletedPayload);
                 }
             }
             else
@@ -332,37 +370,39 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Internal method to modify a stat by its index in the NetworkList.
+        /// Internal method to modify a stat by its index in the networked array.
         /// Clamps the value to the stat's min and max values and triggers network synchronization.
         /// </summary>
-        /// <param name="index">The index of the stat in the NetworkList.</param>
+        /// <param name="index">The index of the stat in the networked array.</param>
         /// <param name="amount">The amount to add or subtract.</param>
         /// <param name="recordUseTime">Whether to record the use time for regeneration delay tracking.</param>
         /// <param name="sourcePlayerId">The player who caused this change.</param>
         /// <param name="sourceType">The type of modification.</param>
         private void ModifyStat(int index, float amount, bool recordUseTime, ulong sourcePlayerId = 0, ModificationSource sourceType = ModificationSource.Unknown)
         {
-            if (index < 0 || index >= m_RuntimeStats.Count)
+            if (index < 0 || index >= StatCount)
             {
-                Debug.LogError($"[CoreStatsHandler] ModifyStat: Index {index} out of bounds (count: {m_RuntimeStats.Count}) on {gameObject.name}", this);
+                Debug.LogError($"[CoreStatsHandler] ModifyStat: Index {index} out of bounds (count: {StatCount}) on {gameObject.name}", this);
                 return;
             }
 
-            var stat = m_RuntimeStats[index];
+            var stat = NetStats[index];
             if (m_StatDefinitions.TryGetValue(stat.StatHash, out var def))
             {
                 stat.CurrentValue = Mathf.Clamp(stat.CurrentValue + amount, def.minValue, def.maxValue);
                 stat.SourcePlayerId = sourcePlayerId;
                 stat.SourceType = sourceType;
 
-                // Assignment to NetworkList triggers network synchronization to all clients
-                m_RuntimeStats[index] = stat;
+                // Writing the networked array replicates the change to all clients
+                NetStats.Set(index, stat);
 
                 // Record use time only for consumption to enforce regeneration delays
                 if (recordUseTime && amount < 0)
                 {
                     m_LastStatUseTime[stat.StatHash] = Time.time;
                 }
+
+                DetectChanges();
             }
             else
             {
@@ -371,15 +411,16 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Finds the index of a stat in the NetworkList using its hash.
+        /// Finds the index of a stat in the networked array using its hash.
         /// </summary>
         /// <param name="statHash">The hash of the stat to find.</param>
         /// <returns>The index of the stat, or -1 if not found.</returns>
         private int FindStatIndex(int statHash)
         {
-            for (int i = 0; i < m_RuntimeStats.Count; i++)
+            int count = StatCount;
+            for (int i = 0; i < count; i++)
             {
-                if (m_RuntimeStats[i].StatHash == statHash)
+                if (NetStats[i].StatHash == statHash)
                 {
                     return i;
                 }

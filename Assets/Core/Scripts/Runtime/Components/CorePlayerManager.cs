@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode;
 using System.Collections.Generic;
 
 namespace Blocks.Gameplay.Core
@@ -7,9 +6,17 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// The central orchestrator for a Core player character.
     /// Refactored to support the Fallback Pattern: it can handle death automatically OR wait for GameManager.
+    ///
+    /// Networking (Photon Fusion, Shared mode): the player's own client has State Authority over this
+    /// avatar (<see cref="CoreNetworkBehaviour.IsOwner"/>). Every spawned avatar registers itself with
+    /// <see cref="NetworkPlayers"/> so other systems (HUD scoreboard, ChallengeManager, GameManager) can
+    /// find players by id.
     /// </summary>
-    public class CorePlayerManager : NetworkBehaviour
+    public class CorePlayerManager : CoreNetworkBehaviour
     {
+        /// <summary>What <see cref="PlayerName"/> returns before the player has a name.</summary>
+        public const string UninitializedName = "Uninitialized";
+
         #region Fields & Properties
 
         [Header("Core Components")]
@@ -83,7 +90,7 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Gets the player's name from the Core Player State, or "Uninitialized" if not available.
         /// </summary>
-        public string PlayerName => corePlayerState != null ? corePlayerState.PlayerName : "Uninitialized";
+        public string PlayerName => corePlayerState != null && !string.IsNullOrEmpty(corePlayerState.PlayerName) ? corePlayerState.PlayerName : UninitializedName;
 
         /// <summary>
         /// Gets a value indicating whether this component automatically handles player lifecycle.
@@ -133,10 +140,14 @@ namespace Blocks.Gameplay.Core
             {
                 addon.OnPlayerSpawn();
             }
+
+            NetworkPlayers.Register(this);
         }
 
         public override void OnNetworkDespawn()
         {
+            NetworkPlayers.Unregister(this);
+
             if (corePlayerState != null)
             {
                 corePlayerState.OnNameChanged -= HandlePlayerNameChanged;
@@ -325,10 +336,7 @@ namespace Blocks.Gameplay.Core
         {
             if (string.IsNullOrEmpty(newName)) return;
 
-            if (NetworkObject.IsPlayerObject)
-            {
-                gameObject.name = newName;
-            }
+            gameObject.name = newName;
         }
 
         private void RegisterEventListeners()

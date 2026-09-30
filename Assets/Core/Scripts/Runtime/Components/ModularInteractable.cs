@@ -1,5 +1,5 @@
 using UnityEngine;
-using Unity.Netcode;
+using Fusion;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -9,11 +9,12 @@ namespace Blocks.Gameplay.Core
     /// A versatile, network-aware interactable object whose behavior is defined by attaching one or more
     /// <see cref="IInteractionEffect"/> components. This modular approach allows for creating complex interactions
     /// (e.g., granting an item, playing a sound, and then despawning) by combining simple, reusable effect scripts.
-    /// This component is an in-scene NetworkObject, meaning it must exist in the scene before the network session starts.
-    /// See: https://docs-multiplayer.unity3d.com/netcode/current/basics/scenemanagement/inscene-placed-networkobjects/
+    /// This component is an in-scene networked object (Fusion NetworkObject, owned by the master client in
+    /// Shared mode), meaning it must exist in the scene before the network session starts. Interactions
+    /// run on the interacting player's own client; despawning is requested from the object's State Authority.
     /// </summary>
     [RequireComponent(typeof(NetworkObject))]
-    public class ModularInteractable : NetworkBehaviour, IInteractable
+    public class ModularInteractable : CoreNetworkBehaviour, IInteractable
     {
         #region Fields & Properties
 
@@ -114,7 +115,7 @@ namespace Blocks.Gameplay.Core
         {
             // Only the owner of the entering object can trigger the interaction
             if (triggerMode == InteractionTriggerMode.OnTriggerEnter &&
-                other.TryGetComponent<NetworkObject>(out var netObj) && netObj.IsOwner &&
+                other.TryGetComponent<CorePlayerManager>(out var player) && player.IsOwner &&
                 IsPlayer(other.gameObject))
             {
                 Interact(other.gameObject);
@@ -131,7 +132,7 @@ namespace Blocks.Gameplay.Core
         {
             // Only the owner of the colliding object can trigger the interaction
             if (triggerMode == InteractionTriggerMode.OnRigidbodyCollision &&
-                collision.gameObject.TryGetComponent<NetworkObject>(out var netObj) && netObj.IsOwner &&
+                collision.gameObject.TryGetComponent<CorePlayerManager>(out var player) && player.IsOwner &&
                 IsPlayer(collision.gameObject))
             {
                 Interact(collision.gameObject);
@@ -233,6 +234,7 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public void RequestDespawn()
         {
+            if (!IsSpawned) return;
             RequestDespawnRpc();
         }
 
@@ -311,7 +313,7 @@ namespace Blocks.Gameplay.Core
         /// An RPC sent to the server to request that this object be despawned.
         /// This ensures that despawning is handled authoritatively.
         /// </summary>
-        [Rpc(SendTo.Authority)]
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
         private void RequestDespawnRpc()
         {
             if (m_IsDespawnSequenceActive)
@@ -457,7 +459,7 @@ namespace Blocks.Gameplay.Core
 
             if (IsSpawned && HasAuthority)
             {
-                NetworkObject.Despawn(false);
+                Runner.Despawn(Object);
             }
             else
             {
@@ -485,13 +487,13 @@ namespace Blocks.Gameplay.Core
                 return;
             }
 
-            if (!m_CurrentInteractor.TryGetComponent<NetworkObject>(out var netObj))
+            if (!m_CurrentInteractor.TryGetComponent<CorePlayerManager>(out var interactor))
             {
-                Debug.LogWarning($"[ModularInteractable] {gameObject.name}: Current interactor '{m_CurrentInteractor.name}' does not have a NetworkObject component.", this);
+                Debug.LogWarning($"[ModularInteractable] {gameObject.name}: Current interactor '{m_CurrentInteractor.name}' is not a player.", this);
                 return;
             }
 
-            if (netObj.OwnerClientId == payload.playerId)
+            if (interactor.OwnerClientId == payload.playerId)
             {
                 StopAllEffects();
             }

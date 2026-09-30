@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode;
 using Unity.Cinemachine;
 using System.Collections.Generic;
 
@@ -10,7 +9,7 @@ namespace Blocks.Gameplay.Core
     /// This component works with Cinemachine to control the active virtual camera by adjusting priorities.
     /// It should be attached to the player prefab and will only activate for the local owner.
     /// </summary>
-    public class CoreCameraController : NetworkBehaviour
+    public class CoreCameraController : CoreNetworkBehaviour
     {
         #region Fields & Properties
 

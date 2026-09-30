@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode;
 using UnityEngine.InputSystem;
 
 namespace Blocks.Gameplay.Core
@@ -24,7 +23,7 @@ namespace Blocks.Gameplay.Core
     /// after this instance's own GameplayInputSystem_Actions is constructed - so a player's rebinds take
     /// effect the moment gameplay starts, not just on the settings screen that changed them.
     /// </summary>
-    public class CoreInputHandler : NetworkBehaviour
+    public class CoreInputHandler : CoreNetworkBehaviour
     {
         #region Fields
 

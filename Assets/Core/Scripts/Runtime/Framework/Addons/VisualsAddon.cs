@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode.Components;
 using System.Collections.Generic;
 
 namespace Blocks.Gameplay.Core
@@ -28,8 +27,9 @@ namespace Blocks.Gameplay.Core
         [Header("Component Dependencies")]
         [Tooltip("A direct reference to the player's animator.")]
         [SerializeField] private Animator playerAnimator;
-        [Tooltip("Reference to the component controller for enabling/disabling player components.")]
-        [SerializeField] private ComponentController componentController;
+        [Tooltip("Components (renderers, colliders, behaviours) switched off while the player is eliminated, when not using the ragdoll. " +
+            "Leave empty to just hide the Target Renderer. Every client does this itself from the replicated life state.")]
+        [SerializeField] private List<Component> hideWhenEliminated = new List<Component>();
 
         [Header("Visual Customization")]
         [Tooltip("The Renderer (MeshRenderer or SkinnedMeshRenderer) to apply materials to.")]
@@ -176,17 +176,16 @@ namespace Blocks.Gameplay.Core
             }
             else
             {
-                // When not using ragdoll, directly control component enabled state
-                if (componentController != null && m_PlayerManager.HasAuthority)
-                {
-                    componentController.SetEnabled(!isEliminated);
-                }
+                // When not using ragdoll, hide the player while eliminated. The life state is replicated,
+                // so every client does this for itself (this used to go through NGO's networked
+                // ComponentController on the owner).
+                SetEliminationComponentsEnabled(!isEliminated);
             }
 
             // Re-enable components after ragdoll respawn completes
-            if (componentController != null && newState == PlayerLifeState.Respawned && useRagdollOnElimination && m_PlayerManager.HasAuthority)
+            if (newState == PlayerLifeState.Respawned && useRagdollOnElimination)
             {
-                componentController.SetEnabled(true);
+                SetEliminationComponentsEnabled(true);
             }
 
             // Play elimination effects only on first transition to eliminated state
@@ -200,6 +199,27 @@ namespace Blocks.Gameplay.Core
         /// Toggles ragdoll physics by setting all rigidbodies to kinematic or dynamic.
         /// </summary>
         /// <param name="isActive">True to enable ragdoll physics (dynamic), false to disable (kinematic).</param>
+        private void SetEliminationComponentsEnabled(bool isEnabled)
+        {
+            if (hideWhenEliminated == null || hideWhenEliminated.Count == 0)
+            {
+                if (targetRenderer != null) targetRenderer.enabled = isEnabled;
+                return;
+            }
+
+            foreach (Component component in hideWhenEliminated)
+            {
+                switch (component)
+                {
+                    case Behaviour behaviour: behaviour.enabled = isEnabled; break;
+                    case Renderer rendererComponent: rendererComponent.enabled = isEnabled; break;
+                    case Collider colliderComponent: colliderComponent.enabled = isEnabled; break;
+                    case null: break;
+                    default: component.gameObject.SetActive(isEnabled); break;
+                }
+            }
+        }
+
         private void SetRagdollState(bool isActive)
         {
             if (m_RagdollRigidbodies == null) return;

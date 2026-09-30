@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode;
 using System.Collections.Generic;
 
 namespace Blocks.Gameplay.Core
@@ -9,7 +8,7 @@ namespace Blocks.Gameplay.Core
     /// It detects targets via raycast (look) and proximity (nearby), manages the "focus" state,
     /// and triggers interactions via input or collision.
     /// </summary>
-    public class InteractionAddon : NetworkBehaviour, IPlayerAddon
+    public class InteractionAddon : CoreNetworkBehaviour, IPlayerAddon
     {
         #region Fields & Properties
 

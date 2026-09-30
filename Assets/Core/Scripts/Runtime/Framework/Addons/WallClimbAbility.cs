@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode;
 
 namespace Blocks.Gameplay.Core
 {
@@ -38,7 +37,7 @@ namespace Blocks.Gameplay.Core
     /// Climb To ... Player does this automatically (see WallClimbSetup.cs).
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public class WallClimbAbility : NetworkBehaviour, IMovementAbility, IPlayerAddon
+    public class WallClimbAbility : CoreNetworkBehaviour, IMovementAbility, IPlayerAddon
     {
         #region IMovementAbility
 

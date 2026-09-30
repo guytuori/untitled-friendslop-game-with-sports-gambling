@@ -1,5 +1,4 @@
 using UnityEngine;
-using Unity.Netcode;
 
 namespace Blocks.Gameplay.Core
 {
@@ -7,7 +6,7 @@ namespace Blocks.Gameplay.Core
     /// An addon that grants the player the ability to perform a double jump.
     /// Listens for jump input and applies vertical velocity if the player is airborne and hasn't already double jumped.
     /// </summary>
-    public class DoubleJumpAddon : NetworkBehaviour, IPlayerAddon
+    public class DoubleJumpAddon : CoreNetworkBehaviour, IPlayerAddon
     {
         #region Fields & Properties
 
