@@ -68,11 +68,21 @@ namespace Blocks.Gameplay.Core
                 MeshFilter filter = child.GetComponent<MeshFilter>();
                 Collider collider = child.GetComponent<Collider>();
 
-                if (filter == null || filter.sharedMesh == null)
+                if (child.childCount > 0)
+                {
+                    if (filter == null)
+                    {
+                        filter = child.GetChild(0).GetComponent<MeshFilter>();
+                    }
+                    if (collider == null)
+                    {
+                        collider = child.GetChild(0).GetComponent<Collider>();
+                    }
+                }
+                if (filter == null || collider == null)
                 {
                     continue; // Skip children without a valid mesh
                 }
-
                 // Get local bounds dimensions
                 Vector3 localMin = filter.sharedMesh.bounds.min;
                 Vector3 localMax = filter.sharedMesh.bounds.max;

@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/_scenes/Thrash.unity
+    guid: 14b94591db716494685e021bd60687c3
+  - enabled: 1
     path: Assets/Core/Scenes/SplashScreen.unity
     guid: 41286dbe11d830b4f88bfe717b372c03
   - enabled: 1
@@ -53,8 +56,5 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Core/Scenes/ChangeProfile.unity
     guid: ec8e734dfddb454ea28a783e41db748d
-  - enabled: 1
-    path: Assets/_scenes/Thrash.unity
-    guid: 14b94591db716494685e021bd60687c3
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
