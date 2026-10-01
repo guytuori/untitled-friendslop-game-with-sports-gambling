@@ -48,6 +48,12 @@ EditorBuildSettings:
     path: Assets/Core/Scenes/GameLobby.unity
     guid: 5a95553db14147a7151f3cc25b743aa5
   - enabled: 1
+    path: Assets/Core/Scenes/SinglePlayer.unity
+    guid: 7bf79d29596b49dd84000c6edc5cee68
+  - enabled: 1
+    path: Assets/Core/Scenes/ChangeProfile.unity
+    guid: ec8e734dfddb454ea28a783e41db748d
+  - enabled: 1
     path: Assets/_scenes/Thrash.unity
     guid: 14b94591db716494685e021bd60687c3
   m_configObjects:

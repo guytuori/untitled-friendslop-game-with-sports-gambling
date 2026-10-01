@@ -292,7 +292,7 @@ namespace Blocks.Gameplay.Core
                     RoomCode = code;
                     IsPublic = rules.IsPublic;
                     MaxPlayers = rules.MaxPlayers;
-                    RebuildRoster();
+                    OnSessionReady();
                     return null;
                 }
 
@@ -349,7 +349,7 @@ namespace Blocks.Gameplay.Core
             RoomCode = code;
             IsPublic = info != null && info.IsVisible;
             MaxPlayers = info != null ? info.MaxPlayers : 0;
-            RebuildRoster();
+            OnSessionReady();
             return null;
         }
 
@@ -463,7 +463,7 @@ namespace Blocks.Gameplay.Core
             RoomCode = sessionName;
             IsPublic = false;
             MaxPlayers = DevSessionMaxPlayers;
-            RebuildRoster();
+            OnSessionReady();
             return null;
         }
 
@@ -573,6 +573,14 @@ namespace Blocks.Gameplay.Core
             IsDevSession = false;
             m_RosterMasterId = -1;
             m_Players.Clear();
+            SessionProfiles.Clear();
+        }
+
+        /// <summary>A session has started and been checked: build the roster and tell everyone who we are (SessionProfiles).</summary>
+        private void OnSessionReady()
+        {
+            RebuildRoster();
+            SessionProfiles.BroadcastLocal(m_GameRunner);
         }
 
         // =====================================================================================
@@ -766,12 +774,17 @@ namespace Blocks.Gameplay.Core
 
         public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
         {
-            if (runner == m_GameRunner && !m_Starting) RebuildRoster();
+            if (runner != m_GameRunner || m_Starting) return;
+            RebuildRoster();
+            // Everyone re-sends their profile so the newcomer learns every name and character.
+            SessionProfiles.BroadcastLocal(runner);
         }
 
         public void OnPlayerLeft(NetworkRunner runner, PlayerRef player)
         {
-            if (runner == m_GameRunner && !m_Starting) RebuildRoster();
+            if (runner != m_GameRunner || m_Starting) return;
+            SessionProfiles.Remove(player.PlayerId);
+            RebuildRoster();
         }
 
         public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)

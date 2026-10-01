@@ -10,9 +10,8 @@ namespace Blocks.Gameplay.Core
     /// Settings / Quit Game stacked in the bottom-right corner instead of centered. Join Game loads the
     /// Join Game menu (<see cref="joinGameSceneName"/>, see JoinGameController: Public browsing or Private
     /// room codes) and Host Game loads the Host Game rules screen (<see cref="hostGameSceneName"/>, see
-    /// HostGameController); actually hosting/joining sessions isn't wired up yet (it'll be built on Photon
-    /// Fusion 2). Single Player is a placeholder for now (it just logs) - it'll also get a real
-    /// implementation as part of the move to Fusion 2, whose own single-player mode is the natural fit.
+    /// HostGameController). Single Player loads the Single Player menu (<see cref="singlePlayerSceneName"/>,
+    /// see SinglePlayerController: Change Profile, How To Play, Practice Map, Practice Challenges).
     ///
     /// Navigable with a gamepad's left stick or d-pad plus the submit button, not just the mouse - see
     /// BuildUI for what that actually takes (an EventSystem + InputSystemUIInputModule is already
@@ -43,6 +42,9 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("Scene to load when Host Game is clicked - the game-rules setup screen.")]
         [SerializeField] private string hostGameSceneName = "HostGame";
+
+        [Tooltip("Scene to load when Single Player is clicked - the Single Player menu.")]
+        [SerializeField] private string singlePlayerSceneName = "SinglePlayer";
 
         [Tooltip("Scene to load when Settings is clicked.")]
         [SerializeField] private string settingsSceneName = "Settings";
@@ -173,8 +175,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnSinglePlayerClicked()
         {
-            // Placeholder until the Fusion 2 migration - see the class summary.
-            Debug.Log("[MainMenu] Single Player selected (not implemented yet).");
+            SceneManager.LoadScene(singlePlayerSceneName);
         }
 
         private void OnSettingsClicked()

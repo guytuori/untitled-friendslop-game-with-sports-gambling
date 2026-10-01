@@ -33,6 +33,7 @@ namespace Blocks.Gameplay.Core
         {
             m_PlayerManager = playerManager;
             m_PlayerManager.PlayerState.OnNameChanged += UpdateNameDisplay;
+            SessionProfiles.Changed += RefreshNameDisplay;
         }
 
         /// <summary>
@@ -80,6 +81,11 @@ namespace Blocks.Gameplay.Core
 
         #region Unity Methods
 
+        private void OnDestroy()
+        {
+            SessionProfiles.Changed -= RefreshNameDisplay;
+        }
+
         private void LateUpdate()
         {
             UpdateNameDisplayRotation();
@@ -97,8 +103,16 @@ namespace Blocks.Gameplay.Core
         {
             if (nameDisplayText != null)
             {
-                nameDisplayText.text = newName;
+                // The shared display name - or "Player N" if this player hides other players' names.
+                nameDisplayText.text = m_PlayerManager != null && m_PlayerManager.IsSpawned
+                    ? NetworkPlayers.GetDisplayName(m_PlayerManager.OwnerClientId)
+                    : newName;
             }
+        }
+
+        private void RefreshNameDisplay()
+        {
+            UpdateNameDisplay(m_PlayerManager != null ? m_PlayerManager.PlayerName : string.Empty);
         }
 
         /// <summary>

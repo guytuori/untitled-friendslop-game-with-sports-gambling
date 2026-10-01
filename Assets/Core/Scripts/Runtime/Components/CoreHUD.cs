@@ -124,6 +124,7 @@ namespace Blocks.Gameplay.Core
             StartCoroutine(InitialHUDUpdate());
 
             NetworkPlayers.RosterChanged += HandleScoreboardRosterChanged;
+            SessionProfiles.Changed += HandleScoreboardRosterChanged; // names can arrive after the avatars
             RequestScoreboardRefresh();
 
             m_SubscribedRoundTimer = RoundTimer.Instance;
@@ -162,6 +163,7 @@ namespace Blocks.Gameplay.Core
                 ClearAllNotifications();
 
                 NetworkPlayers.RosterChanged -= HandleScoreboardRosterChanged;
+                SessionProfiles.Changed -= HandleScoreboardRosterChanged;
 
                 if (m_SubscribedRoundTimer != null)
                 {
@@ -693,7 +695,7 @@ namespace Blocks.Gameplay.Core
                 var row = new VisualElement();
                 row.AddToClassList("scoreboard-row");
 
-                var nameLabel = new Label(GetPlayerName(clientId));
+                var nameLabel = new Label(NetworkPlayers.GetPlayerLabel(clientId));
                 nameLabel.AddToClassList("scoreboard-name");
                 row.Add(nameLabel);
 

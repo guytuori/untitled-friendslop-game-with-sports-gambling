@@ -121,7 +121,7 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        private static float GetPlayerHeight()
+        public static float GetPlayerHeight()
         {
             var player = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
             var controller = player != null ? player.GetComponent<CharacterController>() : null;
@@ -138,10 +138,22 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private static bool ConfigureHumanoidModel(string modelPath, float targetHeight, StringBuilder log)
         {
+            if (TryConfigureHumanoidModel(modelPath, targetHeight, log, out string error)) return true;
+            Fail(error);
+            return false;
+        }
+
+        /// <summary>
+        /// Same as ConfigureHumanoidModel, without any dialogs - for automatic callers (CharacterCatalogBuilder).
+        /// On failure, <paramref name="error"/> says why.
+        /// </summary>
+        public static bool TryConfigureHumanoidModel(string modelPath, float targetHeight, StringBuilder log, out string error)
+        {
+            error = null;
             var importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
             if (importer == null)
             {
-                Fail($"{modelPath} isn't a model file.");
+                error = $"{modelPath} isn't a model file.";
                 return false;
             }
 
@@ -175,7 +187,7 @@ namespace Blocks.Gameplay.Core
             var missing = BlenderRigMapping.Where(m => !names.Contains(m.bone)).Select(m => m.bone).ToList();
             if (missing.Count > 0)
             {
-                Fail($"{modelPath} is missing bones the Humanoid avatar needs: {string.Join(", ", missing)}.");
+                error = $"{modelPath} is missing bones the Humanoid avatar needs: {string.Join(", ", missing)}.";
                 return false;
             }
 
@@ -200,7 +212,7 @@ namespace Blocks.Gameplay.Core
             Avatar avatar = AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<Avatar>().FirstOrDefault();
             if (avatar == null || !avatar.isValid || !avatar.isHuman)
             {
-                Fail($"Unity couldn't build a Humanoid avatar for {modelPath}. Select it and open Rig > Configure to see why.");
+                error = $"Unity couldn't build a Humanoid avatar for {modelPath}. Select it and open Rig > Configure to see why.";
                 return false;
             }
 
@@ -210,7 +222,7 @@ namespace Blocks.Gameplay.Core
             Transform rightLeg = transforms.First(t => t.name == "thigh.R");
             if (leftLeg.position.x > rightLeg.position.x)
             {
-                Fail($"{modelPath} faces backwards (-Z): its left leg is on the +X side. Turn the model 180 degrees in Blender and re-export it.");
+                error = $"{modelPath} faces backwards (-Z): its left leg is on the +X side. Turn the model 180 degrees in Blender and re-export it.";
                 return false;
             }
 

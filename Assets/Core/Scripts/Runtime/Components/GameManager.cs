@@ -217,7 +217,7 @@ namespace Blocks.Gameplay.Core
 
             if (localPlayer.PlayerState != null)
             {
-                localPlayer.PlayerState.SetPlayerName($"Player {localPlayer.OwnerClientId}");
+                localPlayer.PlayerState.SetPlayerName(PlayerProfile.DisplayName);
             }
 
             if (localPlayer.CoreMovement != null)

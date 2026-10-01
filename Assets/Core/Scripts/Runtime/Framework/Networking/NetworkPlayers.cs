@@ -64,15 +64,65 @@ namespace Blocks.Gameplay.Core
             return TryGet(clientId, out CorePlayerManager player) && player.TryGetComponent(out component);
         }
 
-        /// <summary>The player's display name, or "Player N" if they have no name (yet).</summary>
+        /// <summary>
+        /// The player's display name, or "Player N" if they have none (yet) - or if this player has turned
+        /// off Show Display Names on the Change Profile screen (your own name is always shown to you).
+        /// </summary>
         public static string GetDisplayName(ulong clientId)
         {
+            string name = GetSharedName(clientId);
+            bool isLocal = clientId != 0 && clientId == LocalClientId;
+            if (!string.IsNullOrEmpty(name) && (isLocal || PlayerProfile.ShowDisplayNames)) return name;
+            return $"Player {GetPlayerNumber(clientId)}";
+        }
+
+        /// <summary>"Player 1: Name", or just "Player 1" when there's no name to show (see <see cref="GetDisplayName"/>).</summary>
+        public static string GetPlayerLabel(ulong clientId)
+        {
+            int number = GetPlayerNumber(clientId);
+            string name = GetDisplayName(clientId);
+            string numbered = $"Player {number}";
+            return name == numbered ? numbered : $"{numbered}: {name}";
+        }
+
+        /// <summary>
+        /// 1-based position of the player in the session, in join order - the "N" in "Player N". The same
+        /// numbering is used in the lobby and in game.
+        /// </summary>
+        public static int GetPlayerNumber(ulong clientId)
+        {
+            NetworkRunner runner = Runner;
+            if (runner != null && runner.IsRunning)
+            {
+                int position = 1;
+                bool found = false;
+                foreach (PlayerRef player in runner.ActivePlayers)
+                {
+                    if (!player.IsRealPlayer) continue;
+                    if ((ulong)player.PlayerId == clientId) found = true;
+                    else if ((ulong)player.PlayerId < clientId) position++;
+                }
+                if (found) return position;
+            }
+
+            int index = s_SortedIds.IndexOf(clientId);
+            return index >= 0 ? index + 1 : (int)clientId;
+        }
+
+        /// <summary>The name the player chose (SessionProfiles), falling back to their avatar's name; "" if none.</summary>
+        private static string GetSharedName(ulong clientId)
+        {
+            if (SessionProfiles.TryGet((int)clientId, out SessionProfile profile) && !string.IsNullOrEmpty(profile.DisplayName))
+            {
+                return profile.DisplayName;
+            }
+
             if (TryGet(clientId, out CorePlayerManager player))
             {
-                string name = player.PlayerName;
-                if (!string.IsNullOrEmpty(name) && name != CorePlayerManager.UninitializedName) return name;
+                string name = NameFilter.Clean(player.PlayerName);
+                if (name.Length > 0 && name != CorePlayerManager.UninitializedName && NameFilter.IsAllowed(name)) return name;
             }
-            return $"Player {clientId}";
+            return string.Empty;
         }
 
         internal static void Register(CorePlayerManager player)
@@ -86,6 +136,9 @@ namespace Blocks.Gameplay.Core
                 s_SortedIds.Add(id);
                 s_SortedIds.Sort();
             }
+
+            // Shows the avatar as the character its player picked (Change Profile screen).
+            PlayerCharacterModel.Attach(player);
 
             if (player.IsOwner)
             {

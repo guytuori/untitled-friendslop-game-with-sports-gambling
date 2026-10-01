@@ -89,6 +89,23 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
+        /// Called by PlayerCharacterModel after it swaps the character model: hide all of the new model's
+        /// renderers on elimination, and keep per-player colours only for a single-mesh model (the material
+        /// sets are made for the placeholder's one mesh).
+        /// </summary>
+        public void SetModelRenderers(IReadOnlyList<Renderer> renderers)
+        {
+            hideWhenEliminated = new List<Component>(renderers);
+            targetRenderer = renderers.Count == 1 ? renderers[0] : null;
+
+            if (m_PlayerManager != null)
+            {
+                ApplyMaterialSet();
+                if (m_PlayerManager.PlayerState != null) SetEliminationComponentsEnabled(m_PlayerManager.PlayerState.IsActive);
+            }
+        }
+
+        /// <summary>
         /// Called when the player spawns. Applies the appropriate material set based on the player's ClientID.
         /// </summary>
         public void OnPlayerSpawn()

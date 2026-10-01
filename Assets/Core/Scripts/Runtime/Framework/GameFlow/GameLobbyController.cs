@@ -107,6 +107,7 @@ namespace Blocks.Gameplay.Core
 
             m_Service.RosterChanged += Refresh;
             m_Service.GameEnded += OnGameEnded;
+            SessionProfiles.Changed += Refresh; // names arrive a moment after each player joins
 
             if (!m_Service.InGame)
             {
@@ -126,6 +127,7 @@ namespace Blocks.Gameplay.Core
             if (m_Service == null) return;
             m_Service.RosterChanged -= Refresh;
             m_Service.GameEnded -= OnGameEnded;
+            SessionProfiles.Changed -= Refresh;
         }
 
         private static Label MakeLabel(string text, int size, Color color)
@@ -151,7 +153,7 @@ namespace Blocks.Gameplay.Core
             for (int i = 0; i < m_Service.Players.Count; i++)
             {
                 LobbyPlayer player = m_Service.Players[i];
-                list.Append("Player ").Append(i + 1);
+                list.Append(NetworkPlayers.GetPlayerLabel((ulong)player.PlayerId));
                 if (player.IsHost) list.Append(" (Host)");
                 if (player.IsLocal) list.Append(" (You)");
                 if (i < m_Service.Players.Count - 1) list.Append('\n');
