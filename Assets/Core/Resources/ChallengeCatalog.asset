@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82fd425a484d08341a01d9e4fc13dce4, type: 3}
+  m_Name: ChallengeCatalog
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.ChallengeCatalog
+  challenges:
+  - id: Challenge_16_01
+    size: 16
+    prefab: {fileID: 3920331689230364790, guid: 3f8fd3a55b7e592409c3abd2cffe9c06, type: 3}
+  - id: Challenge_16_02
+    size: 16
+    prefab: {fileID: 8151796203055984999, guid: 409fe2f8b878a4740a097b46b98904f8, type: 3}
+  - id: Challenge_16_03
+    size: 16
+    prefab: {fileID: 6618682373943619217, guid: 7f735c63e78d8374ea0c13777710dd56, type: 3}
+  - id: Challenge_16_04
+    size: 16
+    prefab: {fileID: 366596684933600935, guid: 0357600ca5f2e2d428e52d79fec5383a, type: 3}
+  - id: Challenge_32_01
+    size: 32
+    prefab: {fileID: 4009937417778457704, guid: 1706642b7dbf80a47913948eea8c7b85, type: 3}
+  - id: Challenge_32_02
+    size: 32
+    prefab: {fileID: 4135444930588747432, guid: d537c519c67dff645bc1163237d8208d, type: 3}
+  - id: Challenge_32_03
+    size: 32
+    prefab: {fileID: 3042451012078109551, guid: eac9749e147d2964394895a5d28882d5, type: 3}
+  - id: Challenge_32_04
+    size: 32
+    prefab: {fileID: 3940840670075306491, guid: fc51ea915fc15db469d9b29ce063d9f1, type: 3}

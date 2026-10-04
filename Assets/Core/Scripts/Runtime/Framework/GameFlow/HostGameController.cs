@@ -65,6 +65,10 @@ namespace Blocks.Gameplay.Core
             public string displayName;
             public Texture2D thumbnail;
             [TextArea] public string flavorText;
+
+            [Tooltip("HostGame mode only: the map prefab this entry plays - its file name in Assets/Core/Prefabs/Maps (e.g. LastStop). " +
+                     "Leave empty on Random: hosting it picks one of the other entries' maps.")]
+            public string mapPrefab;
         }
 
         [Tooltip("HostGame: rules for hosting. FindGamesFilter: the Join Game > Public > Custom search filter.")]
@@ -757,6 +761,26 @@ namespace Blocks.Gameplay.Core
             }
         }
 
+        /// <summary>
+        /// The map prefab the given grid entry plays: its own <see cref="MapEntry.mapPrefab"/>, or - for Random,
+        /// or any entry without one - a random pick among the entries that have one. Empty if none do.
+        /// </summary>
+        private string ResolveMapPrefab(int index)
+        {
+            if (MapCount == 0) return "";
+            if (index >= 0 && index < MapCount && !string.IsNullOrWhiteSpace(maps[index].mapPrefab))
+            {
+                return maps[index].mapPrefab.Trim();
+            }
+
+            var choices = new List<string>();
+            foreach (MapEntry entry in maps)
+            {
+                if (!string.IsNullOrWhiteSpace(entry.mapPrefab)) choices.Add(entry.mapPrefab.Trim());
+            }
+            return choices.Count > 0 ? choices[UnityEngine.Random.Range(0, choices.Count)] : "";
+        }
+
         private int FindMapIndex(string mapName)
         {
             for (int i = 0; i < MapCount; i++)
@@ -1078,7 +1102,11 @@ namespace Blocks.Gameplay.Core
             m_Busy = true;
             m_StatusLabel.text = "Creating game...";
 
-            string error = await FusionSessionService.Instance.HostGameAsync(m_Rules.Clone());
+            HostGameRulesData rules = m_Rules.Clone();
+            rules.MapPrefab = ResolveMapPrefab(m_SelectedMapIndex);
+            Debug.Log($"[HostGame] Map '{rules.MapName}' plays map prefab '{rules.MapPrefab}'.");
+
+            string error = await FusionSessionService.Instance.HostGameAsync(rules);
             if (this == null) return; // screen closed meanwhile
 
             if (error == null)

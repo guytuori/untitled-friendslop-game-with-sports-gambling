@@ -30,6 +30,13 @@ namespace Blocks.Gameplay.Core
         public bool ItemsEnabled = true;
         public bool PickupsEnabled = true;
 
+        /// <summary>
+        /// The map prefab this game actually plays (its file name in Assets/Core/Prefabs/Maps, e.g. "LastStop"),
+        /// worked out from the selected map when the game is hosted - see HostGameController.MapEntry.mapPrefab.
+        /// Not part of any preset or search filter; those go by <see cref="MapName"/>, the name shown in menus.
+        /// </summary>
+        public string MapPrefab = "";
+
         public HostGameRulesData Clone() => (HostGameRulesData)MemberwiseClone();
 
         /// <summary>Copies every field from <paramref name="other"/>, including IsPublic.</summary>

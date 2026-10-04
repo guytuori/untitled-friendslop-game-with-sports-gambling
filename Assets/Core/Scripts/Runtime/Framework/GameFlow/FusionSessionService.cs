@@ -71,14 +71,17 @@ namespace Blocks.Gameplay.Core
 
         public const int RoomCodeLength = 5;
 
-        /// <summary>Start Match needs at least this many players in the session, host included.</summary>
-        public const int MinPlayersToStart = 2;
+        /// <summary>
+        /// Start Match needs at least this many players in the session, host included: 2 in release builds,
+        /// but 1 in the Editor and development builds so a match can be tested solo.
+        /// </summary>
+        public static int MinPlayersToStart => Application.isEditor || Debug.isDebugBuild ? 1 : 2;
 
         /// <summary>
-        /// The gameplay scene Start Match loads for everyone (must be in the build settings). Thrash is
-        /// currently the only gameplay scene there.
+        /// The gameplay scene Start Match loads for everyone (must be in the build settings): the shared
+        /// gameplay systems scene, whose MatchLayout then builds the chosen map and its challenges.
         /// </summary>
-        public const string GameplaySceneName = "Thrash";
+        public const string GameplaySceneName = "Assets/Core/Scenes/[BB] Core.unity";
 
         private const string RoomCodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 31 chars, no 0/O/1/I/L
         private const int MaxHostAttempts = 5;
@@ -88,6 +91,7 @@ namespace Blocks.Gameplay.Core
         private static class PropertyKeys
         {
             public const string Map = "map";
+            public const string MapPrefab = "mp"; // the map prefab actually played - see HostGameRulesData.MapPrefab
             public const string RoundTime = "rt";
             public const string BonusTime = "bt";
             public const string Lives = "lv";
@@ -660,6 +664,7 @@ namespace Blocks.Gameplay.Core
             return new Dictionary<string, SessionProperty>
             {
                 [PropertyKeys.Map] = rules.MapName ?? "",
+                [PropertyKeys.MapPrefab] = rules.MapPrefab ?? "",
                 [PropertyKeys.RoundTime] = rules.RoundTimeSeconds,
                 [PropertyKeys.BonusTime] = rules.BonusTimeSeconds,
                 [PropertyKeys.Lives] = rules.Lives,
@@ -704,6 +709,7 @@ namespace Blocks.Gameplay.Core
             if (props == null) return rules;
 
             if (props.TryGetValue(PropertyKeys.Map, out SessionProperty p) && p.IsString) rules.MapName = (string)p;
+            if (props.TryGetValue(PropertyKeys.MapPrefab, out p) && p.IsString) rules.MapPrefab = (string)p;
             if (props.TryGetValue(PropertyKeys.RoundTime, out p) && p.IsInt) rules.RoundTimeSeconds = (int)p;
             if (props.TryGetValue(PropertyKeys.BonusTime, out p) && p.IsInt) rules.BonusTimeSeconds = (int)p;
             if (props.TryGetValue(PropertyKeys.Lives, out p) && p.IsInt) rules.Lives = (int)p;

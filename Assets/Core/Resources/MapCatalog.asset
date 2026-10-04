@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5f7e1f43efeac94da9ba78c3e72d042, type: 3}
+  m_Name: MapCatalog
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.MapCatalog
+  maps:
+  - id: DinosaurZoo
+    prefab: {fileID: 5870600805053538376, guid: 1a5166b95eea03f45b040907cdf1ac9a, type: 3}
+    sockets16: 0
+    sockets32: 0
+  - id: LastStop
+    prefab: {fileID: 3715106239626743101, guid: 7e158edeb48278e4e972b9310b370505, type: 3}
+    sockets16: 17
+    sockets32: 7

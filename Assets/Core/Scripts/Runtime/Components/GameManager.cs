@@ -162,6 +162,13 @@ namespace Blocks.Gameplay.Core
                 yield return null;
             }
 
+            // If this scene builds its map at runtime (MatchLayout), wait for the map and its spawn points.
+            while (MatchLayout.Current != null && !MatchLayout.Current.IsBuilt)
+            {
+                if (this == null || service.GameRunner == null) yield break;
+                yield return null;
+            }
+
             if (m_HasSpawnedLocalPlayer || playerPrefab == null) yield break;
             m_HasSpawnedLocalPlayer = true;
 

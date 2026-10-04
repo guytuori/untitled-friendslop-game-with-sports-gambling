@@ -36,6 +36,11 @@ namespace Blocks.Gameplay.Core
             }
 
             s_Instance = this;
+
+            // Lives on a child of the [BB] GameManager prefab: detach before DontDestroyOnLoad so only the
+            // director (and its sound pool) outlives the scene - GameManager has to stay in the gameplay
+            // scene (one per match, and its scene is the one a dev session networks).
+            if (transform.parent != null) transform.SetParent(null, true);
             DontDestroyOnLoad(gameObject);
 
             m_SoundSystem = new SoundSystem();

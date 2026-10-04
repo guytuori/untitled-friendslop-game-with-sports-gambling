@@ -363,6 +363,15 @@ namespace Blocks.Gameplay.Core
         /// This zone's index in the scene's ChallengeZones, sorted by hierarchy path so every client
         /// computes the same index for the same zone (the scene is identical on every client).
         /// </summary>
+        /// <summary>
+        /// Forgets the cached zone list so it's rebuilt on next use. MatchLayout calls this on every client
+        /// once it has placed the match's challenges (their zones don't exist when the scene first loads).
+        /// </summary>
+        public void RefreshZones()
+        {
+            m_Zones = null;
+        }
+
         public int GetZoneIndex(ChallengeZone zone)
         {
             EnsureZones();
