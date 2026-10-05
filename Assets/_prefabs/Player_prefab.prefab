@@ -300,13 +300,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   directionMode: 2
-  moveSpeed: 3
-  sprintSpeed: 9
+  moveSpeed: 9
+  sprintSpeed: 3
   rotationSmoothTime: 0.1
-  speedChangeRate: 15
-  forceDecayRate: 5
-  gravity: -18
-  jumpHeight: 3
+  speedChangeRate: 25
+  forceDecayRate: 1
+  gravity: -30
+  jumpHeight: 5
   groundedOffset: -0.14
   groundedRadius: 0.28
   groundLayers:
@@ -415,8 +415,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 08b1147bca1a54974a6f52d1a504f530, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  airControl: 0.2
-  airRotationSpeed: 2
+  airControl: 1
+  airRotationSpeed: 999
   conserveMomentum: 1
   minIceTurnGrip: 0.1
 --- !u!114 &1665020148906035432
