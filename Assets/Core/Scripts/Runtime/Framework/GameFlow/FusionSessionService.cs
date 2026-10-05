@@ -87,19 +87,16 @@ namespace Blocks.Gameplay.Core
         private const int MaxHostAttempts = 5;
         private const int DevSessionMaxPlayers = 8;
 
-        /// <summary>Session property keys (kept short - they're sent to every player browsing the lobby).</summary>
+        /// <summary>
+        /// Session property keys (kept short - they're sent to every player browsing the lobby). Photon allows at
+        /// most 10 custom session properties, so the numeric/on-off rules share one packed property
+        /// (<see cref="Rules"/> - see PackRules/UnpackRules) instead of one each.
+        /// </summary>
         private static class PropertyKeys
         {
             public const string Map = "map";
             public const string MapPrefab = "mp"; // the map prefab actually played - see HostGameRulesData.MapPrefab
-            public const string RoundTime = "rt";
-            public const string BonusTime = "bt";
-            public const string Lives = "lv";
-            public const string StartingPoints = "sp";
-            public const string DeathPenalty = "dp";
-            public const string WagerPayoutTenths = "wp"; // session properties can't be floats - 2.5 is stored as 25
-            public const string Items = "it";
-            public const string Pickups = "pu";
+            public const string Rules = "r";      // "roundTime,bonusTime,lives,startingPoints,deathPenalty,payoutTenths,items,pickups"
             public const string CreatedUnixSeconds = "ct"; // when the host created it - for oldest-first ordering
             public const string HostNonce = "hn";         // random number from the creating host - see the class summary
         }
@@ -665,15 +662,8 @@ namespace Blocks.Gameplay.Core
             {
                 [PropertyKeys.Map] = rules.MapName ?? "",
                 [PropertyKeys.MapPrefab] = rules.MapPrefab ?? "",
-                [PropertyKeys.RoundTime] = rules.RoundTimeSeconds,
-                [PropertyKeys.BonusTime] = rules.BonusTimeSeconds,
-                [PropertyKeys.Lives] = rules.Lives,
-                [PropertyKeys.StartingPoints] = rules.StartingPoints,
-                [PropertyKeys.DeathPenalty] = rules.DeathPenalty,
-                [PropertyKeys.WagerPayoutTenths] = Mathf.RoundToInt(rules.WagerPayout * 10f),
+                [PropertyKeys.Rules] = PackRules(rules),
                 [PropertyKeys.CreatedUnixSeconds] = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                [PropertyKeys.Items] = rules.ItemsEnabled,
-                [PropertyKeys.Pickups] = rules.PickupsEnabled,
                 [PropertyKeys.HostNonce] = nonce,
             };
         }
@@ -710,15 +700,40 @@ namespace Blocks.Gameplay.Core
 
             if (props.TryGetValue(PropertyKeys.Map, out SessionProperty p) && p.IsString) rules.MapName = (string)p;
             if (props.TryGetValue(PropertyKeys.MapPrefab, out p) && p.IsString) rules.MapPrefab = (string)p;
-            if (props.TryGetValue(PropertyKeys.RoundTime, out p) && p.IsInt) rules.RoundTimeSeconds = (int)p;
-            if (props.TryGetValue(PropertyKeys.BonusTime, out p) && p.IsInt) rules.BonusTimeSeconds = (int)p;
-            if (props.TryGetValue(PropertyKeys.Lives, out p) && p.IsInt) rules.Lives = (int)p;
-            if (props.TryGetValue(PropertyKeys.StartingPoints, out p) && p.IsInt) rules.StartingPoints = (int)p;
-            if (props.TryGetValue(PropertyKeys.DeathPenalty, out p) && p.IsInt) rules.DeathPenalty = (int)p;
-            if (props.TryGetValue(PropertyKeys.WagerPayoutTenths, out p) && p.IsInt) rules.WagerPayout = (int)p / 10f;
-            if (props.TryGetValue(PropertyKeys.Items, out p) && p.Isbool) rules.ItemsEnabled = (bool)p;
-            if (props.TryGetValue(PropertyKeys.Pickups, out p) && p.Isbool) rules.PickupsEnabled = (bool)p;
+            if (props.TryGetValue(PropertyKeys.Rules, out p) && p.IsString) UnpackRules((string)p, rules);
             return rules;
+        }
+
+        /// <summary>The numeric/on-off rules as one comma-separated string (session properties are limited to 10).</summary>
+        private static string PackRules(HostGameRulesData rules)
+        {
+            return string.Join(",",
+                rules.RoundTimeSeconds,
+                rules.BonusTimeSeconds,
+                rules.Lives,
+                rules.StartingPoints,
+                rules.DeathPenalty,
+                Mathf.RoundToInt(rules.WagerPayout * 10f), // floats are stored as tenths: 2.5 -> 25
+                rules.ItemsEnabled ? 1 : 0,
+                rules.PickupsEnabled ? 1 : 0);
+        }
+
+        /// <summary>Reads PackRules' string back. Missing or unreadable values keep their current (default) value.</summary>
+        private static void UnpackRules(string packed, HostGameRulesData rules)
+        {
+            string[] parts = packed.Split(',');
+            int Get(int index, int fallback) =>
+                index < parts.Length && int.TryParse(parts[index], System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out int value) ? value : fallback;
+
+            rules.RoundTimeSeconds = Get(0, rules.RoundTimeSeconds);
+            rules.BonusTimeSeconds = Get(1, rules.BonusTimeSeconds);
+            rules.Lives = Get(2, rules.Lives);
+            rules.StartingPoints = Get(3, rules.StartingPoints);
+            rules.DeathPenalty = Get(4, rules.DeathPenalty);
+            rules.WagerPayout = Get(5, Mathf.RoundToInt(rules.WagerPayout * 10f)) / 10f;
+            rules.ItemsEnabled = Get(6, rules.ItemsEnabled ? 1 : 0) != 0;
+            rules.PickupsEnabled = Get(7, rules.PickupsEnabled ? 1 : 0) != 0;
         }
 
         // =====================================================================================
