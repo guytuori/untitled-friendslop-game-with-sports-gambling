@@ -12,8 +12,8 @@ namespace Blocks.Gameplay.Core
     ///     list (NameFilter) when saving.
     ///   - SHOW DISPLAY NAMES: checkbox, on by default. Off shows other players only as "Player 1",
     ///     "Player 2", ... on this machine.
-    ///   - CHARACTER: a scrolling box of T-pose thumbnails, 3 per row and 2.5 rows tall, one per model in the
-    ///     characters folder (see CharacterCatalog / CharacterCatalogBuilder - nothing is hard-coded). The
+    ///   - CHARACTER: a scrolling box of T-pose thumbnails, 3 per row and 2.5 rows tall, one per character in
+    ///     the hand-edited CharacterCatalog list (Resources/CharacterCatalog), in its order. The
     ///     selected (or hovered) character's name is shown to the right, with a double-size picture under
     ///     it. That's the model this player uses in games.
     /// Nothing is saved until Save Changes; Back (below it in the bottom-right column, like the other
@@ -93,7 +93,7 @@ namespace Blocks.Gameplay.Core
             GamepadUIBindingFix.Apply();
 
             m_Catalog = CharacterCatalog.Load();
-            if (m_Catalog != null) m_Characters = m_Catalog.Characters;
+            if (m_Catalog != null) m_Characters = m_Catalog.GetSelectable();
 
             VisualElement root = GetComponent<UIDocument>().rootVisualElement;
             BuildUI(root);
@@ -360,7 +360,7 @@ namespace Blocks.Gameplay.Core
             m_CharacterPreview.style.backgroundColor = new Color(0.2f, 0.2f, 0.2f);
             info.Add(m_CharacterPreview);
 
-            int saved = m_Catalog != null ? m_Catalog.IndexOf(PlayerProfile.CharacterId) : -1;
+            int saved = IndexOfCharacter(PlayerProfile.CharacterId);
             SetSelected(saved >= 0 ? saved : 0);
 
             SetGridHighlight(false);
@@ -454,7 +454,7 @@ namespace Blocks.Gameplay.Core
             if (CharacterCount == 0) return;
             int index = m_HoveredIndex >= 0 ? m_HoveredIndex : m_SelectedIndex;
             CharacterCatalog.Entry entry = m_Characters[index];
-            m_CharacterNameLabel.text = string.IsNullOrEmpty(entry.displayName) ? entry.id : entry.displayName;
+            m_CharacterNameLabel.text = entry.DisplayNameOrId;
             m_CharacterPreview.image = entry.thumbnail;
         }
 
@@ -624,6 +624,15 @@ namespace Blocks.Gameplay.Core
             m_NameField.SetValueWithoutNotify(name);
             MenuUI.PlaySound(selectSound);
             ShowStatus("Changes saved.", error: false);
+        }
+
+        private int IndexOfCharacter(string id)
+        {
+            for (int i = 0; i < m_Characters.Count; i++)
+            {
+                if (m_Characters[i].id == id) return i;
+            }
+            return -1;
         }
 
         private void OnBack() => SceneManager.LoadScene(backSceneName);

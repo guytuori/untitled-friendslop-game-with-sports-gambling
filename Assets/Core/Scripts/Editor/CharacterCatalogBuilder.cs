@@ -10,103 +10,188 @@ using Object = UnityEngine.Object;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// Keeps the CharacterCatalog (Resources/CharacterCatalog.asset - the list the Change Profile screen's
-    /// character selector shows) in step with the models in <see cref="CharactersFolder"/>, so adding a
-    /// character is just dropping its model in that folder:
-    ///   - every model (FBX or prefab) in the folder becomes an entry, sorted by name, with its file name as
-    ///     both id and display name;
-    ///   - an FBX that isn't set up as a Humanoid yet is set up the same way Friendslop > Player Model does
-    ///     it (bone map for the BlenderProjects rigs, scaled to the player's height) - models that can't be
-    ///     made Humanoid are skipped with a warning, since the shared animations need it;
-    ///   - each gets a front-view thumbnail of its T-pose, rendered into <see cref="ThumbnailFolder"/> (only
-    ///     re-rendered when the model changes).
-    /// Runs automatically whenever something in the folder is imported, moved or deleted, and once when the
-    /// editor loads if the catalog doesn't exist yet. Friendslop > Characters > Rebuild Character List
-    /// forces a full rebuild (including thumbnails).
+    /// Looks after the hand-edited CharacterCatalog (Resources/CharacterCatalog.asset - the list the Change
+    /// Profile screen's character selector shows). It never adds, removes or reorders characters - the list
+    /// is whatever's typed into it - it only fills in what each entry left blank:
+    ///   - id: the model's file name;
+    ///   - display name: the id with spaces ("FastFoodGuy" -> "Fast Food Guy");
+    ///   - thumbnail: a front-view render of the model's T-pose, saved in <see cref="ThumbnailFolder"/> as
+    ///     "{id}.png". Thumbnails it rendered itself are re-rendered when the model (or its import settings)
+    ///     changes; a picture assigned by hand from anywhere else is left alone.
+    /// It also sets an FBX up as a Humanoid if it isn't one yet, the same way Friendslop > Player Model does
+    /// (bone map for the BlenderProjects rigs, auto-mapping for others), since the shared animations need it.
+    /// Problems (no model, duplicate ids, not Humanoid) are logged as warnings; those entries just aren't
+    /// offered in game.
+    ///
+    /// Runs automatically when the list is saved or one of its models is reimported. Menus (Friendslop >
+    /// Characters): Edit Character List (selects it), Refresh Character List, Re-render Character Thumbnails.
+    /// The list's Inspector has the same buttons.
     /// </summary>
     [InitializeOnLoad]
     public static class CharacterCatalogBuilder
     {
-        public const string CharactersFolder = "Assets/Core/Art/Models/Characters";
-        public const string ThumbnailFolder = CharactersFolder + "/Thumbnails";
-        private const string ResourcesFolder = "Assets/Core/Resources";
-        private const string CatalogPath = ResourcesFolder + "/" + CharacterCatalog.ResourcePath + ".asset";
+        public const string ThumbnailFolder = "Assets/Core/Art/Models/Characters/Thumbnails";
+        public const string ResourcesFolder = "Assets/Core/Resources";
+        public const string CatalogPath = ResourcesFolder + "/" + CharacterCatalog.ResourcePath + ".asset";
         // Rendered big enough for the Change Profile screen's double-size preview (192 px) to stay sharp at
         // 2x UI scale; the 96 px list cells use the mipmaps.
         private const int ThumbnailSize = 384;
 
         private static bool s_Building;
         private static bool s_Scheduled;
+        private static HashSet<string> s_ModelPaths;
 
         static CharacterCatalogBuilder()
         {
             EditorApplication.delayCall += () =>
             {
-                if (AssetDatabase.LoadAssetAtPath<CharacterCatalog>(CatalogPath) == null) Rebuild(forceThumbnails: false);
+                if (AssetDatabase.LoadAssetAtPath<CharacterCatalog>(CatalogPath) == null)
+                {
+                    Debug.LogWarning($"[Characters] There's no character list at {CatalogPath} - use Friendslop > Characters > Edit Character List to make one.");
+                }
             };
         }
 
-        [MenuItem("Friendslop/Characters/Rebuild Character List")]
-        public static void RebuildFromMenu()
+        // =====================================================================================
+        // Menus
+        // =====================================================================================
+
+        [MenuItem("Friendslop/Characters/Edit Character List")]
+        public static void SelectCatalog()
         {
-            string summary = Rebuild(forceThumbnails: true);
-            EditorUtility.DisplayDialog("Characters", summary, "OK");
+            CharacterCatalog catalog = LoadOrCreateCatalog();
+            Selection.activeObject = catalog;
+            EditorGUIUtility.PingObject(catalog);
         }
 
-        /// <summary>Called by <see cref="CharacterFolderWatcher"/> when anything in the folder changes.</summary>
-        internal static void ScheduleRebuild()
+        [MenuItem("Friendslop/Characters/Refresh Character List")]
+        public static void RefreshFromMenu()
+        {
+            EditorUtility.DisplayDialog("Characters", Refresh(forceThumbnails: false), "OK");
+        }
+
+        [MenuItem("Friendslop/Characters/Re-render Character Thumbnails")]
+        public static void RerenderFromMenu()
+        {
+            EditorUtility.DisplayDialog("Characters", Refresh(forceThumbnails: true), "OK");
+        }
+
+        // =====================================================================================
+        // Automatic refresh
+        // =====================================================================================
+
+        /// <summary>The list itself, or a model it uses.</summary>
+        internal static bool IsWatchedPath(string path)
+        {
+            if (path == CatalogPath) return true;
+            if (s_ModelPaths == null) CacheModelPaths(AssetDatabase.LoadAssetAtPath<CharacterCatalog>(CatalogPath));
+            return s_ModelPaths.Contains(path);
+        }
+
+        internal static void ScheduleRefresh()
         {
             if (s_Building || s_Scheduled) return;
             s_Scheduled = true;
             EditorApplication.delayCall += () =>
             {
                 s_Scheduled = false;
-                Rebuild(forceThumbnails: false);
+                Refresh(forceThumbnails: false);
             };
         }
 
-        internal static bool IsInCharactersFolder(string path) =>
-            path.StartsWith(CharactersFolder + "/", StringComparison.Ordinal) &&
-            !path.StartsWith(ThumbnailFolder + "/", StringComparison.Ordinal);
-
-        /// <summary>Rebuilds the catalog. Returns a one-paragraph summary (also logged).</summary>
-        public static string Rebuild(bool forceThumbnails)
+        private static void CacheModelPaths(CharacterCatalog catalog)
         {
-            if (s_Building) return "Already rebuilding.";
-            if (EditorApplication.isPlayingOrWillChangePlaymode) return "Not rebuilt in play mode.";
+            s_ModelPaths = new HashSet<string>(StringComparer.Ordinal);
+            if (catalog == null) return;
+            foreach (CharacterCatalog.Entry entry in catalog.Characters)
+            {
+                if (entry?.model != null) s_ModelPaths.Add(AssetDatabase.GetAssetPath(entry.model));
+            }
+        }
+
+        // =====================================================================================
+        // Refresh
+        // =====================================================================================
+
+        /// <summary>Fills in blank ids, names and thumbnails and checks every entry. Returns a summary (also logged).</summary>
+        public static string Refresh(bool forceThumbnails)
+        {
+            if (s_Building) return "Already refreshing.";
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return "Not refreshed in play mode.";
 
             s_Building = true;
-            var log = new StringBuilder();
+            var problems = new StringBuilder();
             try
             {
-                if (!AssetDatabase.IsValidFolder(CharactersFolder))
+                CharacterCatalog catalog = LoadOrCreateCatalog();
+                List<CharacterCatalog.Entry> entries = catalog.EditableCharacters;
+                bool changed = false;
+                var ids = new HashSet<string>(StringComparer.Ordinal);
+                int usable = 0;
+
+                for (int i = 0; i < entries.Count; i++)
                 {
-                    return Log($"No {CharactersFolder} folder - the character list is empty.");
+                    CharacterCatalog.Entry entry = entries[i];
+                    if (entry == null) continue;
+
+                    string label = $"Entry {i}" + (string.IsNullOrWhiteSpace(entry.id) ? "" : $" ({entry.id})");
+                    if (entry.model == null)
+                    {
+                        problems.AppendLine($"{label} has no model - it won't be offered.");
+                        continue;
+                    }
+
+                    string modelPath = AssetDatabase.GetAssetPath(entry.model);
+
+                    if (string.IsNullOrWhiteSpace(entry.id))
+                    {
+                        entry.id = Path.GetFileNameWithoutExtension(modelPath);
+                        changed = true;
+                    }
+                    if (string.IsNullOrWhiteSpace(entry.displayName))
+                    {
+                        entry.displayName = ObjectNames.NicifyVariableName(entry.id);
+                        changed = true;
+                    }
+                    if (!ids.Add(entry.id))
+                    {
+                        problems.AppendLine($"Entry {i}: id '{entry.id}' is already used by an earlier entry - only the first one is offered.");
+                        continue;
+                    }
+
+                    if (!EnsureHumanoid(modelPath, out string humanoidError))
+                    {
+                        problems.AppendLine($"{entry.id}: {humanoidError}");
+                    }
+
+                    if (NeedsThumbnail(entry, modelPath, forceThumbnails))
+                    {
+                        Texture2D thumbnail = RenderThumbnailAsset(entry.id, entry.model);
+                        if (thumbnail != null && thumbnail != entry.thumbnail)
+                        {
+                            entry.thumbnail = thumbnail;
+                            changed = true;
+                        }
+                    }
+
+                    usable++;
                 }
 
-                EnsureFolder(ResourcesFolder);
-                EnsureFolder(ThumbnailFolder);
-
-                var entries = new List<CharacterCatalog.Entry>();
-                foreach (string path in FindModelPaths())
+                if (changed)
                 {
-                    CharacterCatalog.Entry entry = BuildEntry(path, forceThumbnails, log);
-                    if (entry != null) entries.Add(entry);
+                    EditorUtility.SetDirty(catalog);
+                    AssetDatabase.SaveAssetIfDirty(catalog);
                 }
+                CacheModelPaths(catalog);
 
-                CharacterCatalog catalog = AssetDatabase.LoadAssetAtPath<CharacterCatalog>(CatalogPath);
-                if (catalog == null)
+                string summary = $"Character list: {usable} character(s) ready ({string.Join(", ", catalog.GetSelectable().Select(e => e.id))}).";
+                if (problems.Length > 0)
                 {
-                    catalog = ScriptableObject.CreateInstance<CharacterCatalog>();
-                    AssetDatabase.CreateAsset(catalog, CatalogPath);
+                    Debug.LogWarning("[Characters] " + problems.ToString().TrimEnd(), catalog);
+                    summary += "\n\n" + problems.ToString().TrimEnd();
                 }
-
-                catalog.SetCharacters(entries);
-                EditorUtility.SetDirty(catalog);
-                AssetDatabase.SaveAssets();
-
-                string names = entries.Count > 0 ? string.Join(", ", entries.Select(e => e.id)) : "none";
-                return Log($"Character list rebuilt: {entries.Count} character(s) ({names}).\n{log}".TrimEnd());
+                Debug.Log("[Characters] " + summary.Split('\n')[0], catalog);
+                return summary;
             }
             finally
             {
@@ -114,52 +199,33 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        private static string Log(string message)
+        private static CharacterCatalog LoadOrCreateCatalog()
         {
-            Debug.Log($"[Characters] {message}");
-            return message;
+            var catalog = AssetDatabase.LoadAssetAtPath<CharacterCatalog>(CatalogPath);
+            if (catalog != null) return catalog;
+
+            EnsureFolder(ResourcesFolder);
+            catalog = ScriptableObject.CreateInstance<CharacterCatalog>();
+            AssetDatabase.CreateAsset(catalog, CatalogPath);
+            AssetDatabase.SaveAssets();
+            return catalog;
         }
 
-        private static IEnumerable<string> FindModelPaths()
+        /// <summary>Makes an FBX a Humanoid if it isn't one. False (with a reason) if it still isn't.</summary>
+        private static bool EnsureHumanoid(string modelPath, out string error)
         {
-            return AssetDatabase.FindAssets("t:GameObject", new[] { CharactersFolder })
-                .Select(AssetDatabase.GUIDToAssetPath)
-                .Where(IsInCharactersFolder)
-                .Distinct()
-                .OrderBy(path => Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase);
-        }
+            error = null;
+            if (HasHumanoidAvatar(modelPath)) return true;
 
-        private static CharacterCatalog.Entry BuildEntry(string path, bool forceThumbnail, StringBuilder log)
-        {
-            string id = Path.GetFileNameWithoutExtension(path);
-
-            // FBX straight from Blender: make it a Humanoid the same way the Player Model tool does.
-            if (AssetImporter.GetAtPath(path) is ModelImporter importer && !HasHumanoidAvatar(path))
+            if (AssetImporter.GetAtPath(modelPath) is ModelImporter)
             {
-                if (!PlayerModelSwapTool.TryConfigureHumanoidModel(path, PlayerModelSwapTool.GetPlayerHeight(), log, out string error))
-                {
-                    Debug.LogWarning($"[Characters] Skipped {path}: {error}");
-                    log.AppendLine($"Skipped {id}: {error}");
-                    return null;
-                }
+                var log = new StringBuilder();
+                if (!PlayerModelSwapTool.TryConfigureHumanoidModel(modelPath, PlayerModelSwapTool.GetPlayerHeight(), log, out error)) return false;
+                if (HasHumanoidAvatar(modelPath)) return true;
             }
 
-            if (!HasHumanoidAvatar(path))
-            {
-                string reason = $"Skipped {id}: it has no valid Humanoid avatar (the player animations need one).";
-                Debug.LogWarning($"[Characters] {reason} ({path})");
-                log.AppendLine(reason);
-                return null;
-            }
-
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            return new CharacterCatalog.Entry
-            {
-                id = id,
-                displayName = id,
-                model = model,
-                thumbnail = GetOrRenderThumbnail(path, model, forceThumbnail)
-            };
+            error = $"{modelPath} has no valid Humanoid avatar (the player animations need one), so swapping to it won't work.";
+            return false;
         }
 
         private static bool HasHumanoidAvatar(string path)
@@ -178,19 +244,33 @@ namespace Blocks.Gameplay.Core
         // Thumbnails
         // =====================================================================================
 
-        private static Texture2D GetOrRenderThumbnail(string modelPath, GameObject model, bool force)
-        {
-            string thumbnailPath = $"{ThumbnailFolder}/{Path.GetFileNameWithoutExtension(modelPath)}.png";
+        private static string ThumbnailPathFor(string id) => $"{ThumbnailFolder}/{id}.png";
 
-            var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(thumbnailPath);
-            bool upToDate = File.Exists(thumbnailPath) &&
-                            existing != null && existing.width >= ThumbnailSize && // older thumbnails were smaller
-                            File.GetLastWriteTimeUtc(thumbnailPath) >= File.GetLastWriteTimeUtc(modelPath) &&
-                            File.GetLastWriteTimeUtc(thumbnailPath) >= File.GetLastWriteTimeUtc(modelPath + ".meta");
-            if (!force && upToDate)
-            {
-                return existing;
-            }
+        /// <summary>
+        /// Blank, or one of ours that's out of date (wrong name, too small, older than the model or its import
+        /// settings). Hand-picked pictures from outside <see cref="ThumbnailFolder"/> are never replaced.
+        /// </summary>
+        private static bool NeedsThumbnail(CharacterCatalog.Entry entry, string modelPath, bool force)
+        {
+            if (entry.thumbnail == null) return true;
+
+            string current = AssetDatabase.GetAssetPath(entry.thumbnail);
+            if (!current.StartsWith(ThumbnailFolder + "/", StringComparison.Ordinal)) return false; // chosen by hand
+            if (force) return true;
+
+            string expected = ThumbnailPathFor(entry.id);
+            if (current != expected || !File.Exists(expected)) return true;
+            if (entry.thumbnail.width < ThumbnailSize) return true;
+
+            DateTime rendered = File.GetLastWriteTimeUtc(expected);
+            return rendered < File.GetLastWriteTimeUtc(modelPath) ||
+                   (File.Exists(modelPath + ".meta") && rendered < File.GetLastWriteTimeUtc(modelPath + ".meta"));
+        }
+
+        private static Texture2D RenderThumbnailAsset(string id, GameObject model)
+        {
+            EnsureFolder(ThumbnailFolder);
+            string thumbnailPath = ThumbnailPathFor(id);
 
             Texture2D rendered = RenderThumbnail(model);
             if (rendered == null) return AssetDatabase.LoadAssetAtPath<Texture2D>(thumbnailPath);
@@ -264,14 +344,45 @@ namespace Blocks.Gameplay.Core
         }
     }
 
-    /// <summary>Triggers a catalog rebuild when anything in the characters folder is imported, moved or deleted.</summary>
-    internal class CharacterFolderWatcher : AssetPostprocessor
+    /// <summary>Refreshes the character list when it's saved or one of its models is imported, moved or deleted.</summary>
+    internal class CharacterCatalogWatcher : AssetPostprocessor
     {
         private static void OnPostprocessAllAssets(string[] imported, string[] deleted, string[] moved, string[] movedFrom)
         {
-            if (imported.Concat(deleted).Concat(moved).Concat(movedFrom).Any(CharacterCatalogBuilder.IsInCharactersFolder))
+            if (imported.Concat(deleted).Concat(moved).Concat(movedFrom).Any(CharacterCatalogBuilder.IsWatchedPath))
             {
-                CharacterCatalogBuilder.ScheduleRebuild();
+                CharacterCatalogBuilder.ScheduleRefresh();
+            }
+        }
+    }
+
+    /// <summary>The character list's Inspector: the normal list, plus buttons to fill in blanks or re-render thumbnails now.</summary>
+    [CustomEditor(typeof(CharacterCatalog))]
+    internal class CharacterCatalogEditor : Editor
+    {
+        public override void OnInspectorGUI()
+        {
+            EditorGUILayout.HelpBox(
+                "The characters on the Change Profile screen, in this order (the first is the default for new players). " +
+                "Each entry only needs a model; a blank id, display name or thumbnail is filled in when the list is saved. " +
+                "Don't change an id after people have picked that character.",
+                MessageType.Info);
+
+            DrawDefaultInspector();
+
+            EditorGUILayout.Space();
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Fill In Blanks Now"))
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    CharacterCatalogBuilder.Refresh(forceThumbnails: false);
+                }
+                if (GUILayout.Button("Re-render All Thumbnails"))
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    CharacterCatalogBuilder.Refresh(forceThumbnails: true);
+                }
             }
         }
     }
