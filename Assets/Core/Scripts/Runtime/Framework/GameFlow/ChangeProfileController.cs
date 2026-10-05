@@ -12,15 +12,13 @@ namespace Blocks.Gameplay.Core
     ///     list (NameFilter) when saving.
     ///   - SHOW DISPLAY NAMES: checkbox, on by default. Off shows other players only as "Player 1",
     ///     "Player 2", ... on this machine.
-    ///   - CHARACTER: a scrolling box of T-pose thumbnails, 3 per row and 2.5 rows tall, one per model in the
-    ///     characters folder (see CharacterCatalog / CharacterCatalogBuilder - nothing is hard-coded). The
-    ///     selected (or hovered) character's name is shown to the right, with a double-size picture under
-    ///     it. That's the model this player uses in games.
-    /// Nothing is saved until Save Changes; Back (below it in the bottom-right column, like the other
-    /// screens, or B/Esc) leaves without saving.
+    ///   - CHARACTER: grid of T-pose thumbnails, 4 per row, one per model in the characters folder (see
+    ///     CharacterCatalog / CharacterCatalogBuilder - nothing is hard-coded). The selected (or hovered)
+    ///     character's name is shown to the right. That's the model this player uses in games.
+    /// Nothing is saved until Save Changes (bottom-right); Back (bottom-left, or B/Esc) leaves without saving.
     ///
     /// Controls follow the Host Game screen's conventions: explicit row navigation (Up/Down between rows,
-    /// down through Save Changes to Back at the bottom), A toggles the checkbox, and the character grid uses edit
+    /// Left/Right between Back and Save Changes), A toggles the checkbox, and the character grid uses edit
     /// mode - A to start choosing, the stick/d-pad to move, A to keep the choice or B to undo it. The mouse
     /// can click straight on a thumbnail. Typing a name needs a keyboard (same as room codes); Left/Right in
     /// the text box move the caret. Composite controls handle Submit/Cancel/Move in the capture phase
@@ -40,16 +38,12 @@ namespace Blocks.Gameplay.Core
 
         [SerializeField] private AudioClip cancelSound;
 
-        private const int CharacterColumns = 3;
-        private const float VisibleRows = 2.5f;   // the grid box shows 2.5 rows; the rest scrolls
+        private const int CharacterColumns = 4;
         private const float LabelWidth = 240f;
-        private const float ThumbnailSize = 96f;  // list cells; the preview on the right is twice this
-        private const float CellSlot = ThumbnailSize + 12f; // a cell plus its 3px margins and 3px borders
-        private const float PreviewSize = ThumbnailSize * 2f;
+        private const float ThumbnailSize = 96f;
         private const float RowSpacing = 14f;
         private const float BottomButtonMargin = 40f;
         private const float BottomButtonHeight = 40f;
-        private const float ButtonSlot = BottomButtonHeight + 16f; // a button plus its 8px top/bottom margins
 
         // Same colors as the other GameFlow screens.
         private static readonly Color FocusedBackground = new Color(0.92f, 0.92f, 0.92f);
@@ -67,10 +61,8 @@ namespace Blocks.Gameplay.Core
         private TextField m_NameField;
         private Toggle m_ShowNamesToggle;
         private VisualElement m_Grid;
-        private ScrollView m_GridScroll;
         private readonly List<Image> m_Cells = new List<Image>();
         private Label m_CharacterNameLabel;
-        private Image m_CharacterPreview;
         private Label m_StatusLabel;
         private Button m_BackButton;
         private Button m_SaveButton;
@@ -123,37 +115,36 @@ namespace Blocks.Gameplay.Core
             m_Column.style.left = Length.Percent(50);
             m_Column.style.translate = new Translate(Length.Percent(-50), 0);
             m_Column.style.flexDirection = FlexDirection.Column;
+            m_Column.style.transformOrigin = new TransformOrigin(Length.Percent(50), 0);
             root.Add(m_Column);
+
+            root.RegisterCallback<GeometryChangedEvent>(_ => FitColumnToScreen(root));
+            m_Column.RegisterCallback<GeometryChangedEvent>(_ => FitColumnToScreen(root));
 
             BuildNameRow();
             BuildShowNamesRow();
             BuildCharacterRow();
 
-            // Save Changes with Back below it, in the bottom-right column like the other screens. Never scaled.
-            VisualElement buttons = MenuUI.AddBottomRightColumn(root);
+            // Back (bottom-left) / Save Changes (bottom-right), never scaled.
+            m_BackButton = MakeButton("Back", OnBack, cancelSound);
+            m_BackButton.style.position = Position.Absolute;
+            m_BackButton.style.left = 40;
+            m_BackButton.style.bottom = BottomButtonMargin;
+            root.Add(m_BackButton);
 
             // No click sound here - OnSave plays select or cancel depending on whether it worked.
             m_SaveButton = MakeButton("Save Changes", OnSave, null);
-            buttons.Add(m_SaveButton);
+            m_SaveButton.style.position = Position.Absolute;
+            m_SaveButton.style.right = 40;
+            m_SaveButton.style.bottom = BottomButtonMargin;
+            root.Add(m_SaveButton);
 
-            m_BackButton = MakeButton("Back", OnBack, cancelSound);
-            buttons.Add(m_BackButton);
+            AddNavRow(m_BackButton, m_SaveButton);
 
-            // Same 8px spacing as the other screens' stacked buttons (MakeButton zeroes the margins).
-            foreach (Button b in new[] { m_SaveButton, m_BackButton })
-            {
-                b.style.marginTop = 8;
-                b.style.marginBottom = 8;
-            }
-
-            AddNavRow(m_SaveButton);
-            AddNavRow(m_BackButton);
-
-            // Status messages sit to the left of Save Changes.
             m_StatusLabel = new Label("");
             m_StatusLabel.style.position = Position.Absolute;
             m_StatusLabel.style.right = 260;
-            m_StatusLabel.style.bottom = BottomButtonMargin + ButtonSlot + 18;
+            m_StatusLabel.style.bottom = BottomButtonMargin + 10;
             m_StatusLabel.style.fontSize = 16;
             m_StatusLabel.style.color = StatusText;
             root.Add(m_StatusLabel);
@@ -267,10 +258,7 @@ namespace Blocks.Gameplay.Core
             VisualElement row = MakeRow("CHARACTER");
             row.style.alignItems = Align.FlexStart;
 
-            // A fixed-size box, CharacterColumns cells wide and VisibleRows tall, with a scroll bar for the
-            // rest (mouse wheel / drag the bar; with a gamepad the list scrolls to follow the selection).
-            // m_Grid is the focusable frame (it carries the focus/edit highlight); the ScrollView inside
-            // holds explicit rows of CharacterColumns cells (not one flex-wrapping container, whose wrapping
+            // Explicit rows of CharacterColumns cells (not one flex-wrapping container, whose wrapping
             // depends on exact rendered widths - see HostGameController's map grid).
             m_Grid = new VisualElement { focusable = true };
             m_Grid.style.flexDirection = FlexDirection.Column;
@@ -279,22 +267,9 @@ namespace Blocks.Gameplay.Core
             m_Grid.style.paddingRight = 4;
             m_Grid.style.paddingTop = 4;
             m_Grid.style.paddingBottom = 4;
+            m_Grid.style.minWidth = CharacterColumns * (ThumbnailSize + 12f) + 8f;
+            m_Grid.style.minHeight = ThumbnailSize + 20f;
             row.Add(m_Grid);
-
-            m_GridScroll = new ScrollView(ScrollViewMode.Vertical)
-            {
-                focusable = false,
-                horizontalScrollerVisibility = ScrollerVisibility.Hidden,
-                verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible,
-                touchScrollBehavior = ScrollView.TouchScrollBehavior.Clamped,
-            };
-            m_GridScroll.style.width = CharacterColumns * CellSlot + 20f; // + the vertical scroll bar
-            m_GridScroll.style.height = VisibleRows * CellSlot;
-            m_GridScroll.style.flexShrink = 0;
-            m_GridScroll.mouseWheelScrollSize = CellSlot / 2f;
-            // The scroll bar is for the mouse only - keep gamepad/keyboard focus on the grid itself.
-            m_GridScroll.verticalScroller.Query<VisualElement>().ForEach(e => e.focusable = false);
-            m_Grid.Add(m_GridScroll);
 
             VisualElement gridRow = null;
             for (int i = 0; i < CharacterCount; i++)
@@ -304,7 +279,7 @@ namespace Blocks.Gameplay.Core
                     gridRow = new VisualElement();
                     gridRow.style.flexDirection = FlexDirection.Row;
                     gridRow.style.flexShrink = 0;
-                    m_GridScroll.Add(gridRow);
+                    m_Grid.Add(gridRow);
                 }
 
                 int index = i; // captured per cell
@@ -338,27 +313,13 @@ namespace Blocks.Gameplay.Core
                 m_Cells.Add(cell);
             }
 
-            // Right of the grid: the hovered (or selected) character's name, with a big picture of them under it.
-            var info = new VisualElement();
-            info.style.flexDirection = FlexDirection.Column;
-            info.style.marginLeft = 20;
-            info.style.flexShrink = 0;
-            row.Add(info);
-
             m_CharacterNameLabel = new Label("");
             m_CharacterNameLabel.style.color = Color.white;
             m_CharacterNameLabel.style.fontSize = 18;
+            m_CharacterNameLabel.style.marginLeft = 20;
             m_CharacterNameLabel.style.marginTop = 8;
             m_CharacterNameLabel.style.minWidth = 220;
-            info.Add(m_CharacterNameLabel);
-
-            m_CharacterPreview = new Image { scaleMode = ScaleMode.ScaleToFit };
-            m_CharacterPreview.style.width = PreviewSize;
-            m_CharacterPreview.style.height = PreviewSize;
-            m_CharacterPreview.style.marginTop = 10;
-            m_CharacterPreview.style.flexShrink = 0;
-            m_CharacterPreview.style.backgroundColor = new Color(0.2f, 0.2f, 0.2f);
-            info.Add(m_CharacterPreview);
+            row.Add(m_CharacterNameLabel);
 
             int saved = m_Catalog != null ? m_Catalog.IndexOf(PlayerProfile.CharacterId) : -1;
             SetSelected(saved >= 0 ? saved : 0);
@@ -399,6 +360,26 @@ namespace Blocks.Gameplay.Core
             AddNavRow(m_Grid);
         }
 
+        /// <summary>
+        /// Scales the settings column down (never up) to fit between its top and the bottom buttons, so a
+        /// long character list still fits on screen. style.scale is a transform, so it doesn't feed back into
+        /// layout, and pointer picking follows it.
+        /// </summary>
+        private void FitColumnToScreen(VisualElement root)
+        {
+            float rootHeight = root.layout.height;
+            float rootWidth = root.layout.width;
+            float columnHeight = m_Column.layout.height;
+            float columnWidth = m_Column.layout.width;
+            float top = m_Column.layout.y;
+            if (float.IsNaN(rootHeight) || float.IsNaN(columnHeight) || float.IsNaN(top) || columnHeight <= 0f || columnWidth <= 0f) return;
+
+            float availableHeight = rootHeight - top - BottomButtonMargin - BottomButtonHeight - 16f;
+            float availableWidth = rootWidth - 40f;
+            float scale = Mathf.Clamp(Mathf.Min(1f, availableHeight / columnHeight, availableWidth / columnWidth), 0.1f, 1f);
+            m_Column.style.scale = new Scale(new Vector2(scale, scale));
+        }
+
         // =====================================================================================
         // Character grid
         // =====================================================================================
@@ -425,27 +406,6 @@ namespace Blocks.Gameplay.Core
                 cell.style.borderRightColor = border;
             }
             RefreshCharacterName();
-            ScrollToCell(m_SelectedIndex);
-        }
-
-        /// <summary>Scrolls the grid so the given cell is in view (it may not be laid out on the first frame yet).</summary>
-        private void ScrollToCell(int index)
-        {
-            if (m_GridScroll == null || index < 0 || index >= m_Cells.Count) return;
-            Image cell = m_Cells[index];
-            if (float.IsNaN(cell.layout.height) || cell.layout.height <= 0f)
-            {
-                // Not laid out yet (the screen is still being built): scroll once it is.
-                EventCallback<GeometryChangedEvent> onLayout = null;
-                onLayout = _ =>
-                {
-                    cell.UnregisterCallback(onLayout);
-                    if (m_Cells.IndexOf(cell) == m_SelectedIndex) m_GridScroll.ScrollTo(cell);
-                };
-                cell.RegisterCallback(onLayout);
-                return;
-            }
-            m_GridScroll.ScrollTo(cell);
         }
 
         /// <summary>The hovered character's name, or the selected one's when nothing is hovered.</summary>
@@ -455,7 +415,6 @@ namespace Blocks.Gameplay.Core
             int index = m_HoveredIndex >= 0 ? m_HoveredIndex : m_SelectedIndex;
             CharacterCatalog.Entry entry = m_Characters[index];
             m_CharacterNameLabel.text = string.IsNullOrEmpty(entry.displayName) ? entry.id : entry.displayName;
-            m_CharacterPreview.image = entry.thumbnail;
         }
 
         private void MoveSelection(NavigationMoveEvent.Direction direction)
@@ -544,7 +503,7 @@ namespace Blocks.Gameplay.Core
 
             if (row != pos.Row)
             {
-                // Every row has a single element now (the buttons are stacked), so moving up/down lands on it.
+                // Rows above the buttons have one element each; entering the button row lands on Save Changes.
                 col = elements.Length - 1;
             }
             else if (col < 0 || col >= elements.Length)
