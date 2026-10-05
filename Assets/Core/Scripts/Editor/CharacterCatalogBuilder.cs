@@ -31,7 +31,9 @@ namespace Blocks.Gameplay.Core
         public const string ThumbnailFolder = CharactersFolder + "/Thumbnails";
         private const string ResourcesFolder = "Assets/Core/Resources";
         private const string CatalogPath = ResourcesFolder + "/" + CharacterCatalog.ResourcePath + ".asset";
-        private const int ThumbnailSize = 256;
+        // Rendered big enough for the Change Profile screen's double-size preview (192 px) to stay sharp at
+        // 2x UI scale; the 96 px list cells use the mipmaps.
+        private const int ThumbnailSize = 384;
 
         private static bool s_Building;
         private static bool s_Scheduled;
@@ -180,12 +182,14 @@ namespace Blocks.Gameplay.Core
         {
             string thumbnailPath = $"{ThumbnailFolder}/{Path.GetFileNameWithoutExtension(modelPath)}.png";
 
+            var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(thumbnailPath);
             bool upToDate = File.Exists(thumbnailPath) &&
+                            existing != null && existing.width >= ThumbnailSize && // older thumbnails were smaller
                             File.GetLastWriteTimeUtc(thumbnailPath) >= File.GetLastWriteTimeUtc(modelPath) &&
                             File.GetLastWriteTimeUtc(thumbnailPath) >= File.GetLastWriteTimeUtc(modelPath + ".meta");
             if (!force && upToDate)
             {
-                return AssetDatabase.LoadAssetAtPath<Texture2D>(thumbnailPath);
+                return existing;
             }
 
             Texture2D rendered = RenderThumbnail(model);
@@ -198,7 +202,8 @@ namespace Blocks.Gameplay.Core
             if (AssetImporter.GetAtPath(thumbnailPath) is TextureImporter textureImporter)
             {
                 textureImporter.textureType = TextureImporterType.Default;
-                textureImporter.mipmapEnabled = false;
+                textureImporter.mipmapEnabled = true; // drawn at a quarter size in the list
+                textureImporter.maxTextureSize = 512;
                 textureImporter.alphaIsTransparency = true;
                 textureImporter.wrapMode = TextureWrapMode.Clamp;
                 textureImporter.npotScale = TextureImporterNPOTScale.None;

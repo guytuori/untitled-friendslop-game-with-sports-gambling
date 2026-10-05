@@ -13,7 +13,87 @@ MonoBehaviour:
   m_Name: CharacterCatalog
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.CharacterCatalog
   characters:
+  - id: Biker
+    displayName: Biker
+    model: {fileID: 919132149155446097, guid: 309861ee17db4256b8b88d96087f42b0, type: 3}
+    thumbnail: {fileID: 2800000, guid: ee6980ceb7cfa1e489235a2f2dd0e4f4, type: 3}
+  - id: FastFoodGuy
+    displayName: FastFoodGuy
+    model: {fileID: 919132149155446097, guid: 45e02eb93c09488cb999bb081f303c86, type: 3}
+    thumbnail: {fileID: 2800000, guid: e22c7ff20ad1b364c805c35156cc2080, type: 3}
+  - id: FireFighter
+    displayName: FireFighter
+    model: {fileID: 919132149155446097, guid: 5b264eca42ce461a96790ba1a87ef84d, type: 3}
+    thumbnail: {fileID: 2800000, guid: 5550410425dd2504499d0fdbf87e394e, type: 3}
+  - id: GamerGirl
+    displayName: GamerGirl
+    model: {fileID: 919132149155446097, guid: 1023000e0b1c4c24abd204620c2d1413, type: 3}
+    thumbnail: {fileID: 2800000, guid: ab399f4166ce86f4385757063e4ddb03, type: 3}
+  - id: Gangster
+    displayName: Gangster
+    model: {fileID: 919132149155446097, guid: e4ba4adc74b04706b8e38af447173b7b, type: 3}
+    thumbnail: {fileID: 2800000, guid: caf05f34dd4c2934397fd01b498aa874, type: 3}
+  - id: Girl
+    displayName: Girl
+    model: {fileID: 919132149155446097, guid: 221ca84ccdd1d4f45ace7b42b4b1e86c, type: 3}
+    thumbnail: {fileID: 2800000, guid: a8adb1d3416b17042a1d738a713950b3, type: 3}
+  - id: Grandma
+    displayName: Grandma
+    model: {fileID: 919132149155446097, guid: b9fd6a09e2824a15910d29cf050df8b1, type: 3}
+    thumbnail: {fileID: 2800000, guid: b4ede69879dde554cbe041ba55245161, type: 3}
+  - id: Grandpa
+    displayName: Grandpa
+    model: {fileID: 919132149155446097, guid: d21af0b31131459499555e54218c2b40, type: 3}
+    thumbnail: {fileID: 2800000, guid: 42f1ad8e714c4274a8bbbb2bba600610, type: 3}
+  - id: HipsterGirl
+    displayName: HipsterGirl
+    model: {fileID: 919132149155446097, guid: fd46e7cbcd7441c1a089f80c71303a7b, type: 3}
+    thumbnail: {fileID: 2800000, guid: d44e077cc0f9d9e4aa568deaf8f3072d, type: 3}
+  - id: HipsterGuy
+    displayName: HipsterGuy
+    model: {fileID: 919132149155446097, guid: 1f37e8ab2fc0404ba0a0a2df1eddda20, type: 3}
+    thumbnail: {fileID: 2800000, guid: 6774a693d53f2cc4facd32e63d7f9f8b, type: 3}
+  - id: Hobo
+    displayName: Hobo
+    model: {fileID: 919132149155446097, guid: 24f4d5e96bb84887854d7fbeaba4d65f, type: 3}
+    thumbnail: {fileID: 2800000, guid: 8507dc2e50f07b540af87131d999ec2b, type: 3}
+  - id: Hotdog
+    displayName: Hotdog
+    model: {fileID: 919132149155446097, guid: 7cb0150a8594451cb24e833d9cb717ee, type: 3}
+    thumbnail: {fileID: 2800000, guid: fdfef765930976348b42a708aabb2556, type: 3}
+  - id: Jock
+    displayName: Jock
+    model: {fileID: 919132149155446097, guid: de7a46d0441449fa8cb687db2a3dc5c1, type: 3}
+    thumbnail: {fileID: 2800000, guid: 7b7afa962e1f0d04a8f9f01a7b0a9834, type: 3}
+  - id: Paramedic
+    displayName: Paramedic
+    model: {fileID: 919132149155446097, guid: cf64a82af91a40938ccd97d763f286f6, type: 3}
+    thumbnail: {fileID: 2800000, guid: d982c2a7d7ea2fe40ab1a018097ed5e6, type: 3}
   - id: Pirate
     displayName: Pirate
     model: {fileID: 919132149155446097, guid: a51f78db59957444c9b3ed74dea65d76, type: 3}
     thumbnail: {fileID: 2800000, guid: ce455cd8c47217e4bb12a0bdc0f77ac1, type: 3}
+  - id: PunkGirl
+    displayName: PunkGirl
+    model: {fileID: 919132149155446097, guid: 979e261099b4407d9bea6f6cefd9ee41, type: 3}
+    thumbnail: {fileID: 2800000, guid: 9953a1f6754209b439bdd6f1238439ba, type: 3}
+  - id: PunkGuy
+    displayName: PunkGuy
+    model: {fileID: 919132149155446097, guid: 9ff9a36b543946e7a516e37db5e3d1b3, type: 3}
+    thumbnail: {fileID: 2800000, guid: b2a8bca7ec7881c4c8ffeb4e98bf3afb, type: 3}
+  - id: Roadworker
+    displayName: Roadworker
+    model: {fileID: 919132149155446097, guid: 853b8e3c68674ca3829342d5033d0fc6, type: 3}
+    thumbnail: {fileID: 2800000, guid: ff95e489a1f9c8b489dffe2f1b628b8c, type: 3}
+  - id: ShopKeeper
+    displayName: ShopKeeper
+    model: {fileID: 919132149155446097, guid: 34a0079ea0954a7f919866de46261977, type: 3}
+    thumbnail: {fileID: 2800000, guid: 6a79920d79af5824c966dcbe5073d8eb, type: 3}
+  - id: SummerGirl
+    displayName: SummerGirl
+    model: {fileID: 919132149155446097, guid: 98b39b5a811f4479afa7f3256dd5cbc0, type: 3}
+    thumbnail: {fileID: 2800000, guid: e0481b3fe8e533e4687bbb2f1373ff59, type: 3}
+  - id: Tourist
+    displayName: Tourist
+    model: {fileID: 919132149155446097, guid: 3bd741b6cedb42b6baf423e3e70e4e34, type: 3}
+    thumbnail: {fileID: 2800000, guid: e963da38a41c5b64aa563f44a0b543ba, type: 3}

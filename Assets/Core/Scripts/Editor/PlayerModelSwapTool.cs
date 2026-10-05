@@ -187,8 +187,9 @@ namespace Blocks.Gameplay.Core
             var missing = BlenderRigMapping.Where(m => !names.Contains(m.bone)).Select(m => m.bone).ToList();
             if (missing.Count > 0)
             {
-                error = $"{modelPath} is missing bones the Humanoid avatar needs: {string.Join(", ", missing)}.";
-                return false;
+                // Not one of the BlenderProjects rigs (e.g. a character pack from the asset store, with its own
+                // bone names): let Unity map the skeleton itself, the way Rig > Humanoid does by default.
+                return TryAutoMappedHumanoid(importer, modelPath, log, out error);
             }
 
             HumanDescription description = importer.humanDescription;
@@ -227,6 +228,57 @@ namespace Blocks.Gameplay.Core
             }
 
             log.AppendLine($"{modelPath}: Humanoid avatar OK ({BlenderRigMapping.Length} bones mapped, facing +Z).");
+            return true;
+        }
+
+        /// <summary>
+        /// Humanoid via Unity's own automatic bone mapping, for rigs that aren't ours. Any explicit mapping
+        /// already in the import settings that doesn't produce a valid avatar (e.g. one copied from another
+        /// model's avatar) is cleared first, so the automatic mapping can take over.
+        /// </summary>
+        private static bool TryAutoMappedHumanoid(ModelImporter importer, string modelPath, StringBuilder log, out string error)
+        {
+            error = null;
+            Avatar avatar = AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<Avatar>().FirstOrDefault();
+            if ((avatar == null || !avatar.isValid || !avatar.isHuman) && importer.humanDescription.human != null && importer.humanDescription.human.Length > 0)
+            {
+                HumanDescription description = importer.humanDescription;
+                description.human = new HumanBone[0];
+                description.skeleton = new SkeletonBone[0];
+                importer.humanDescription = description;
+                importer.autoGenerateAvatarMappingIfUnspecified = true;
+                importer.SaveAndReimport();
+                avatar = AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<Avatar>().FirstOrDefault();
+            }
+
+            if (avatar == null || !avatar.isValid || !avatar.isHuman)
+            {
+                error = $"Unity couldn't map {modelPath}'s skeleton to a Humanoid automatically. Select it and open Rig > Configure to see why.";
+                return false;
+            }
+
+            // Same facing check as for our own rigs, using the bones Unity mapped.
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+            var instance = Object.Instantiate(model);
+            try
+            {
+                Animator animator = instance.GetComponent<Animator>();
+                if (animator == null) animator = instance.AddComponent<Animator>();
+                animator.avatar = avatar;
+                Transform leftLeg = animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
+                Transform rightLeg = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
+                if (leftLeg != null && rightLeg != null && leftLeg.position.x > rightLeg.position.x)
+                {
+                    error = $"{modelPath} faces backwards (-Z): its left leg is on the +X side.";
+                    return false;
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(instance);
+            }
+
+            log.AppendLine($"{modelPath}: Humanoid avatar OK (bones mapped automatically, facing +Z).");
             return true;
         }
 
