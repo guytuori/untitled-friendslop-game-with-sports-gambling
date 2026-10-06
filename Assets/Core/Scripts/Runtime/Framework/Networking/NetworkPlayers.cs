@@ -139,6 +139,8 @@ namespace Blocks.Gameplay.Core
 
             // Shows the avatar as the character its player picked (Change Profile screen).
             PlayerCharacterModel.Attach(player);
+            LocalActionTracker.Attach(player); // owner only - counts this player's actions for wagers
+            LocalRespawnTracker.Attach(player); // owner only - death plane and where to respawn
 
             if (player.IsOwner)
             {

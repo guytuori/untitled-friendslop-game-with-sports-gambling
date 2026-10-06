@@ -59,5 +59,11 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Core/Scenes/[BB] Core.unity
     guid: 5492879da6a8a4759a6862bcc1e31e6e
+  - enabled: 1
+    path: Assets/Core/Scenes/RoundResults.unity
+    guid: 93e8a4c0070f4ac4ac9739943c291eaa
+  - enabled: 1
+    path: Assets/Core/Scenes/FinalScore.unity
+    guid: ab236a844bea48059b0ec83624532a1a
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}

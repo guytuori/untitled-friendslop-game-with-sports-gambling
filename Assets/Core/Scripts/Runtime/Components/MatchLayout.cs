@@ -187,6 +187,8 @@ namespace Blocks.Gameplay.Core
                 return;
             }
 
+            PlayerEndPoint.SetUpAll(map.transform);
+
             List<ChallengeSockets.Socket> sockets = ChallengeSockets.FindSockets(map.transform);
             int count = NetSocketCount;
             if (sockets.Count != count)

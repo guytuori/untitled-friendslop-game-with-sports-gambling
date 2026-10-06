@@ -83,6 +83,12 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public const string GameplaySceneName = "Assets/Core/Scenes/[BB] Core.unity";
 
+        /// <summary>Between-rounds screen everyone goes to when the team hits the round's target (see RoundTimer / RoundResultsController).</summary>
+        public const string RoundResultsSceneName = "Assets/Core/Scenes/RoundResults.unity";
+
+        /// <summary>Game-over screen everyone goes to when the team misses the round's target (see FinalScoreController).</summary>
+        public const string FinalScoreSceneName = "Assets/Core/Scenes/FinalScore.unity";
+
         private const string RoomCodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 31 chars, no 0/O/1/I/L
         private const int MaxHostAttempts = 5;
         private const int DevSessionMaxPlayers = 8;
@@ -510,6 +516,28 @@ namespace Blocks.Gameplay.Core
             info.IsOpen = false;
             info.IsVisible = false;
 
+            MatchProgress.Reset();
+            m_GameRunner.LoadScene(scene, LoadSceneMode.Single, LocalPhysicsMode.None, true);
+            return true;
+        }
+
+        /// <summary>
+        /// Master client only: loads <paramref name="scenePath"/> (e.g. <see cref="RoundResultsSceneName"/>) for
+        /// every player in the session, the same way Start Match loads the gameplay scene. False (with an error
+        /// logged) if this client isn't the master or the scene isn't in the Build Settings.
+        /// </summary>
+        public bool LoadSceneForEveryone(string scenePath)
+        {
+            if (!InGame || !m_GameRunner.IsSharedModeMasterClient) return false;
+
+            var sceneManager = m_GameRunner.GetComponent<NetworkSceneManagerDefault>();
+            SceneRef scene = sceneManager != null ? sceneManager.GetSceneRef(scenePath) : SceneRef.None;
+            if (!scene.IsValid)
+            {
+                Debug.LogError($"[Fusion] '{scenePath}' isn't in the build settings - can't load it.");
+                return false;
+            }
+
             m_GameRunner.LoadScene(scene, LoadSceneMode.Single, LocalPhysicsMode.None, true);
             return true;
         }
@@ -575,11 +603,13 @@ namespace Blocks.Gameplay.Core
             m_RosterMasterId = -1;
             m_Players.Clear();
             SessionProfiles.Clear();
+            MatchProgress.Reset();
         }
 
         /// <summary>A session has started and been checked: build the roster and tell everyone who we are (SessionProfiles).</summary>
         private void OnSessionReady()
         {
+            MatchProgress.Reset();
             RebuildRoster();
             SessionProfiles.BroadcastLocal(m_GameRunner);
         }
@@ -715,7 +745,11 @@ namespace Blocks.Gameplay.Core
                 rules.DeathPenalty,
                 Mathf.RoundToInt(rules.WagerPayout * 10f), // floats are stored as tenths: 2.5 -> 25
                 rules.ItemsEnabled ? 1 : 0,
-                rules.PickupsEnabled ? 1 : 0);
+                rules.PickupsEnabled ? 1 : 0,
+                rules.AverageTargetScore,
+                Mathf.RoundToInt(rules.TargetScoreGrowth * 100f), // stored as hundredths: 1.05 -> 105
+                rules.BonusPointsPerSecond,
+                rules.CarryOverPercent);
         }
 
         /// <summary>Reads PackRules' string back. Missing or unreadable values keep their current (default) value.</summary>
@@ -734,6 +768,10 @@ namespace Blocks.Gameplay.Core
             rules.WagerPayout = Get(5, Mathf.RoundToInt(rules.WagerPayout * 10f)) / 10f;
             rules.ItemsEnabled = Get(6, rules.ItemsEnabled ? 1 : 0) != 0;
             rules.PickupsEnabled = Get(7, rules.PickupsEnabled ? 1 : 0) != 0;
+            rules.AverageTargetScore = Get(8, rules.AverageTargetScore);
+            rules.TargetScoreGrowth = Get(9, Mathf.RoundToInt(rules.TargetScoreGrowth * 100f)) / 100f;
+            rules.BonusPointsPerSecond = Get(10, rules.BonusPointsPerSecond);
+            rules.CarryOverPercent = Get(11, rules.CarryOverPercent);
         }
 
         // =====================================================================================

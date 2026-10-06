@@ -60,6 +60,10 @@ namespace Blocks.Gameplay.Core
         private List<IPlayerAddon> m_Addons = new List<IPlayerAddon>();
         private PlayerLifeState m_LastLifeState = PlayerLifeState.InitialSpawn;
         private bool m_IsMovementInputEnabled = true;
+        private readonly HashSet<string> m_InputLocks = new HashSet<string>();
+
+        /// <summary>Movement input is enabled and nothing has locked it (see <see cref="SetInputLock"/>).</summary>
+        private bool CanMove => m_IsMovementInputEnabled && m_InputLocks.Count == 0;
         private System.Action<Vector2> m_OnMoveInputHandler;
 
         /// <summary>
@@ -201,6 +205,32 @@ namespace Blocks.Gameplay.Core
             }
         }
 
+        /// <summary>
+        /// Adds or removes a named reason this player can't move (e.g. "Finished" after reaching the end
+        /// point, "RoundOver"). Unlike <see cref="SetMovementInputEnabled"/> - which the betting pause and
+        /// life state both toggle - locks stack: movement only comes back once every lock is removed, so one
+        /// system unpausing can't undo another's freeze. Owner only.
+        /// </summary>
+        public void SetInputLock(string reason, bool locked)
+        {
+            if (string.IsNullOrEmpty(reason)) return;
+
+            if (locked)
+            {
+                if (!m_InputLocks.Add(reason)) return;
+                if (coreMovement != null)
+                {
+                    coreMovement.SetMoveInput(Vector2.zero);
+                    coreMovement.SetSprintState(false);
+                    coreMovement.SetGrabState(false);
+                }
+            }
+            else
+            {
+                m_InputLocks.Remove(reason);
+            }
+        }
+
         #endregion
 
         #region Private Methods
@@ -220,7 +250,7 @@ namespace Blocks.Gameplay.Core
 
         private void HandleSprint(bool isSprinting)
         {
-            if (!m_IsMovementInputEnabled) return;
+            if (!CanMove) return;
 
             if (coreStats == null || coreMovement == null)
             {
@@ -238,7 +268,7 @@ namespace Blocks.Gameplay.Core
 
         private void HandleGrab(bool isHeld)
         {
-            if (!m_IsMovementInputEnabled) return;
+            if (!CanMove) return;
 
             if (coreMovement == null)
             {
@@ -251,7 +281,7 @@ namespace Blocks.Gameplay.Core
 
         private void HandleJump()
         {
-            if (!m_IsMovementInputEnabled) return;
+            if (!CanMove) return;
 
             if (coreMovement == null)
             {
@@ -266,7 +296,7 @@ namespace Blocks.Gameplay.Core
 
         private void HandleMoveInput(Vector2 input)
         {
-            if (!m_IsMovementInputEnabled) return;
+            if (!CanMove) return;
 
             if (coreMovement == null)
             {

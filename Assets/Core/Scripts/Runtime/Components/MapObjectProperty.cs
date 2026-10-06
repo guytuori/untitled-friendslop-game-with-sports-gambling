@@ -43,7 +43,10 @@ namespace Blocks.Gameplay.Core
         ChallengeStart,
 
         /// <summary>A challenge's finish line - see <see cref="ChallengeZoneTrigger"/>/<see cref="ChallengeZone"/>, same as MapColliderSetup's old "finish"-named-material handling. Still ordinary walkable geometry; it additionally gets an invisible full-height trigger volume.</summary>
-        ChallengeFinish
+        ChallengeFinish,
+
+        /// <summary>The map's end point - see <see cref="PlayerEndPoint"/>. Ordinary walkable geometry that additionally gets an invisible trigger above it (built at runtime). Added last so existing values keep their numbers.</summary>
+        PlayerEndPoint
     }
 
     /// <summary>

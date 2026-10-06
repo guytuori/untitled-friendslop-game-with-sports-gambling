@@ -136,6 +136,7 @@ namespace Blocks.Gameplay.Core
             
             m_CoreMovement.ApplyExternalForce(m_CoreMovement.transform.forward * (1 + m_doubleJumpedCount),ForceMode.Impulse);
             m_CoreMovement.SetVerticalVelocity(jumpVelocity);
+            PlayerActions.Report(m_CoreMovement.gameObject, PlayerAction.Jump); // counted for wagers (LocalActionTracker)
             // Reset any downward force/gravity accumulation if needed, though SetVerticalVelocity handles the main part
         }
 

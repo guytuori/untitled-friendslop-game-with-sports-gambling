@@ -52,6 +52,27 @@ namespace Blocks.Gameplay.Core
 
         private GameplayInputSystem_Actions m_InputActions;
 
+        /// <summary>
+        /// Raised (with the control that was pressed) when the local player presses the Menu action - Esc /
+        /// gamepad Start by default. InGameMenu opens and closes the Escape menu with it. Still raised while
+        /// gameplay input is blocked.
+        /// </summary>
+        public static event System.Action<InputControl> MenuPressed;
+
+        /// <summary>True while a menu (the Escape menu) has taken over the local player's input.</summary>
+        public static bool GameplayInputBlocked { get; private set; }
+
+        private static event System.Action s_Blocked;
+
+        /// <summary>
+        /// The right stick's current position (raw, -1..1), raised whenever it changes - including back to
+        /// zero. Gamepad look doesn't go through onLookInput: that event carries per-frame deltas (right for
+        /// the mouse), but a stick reports a position that only changes when the stick moves, so a stick
+        /// held still used to turn the camera once and then stop. CoreCameraController keeps the latest
+        /// position and turns the camera every frame from it (see its Gamepad Look settings).
+        /// </summary>
+        public event System.Action<Vector2> StickLookChanged;
+
         #endregion
 
         #region Unity Lifecycle & Network Callbacks
@@ -73,6 +94,7 @@ namespace Blocks.Gameplay.Core
                 ApplyAlternateBindingsIfRequested();
                 RegisterInputActions();
                 m_InputActions.Player.Enable();
+                s_Blocked += ReleaseEverything;
             }
         }
 
@@ -82,7 +104,31 @@ namespace Blocks.Gameplay.Core
             {
                 m_InputActions.Player.Disable();
                 UnregisterInputActions();
+                s_Blocked -= ReleaseEverything;
             }
+        }
+
+        /// <summary>
+        /// Blocks (or unblocks) every gameplay action except Menu for the local player - used while the
+        /// Escape menu is open, so the stick/WASD/mouse drive the menu instead of the character. Blocking
+        /// also lets go of anything held (movement, look, sprint, grab, jump).
+        /// </summary>
+        public static void SetGameplayInputBlocked(bool blocked)
+        {
+            if (GameplayInputBlocked == blocked) return;
+            GameplayInputBlocked = blocked;
+            if (blocked) s_Blocked?.Invoke();
+        }
+
+        private void ReleaseEverything()
+        {
+            onMoveInput?.Raise(Vector2.zero);
+            onLookInput?.Raise(Vector2.zero);
+            StickLookChanged?.Invoke(Vector2.zero);
+            onSprintStateChanged?.Raise(false);
+            onGrabStateChanged?.Raise(false);
+            onJumpReleased?.Raise();
+            onPrimaryActionReleased?.Raise();
         }
 
         #endregion
@@ -174,15 +220,32 @@ namespace Blocks.Gameplay.Core
 
         #region Input Handlers
 
-        private void HandleMove(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onMoveInput?.Raise(context.ReadValue<Vector2>()); }
-        private void HandleLook(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onLookInput?.Raise(context.ReadValue<Vector2>()); }
-        private void HandleJumpPressed(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onJumpPressed?.Raise(); }
-        private void HandleJumpReleased(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onJumpReleased?.Raise(); }
-        private void HandleSprintState(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onSprintStateChanged?.Raise(context.ReadValueAsButton()); }
-        private void HandleGrabState(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onGrabStateChanged?.Raise(context.ReadValueAsButton()); }
-        private void HandlePrimaryActionPressed(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onPrimaryActionPressed?.Raise(); }
-        private void HandlePrimaryActionReleased(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onPrimaryActionReleased?.Raise(); }
-        private void HandleMenuPressed(InputAction.CallbackContext context) { if (!ShouldIgnoreGamepadWhileUnfocused(context)) onMenuPressed?.Raise(); }
+        private void HandleMove(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onMoveInput?.Raise(context.ReadValue<Vector2>()); }
+        private void HandleLook(InputAction.CallbackContext context)
+        {
+            if (ShouldIgnore(context)) return;
+
+            InputDevice device = context.control.device;
+            if (device is Gamepad || device is Joystick)
+            {
+                StickLookChanged?.Invoke(context.ReadValue<Vector2>()); // a held position, not a delta
+                return;
+            }
+
+            onLookInput?.Raise(context.ReadValue<Vector2>()); // mouse: a per-frame delta
+        }
+        private void HandleJumpPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onJumpPressed?.Raise(); }
+        private void HandleJumpReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onJumpReleased?.Raise(); }
+        private void HandleSprintState(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onSprintStateChanged?.Raise(context.ReadValueAsButton()); }
+        private void HandleGrabState(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabStateChanged?.Raise(context.ReadValueAsButton()); }
+        private void HandlePrimaryActionPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onPrimaryActionPressed?.Raise(); }
+        private void HandlePrimaryActionReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onPrimaryActionReleased?.Raise(); }
+        private void HandleMenuPressed(InputAction.CallbackContext context)
+        {
+            if (ShouldIgnoreGamepadWhileUnfocused(context)) return;
+            onMenuPressed?.Raise();
+            MenuPressed?.Invoke(context.control);
+        }
 
         /// <summary>
         /// Local multi-instance testing: each window/process keeps simulating even when it isn't the
@@ -197,6 +260,12 @@ namespace Blocks.Gameplay.Core
         private static bool ShouldIgnoreGamepadWhileUnfocused(InputAction.CallbackContext context)
         {
             return !Application.isFocused && context.control.device is Gamepad;
+        }
+
+        /// <summary>Gameplay actions (everything but Menu) are dropped while blocked, or for an unfocused gamepad.</summary>
+        private static bool ShouldIgnore(InputAction.CallbackContext context)
+        {
+            return GameplayInputBlocked || ShouldIgnoreGamepadWhileUnfocused(context);
         }
 
         #endregion

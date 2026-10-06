@@ -493,6 +493,8 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void JumpOffRail()
         {
+            PlayerActions.Report(m_Motor.gameObject, PlayerAction.RailJump); // counted for wagers (LocalActionTracker)
+
             m_CurrentRail.Evaluate(m_ArcLength, out _, out Vector3 tangent, out _, out _);
             Vector3 travelTangent = m_TravelSign >= 0f ? tangent : -tangent;
 

@@ -186,8 +186,13 @@ namespace Blocks.Gameplay.Core
         /// <see cref="ChallengeManager"/> to decide what happens - claiming the challenge, or resolving it,
         /// are both global decisions (only one betting window can run at a time), not this zone's alone.
         /// </summary>
+        /// <summary>Raised on this machine when its own player walks into a challenge's start or finish volume (before the master client decides anything).</summary>
+        public static event System.Action<ChallengeZone, ChallengeZoneKind> LocalPlayerEntered;
+
         public void ReportLocalPlayerEntered(ChallengeZoneKind kind)
         {
+            LocalPlayerEntered?.Invoke(this, kind);
+
             if (ChallengeManager.Instance != null)
             {
                 ChallengeManager.Instance.RequestZoneEntry(this, kind);

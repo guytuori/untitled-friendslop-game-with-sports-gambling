@@ -280,6 +280,8 @@ namespace Blocks.Gameplay.Core
 
         private void PerformJumpOff()
         {
+            PlayerActions.Report(m_Motor.gameObject, PlayerAction.PoleJump); // counted for wagers (LocalActionTracker)
+
             float jumpVelocity = Mathf.Sqrt(Mathf.Max(0.01f, jumpOffHeightMultiplier * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
             m_Motor.SetVerticalVelocity(jumpVelocity);
             m_Motor.ApplyExternalForce(m_LastOutwardDir * jumpOffPushForce, ForceMode.Impulse);

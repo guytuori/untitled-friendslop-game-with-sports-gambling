@@ -35,6 +35,25 @@ namespace Blocks.Gameplay.Core
         private VisualElement m_NotificationContainer;
         private VisualElement m_ScoreboardContainer;
         private Label m_RoundTimerLabel;
+        private Label m_RoundTimerCaption;
+        private Label m_BonusTimerLabel;
+        private VisualElement m_BonusTimerContainer;
+        private VisualElement m_RoundBanner;
+        private Label m_RoundBannerTitle;
+        private Label m_RoundBannerSubtitle;
+        private Coroutine m_BannerHideCoroutine;
+        private Label m_TotalScoreLabel;
+        private Label m_TargetScoreLabel;
+        private InGameMenu m_InGameMenu;
+
+        // Small stamina bar floating above the player's head (the bottom-left bars are hidden - see BuildStaminaBar).
+        private VisualElement m_StaminaFloat;
+        private VisualElement m_StaminaFloatFill;
+        private float m_StaminaFullSince = -1f;
+        private const float k_StaminaFloatWidth = 64f;
+        private const float k_StaminaFloatHeight = 6f;
+        private const float k_StaminaHideDelay = 0.6f;
+        private WagerHUD m_WagerHUD;
         private VisualElement m_ChallengeOverlay;
         private Label m_ChallengeTitleLabel;
         private Label m_ChallengeSubtitleLabel;
@@ -91,6 +110,7 @@ namespace Blocks.Gameplay.Core
             public VisualElement Element;
             public Label ScoreLabel;
             public PlayerScore PlayerScoreComponent;
+            public System.Action AnyScoreChanged;
 
             public void HandleScoreChanged(int previousValue, int newValue)
             {
@@ -98,6 +118,7 @@ namespace Blocks.Gameplay.Core
                 {
                     ScoreLabel.text = newValue.ToString();
                 }
+                AnyScoreChanged?.Invoke();
             }
         }
 
@@ -131,7 +152,29 @@ namespace Blocks.Gameplay.Core
             if (m_SubscribedRoundTimer != null)
             {
                 m_SubscribedRoundTimer.TimeRemainingChanged += HandleRoundTimerChanged;
+                m_SubscribedRoundTimer.BonusTimeRemainingChanged += HandleBonusTimerChanged;
+                m_SubscribedRoundTimer.PhaseChanged += HandleRoundPhaseChanged;
+                m_SubscribedRoundTimer.FinishedPlayersChanged += HandleFinishedPlayersChanged;
+                m_SubscribedRoundTimer.RoundInfoChanged += HandleRoundInfoChanged;
+                m_SubscribedRoundTimer.PlayerFinished += HandlePlayerFinished;
                 UpdateTimerLabel(m_SubscribedRoundTimer.TimeRemaining);
+                UpdateBonusTimerLabel(m_SubscribedRoundTimer.BonusTimeRemaining);
+                HandleRoundInfoChanged();
+                if (m_SubscribedRoundTimer.IsSpawned && m_SubscribedRoundTimer.Phase != RoundTimer.RoundPhase.Playing)
+                {
+                    HandleRoundPhaseChanged(m_SubscribedRoundTimer.Phase);
+                }
+            }
+
+            // Escape menu (Settings / Quit to Main Menu / Quit Game / Return to Game), drawn on this HUD's panel.
+            if (m_UIDocument != null)
+            {
+                m_InGameMenu = gameObject.AddComponent<InGameMenu>();
+                m_InGameMenu.Initialize(m_UIDocument.rootVisualElement);
+
+                // Wager ticker (top) and this player's phone of active bets (bottom right).
+                m_WagerHUD = gameObject.AddComponent<WagerHUD>();
+                m_WagerHUD.Initialize(m_UIDocument.rootVisualElement, AddNotification);
             }
 
             m_SubscribedChallengeManager = ChallengeManager.Instance;
@@ -168,7 +211,24 @@ namespace Blocks.Gameplay.Core
                 if (m_SubscribedRoundTimer != null)
                 {
                     m_SubscribedRoundTimer.TimeRemainingChanged -= HandleRoundTimerChanged;
+                    m_SubscribedRoundTimer.BonusTimeRemainingChanged -= HandleBonusTimerChanged;
+                    m_SubscribedRoundTimer.PhaseChanged -= HandleRoundPhaseChanged;
+                    m_SubscribedRoundTimer.FinishedPlayersChanged -= HandleFinishedPlayersChanged;
+                    m_SubscribedRoundTimer.RoundInfoChanged -= HandleRoundInfoChanged;
+                    m_SubscribedRoundTimer.PlayerFinished -= HandlePlayerFinished;
                     m_SubscribedRoundTimer = null;
+                }
+
+                if (m_InGameMenu != null)
+                {
+                    Destroy(m_InGameMenu);
+                    m_InGameMenu = null;
+                }
+
+                if (m_WagerHUD != null)
+                {
+                    Destroy(m_WagerHUD);
+                    m_WagerHUD = null;
                 }
 
                 if (m_SubscribedChallengeManager != null)
@@ -339,6 +399,7 @@ namespace Blocks.Gameplay.Core
             var root = m_UIDocument.rootVisualElement;
             CacheUIElements(root);
             ConfigureUIElements();
+            BuildStaminaBar(root);
             ConfigureChallengeBetButtons();
             QueryHUDElements(root);
             SetHUDDefaults();
@@ -358,6 +419,12 @@ namespace Blocks.Gameplay.Core
             m_NotificationContainer = root.Q<VisualElement>("notification-container");
             m_ScoreboardContainer = root.Q<VisualElement>("scoreboard-container");
             m_RoundTimerLabel = root.Q<Label>("round-timer-label");
+            m_RoundTimerCaption = root.Q<Label>("round-timer-caption");
+            m_BonusTimerLabel = root.Q<Label>("bonus-timer-label");
+            m_BonusTimerContainer = root.Q<VisualElement>("bonus-timer-container");
+            m_RoundBanner = root.Q<VisualElement>("round-banner");
+            m_RoundBannerTitle = root.Q<Label>("round-banner-title");
+            m_RoundBannerSubtitle = root.Q<Label>("round-banner-subtitle");
             m_ChallengeOverlay = root.Q<VisualElement>("challenge-overlay");
             m_ChallengeTitleLabel = root.Q<Label>("challenge-title-label");
             m_ChallengeSubtitleLabel = root.Q<Label>("challenge-subtitle-label");
@@ -416,6 +483,88 @@ namespace Blocks.Gameplay.Core
         protected virtual void SetHUDDefaults()
         {
             // Override in derived classes to set default HUD states
+        }
+
+        #endregion
+
+        #region Floating Stamina Bar
+
+        /// <summary>
+        /// Hides the old bottom-left health/stamina bars (health isn't a gameplay concept right now - it's still
+        /// tracked in the back end, and the bars still get updated, for hazards later) and adds a small
+        /// stamina bar that floats just above the player's head, shown only while stamina isn't full.
+        /// </summary>
+        private void BuildStaminaBar(VisualElement root)
+        {
+            var oldBars = root.Q<VisualElement>("health-info-container");
+            if (oldBars != null) oldBars.style.display = DisplayStyle.None;
+
+            m_StaminaFloat = new VisualElement { name = "stamina-float", pickingMode = PickingMode.Ignore };
+            m_StaminaFloat.style.position = Position.Absolute;
+            m_StaminaFloat.style.width = k_StaminaFloatWidth;
+            m_StaminaFloat.style.height = k_StaminaFloatHeight;
+            m_StaminaFloat.style.backgroundColor = new Color(0.06f, 0.06f, 0.06f, 0.7f);
+            m_StaminaFloat.style.borderTopLeftRadius = m_StaminaFloat.style.borderTopRightRadius = 3;
+            m_StaminaFloat.style.borderBottomLeftRadius = m_StaminaFloat.style.borderBottomRightRadius = 3;
+            m_StaminaFloat.style.overflow = Overflow.Hidden;
+            m_StaminaFloat.style.display = DisplayStyle.None;
+
+            m_StaminaFloatFill = new VisualElement { pickingMode = PickingMode.Ignore };
+            m_StaminaFloatFill.style.height = Length.Percent(100);
+            m_StaminaFloatFill.style.width = Length.Percent(100);
+            m_StaminaFloatFill.style.backgroundColor = new Color(k_StaminaBarColor.r, k_StaminaBarColor.g, k_StaminaBarColor.b, 0.95f);
+            m_StaminaFloat.Add(m_StaminaFloatFill);
+
+            root.Add(m_StaminaFloat);
+        }
+
+        private void UpdateStaminaFloat(float current, float max)
+        {
+            if (m_StaminaFloat == null || max <= 0f) return;
+
+            float fraction = Mathf.Clamp01(current / max);
+            m_StaminaFloatFill.style.width = Length.Percent(fraction * 100f);
+
+            if (fraction >= 0.999f)
+            {
+                if (m_StaminaFullSince < 0f) m_StaminaFullSince = Time.time; // hidden shortly after it refills
+            }
+            else
+            {
+                m_StaminaFullSince = -1f;
+                m_StaminaFloat.style.display = DisplayStyle.Flex;
+            }
+        }
+
+        /// <summary>Keeps the stamina bar just above the player's head on screen, and hides it once stamina has been full for a moment.</summary>
+        private void LateUpdate()
+        {
+            if (!IsOwner || m_StaminaFloat == null) return;
+
+            if (m_StaminaFullSince >= 0f && Time.time - m_StaminaFullSince >= k_StaminaHideDelay)
+            {
+                m_StaminaFloat.style.display = DisplayStyle.None;
+            }
+            if (m_StaminaFloat.resolvedStyle.display == DisplayStyle.None && m_StaminaFloat.style.display == DisplayStyle.None) return;
+
+            Camera camera = Camera.main;
+            IPanel panel = m_StaminaFloat.panel;
+            if (camera == null || panel == null) return;
+
+            float headHeight = 2f;
+            if (TryGetComponent(out CharacterController controller)) headHeight = controller.center.y + controller.height * 0.5f;
+            Vector3 head = transform.position + Vector3.up * (headHeight + 0.35f);
+
+            if (camera.WorldToViewportPoint(head).z <= 0f)
+            {
+                m_StaminaFloat.style.visibility = Visibility.Hidden;
+                return;
+            }
+
+            Vector2 point = RuntimePanelUtils.CameraTransformWorldToPanel(panel, head, camera);
+            m_StaminaFloat.style.visibility = Visibility.Visible;
+            m_StaminaFloat.style.left = point.x - k_StaminaFloatWidth * 0.5f;
+            m_StaminaFloat.style.top = point.y - k_StaminaFloatHeight;
         }
 
         #endregion
@@ -586,6 +735,7 @@ namespace Blocks.Gameplay.Core
                     m_PlayerStaminaBar.highValue = payload.maxValue;
                     m_PlayerStaminaBar.value = payload.currentValue;
                 }
+                UpdateStaminaFloat(payload.currentValue, payload.maxValue);
             }
         }
 
@@ -688,6 +838,13 @@ namespace Blocks.Gameplay.Core
 
             ClearScoreboardRows();
 
+            // Semi-cooperative: the team's total (and the target it's chasing) sit above everyone's own score.
+            m_TotalScoreLabel = AddTeamRow("TOTAL", "scoreboard-total-score");
+            m_TargetScoreLabel = AddTeamRow("TARGET", "scoreboard-target-score");
+            var divider = new VisualElement();
+            divider.AddToClassList("scoreboard-divider");
+            m_ScoreboardContainer.Add(divider);
+
             foreach (ulong clientId in NetworkPlayers.Ids)
             {
                 if (!NetworkPlayers.TryGetComponent(clientId, out PlayerScore playerScore)) continue;
@@ -695,8 +852,10 @@ namespace Blocks.Gameplay.Core
                 var row = new VisualElement();
                 row.AddToClassList("scoreboard-row");
 
-                var nameLabel = new Label(NetworkPlayers.GetPlayerLabel(clientId));
+                bool finished = RoundTimer.Instance != null && RoundTimer.Instance.IsPlayerFinished(clientId);
+                var nameLabel = new Label(NetworkPlayers.GetPlayerLabel(clientId) + (finished ? " (finished)" : ""));
                 nameLabel.AddToClassList("scoreboard-name");
+                if (finished) nameLabel.AddToClassList("scoreboard-name--finished");
                 row.Add(nameLabel);
 
                 var scoreLabel = new Label(playerScore.Score.ToString());
@@ -709,10 +868,49 @@ namespace Blocks.Gameplay.Core
                 {
                     Element = row,
                     ScoreLabel = scoreLabel,
-                    PlayerScoreComponent = playerScore
+                    PlayerScoreComponent = playerScore,
+                    AnyScoreChanged = UpdateTeamRows
                 };
                 playerScore.ScoreChanged += scoreboardRow.HandleScoreChanged;
                 m_ScoreboardRows[clientId] = scoreboardRow;
+            }
+
+            UpdateTeamRows();
+        }
+
+        /// <summary>One of the TOTAL / TARGET rows at the top of the scoreboard. Returns its value label.</summary>
+        private Label AddTeamRow(string title, string scoreClass)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("scoreboard-row");
+            row.AddToClassList("scoreboard-team-row");
+
+            var nameLabel = new Label(title);
+            nameLabel.AddToClassList("scoreboard-name");
+            row.Add(nameLabel);
+
+            var valueLabel = new Label("0");
+            valueLabel.AddToClassList("scoreboard-score");
+            valueLabel.AddToClassList(scoreClass);
+            row.Add(valueLabel);
+
+            m_ScoreboardContainer.Add(row);
+            return valueLabel;
+        }
+
+        /// <summary>Re-adds everyone's score into TOTAL and refreshes TARGET (green once the team has reached it).</summary>
+        private void UpdateTeamRows()
+        {
+            int total = RoundTimer.ComputeTeamTotal();
+            int target = RoundTimer.Instance != null ? RoundTimer.Instance.TeamTarget : 0;
+
+            if (m_TotalScoreLabel != null) m_TotalScoreLabel.text = total.ToString();
+            if (m_TargetScoreLabel != null)
+            {
+                m_TargetScoreLabel.text = target > 0 ? target.ToString() : "-";
+                bool met = target > 0 && total >= target;
+                m_TargetScoreLabel.EnableInClassList("scoreboard-target-met", met);
+                m_TotalScoreLabel?.EnableInClassList("scoreboard-target-met", met);
             }
         }
 
@@ -730,6 +928,9 @@ namespace Blocks.Gameplay.Core
                 m_ScoreboardContainer?.Remove(row.Element);
             }
             m_ScoreboardRows.Clear();
+            m_ScoreboardContainer?.Clear();
+            m_TotalScoreLabel = null;
+            m_TargetScoreLabel = null;
         }
 
         /// <summary>
@@ -746,9 +947,106 @@ namespace Blocks.Gameplay.Core
         private void UpdateTimerLabel(float secondsRemaining)
         {
             if (m_RoundTimerLabel == null) return;
+            m_RoundTimerLabel.text = FormatTime(secondsRemaining);
+        }
 
+        private void HandleBonusTimerChanged(float previousValue, float newValue)
+        {
+            UpdateBonusTimerLabel(newValue);
+        }
+
+        /// <summary>The bonus timer, dimmed once it has run out (finishing then earns no bonus).</summary>
+        private void UpdateBonusTimerLabel(float secondsRemaining)
+        {
+            if (m_BonusTimerLabel != null) m_BonusTimerLabel.text = FormatTime(secondsRemaining);
+            m_BonusTimerContainer?.EnableInClassList("hud-timer--expired", Mathf.CeilToInt(secondsRemaining) <= 0);
+        }
+
+        private static string FormatTime(float secondsRemaining)
+        {
             int totalSeconds = Mathf.Max(0, Mathf.CeilToInt(secondsRemaining));
-            m_RoundTimerLabel.text = $"{totalSeconds / 60}:{totalSeconds % 60:00}";
+            return $"{totalSeconds / 60}:{totalSeconds % 60:00}";
+        }
+
+        private void HandleRoundInfoChanged()
+        {
+            if (m_RoundTimerCaption != null && m_SubscribedRoundTimer != null)
+            {
+                m_RoundTimerCaption.text = $"ROUND {m_SubscribedRoundTimer.RoundNumber}";
+            }
+            UpdateTeamRows();
+        }
+
+        private void HandleFinishedPlayersChanged()
+        {
+            RequestScoreboardRefresh(); // "(finished)" markers
+            UpdateChallengeBetControlsVisibility(); // a finished player can't wager any more
+        }
+
+        /// <summary>Someone reached the end point: a banner for this player, a notification for anyone else.</summary>
+        private void HandlePlayerFinished(ulong playerId, int bonusPoints)
+        {
+            if (playerId == OwnerClientId)
+            {
+                ShowBanner("FINISHED!", bonusPoints > 0 ? $"+{bonusPoints} bonus points" : "No time left on the bonus timer", null, 3f);
+            }
+            else
+            {
+                AddNotification(bonusPoints > 0
+                    ? $"{GetPlayerName(playerId)} reached the end! +{bonusPoints}"
+                    : $"{GetPlayerName(playerId)} reached the end!");
+            }
+        }
+
+        private void HandleRoundPhaseChanged(RoundTimer.RoundPhase phase)
+        {
+            UpdateChallengeBetControlsVisibility();
+            if (m_SubscribedRoundTimer == null) return;
+
+            switch (phase)
+            {
+                case RoundTimer.RoundPhase.Tallying:
+                    ShowBanner("ROUND OVER", "Adding up the scores...", null, 0f);
+                    break;
+
+                case RoundTimer.RoundPhase.Ended:
+                    bool reached = m_SubscribedRoundTimer.TargetReached;
+                    string score = $"Team scored {m_SubscribedRoundTimer.FinalTeamTotal} of {m_SubscribedRoundTimer.TeamTarget}";
+                    ShowBanner(reached ? "TARGET REACHED!" : "TARGET MISSED", score, reached, 0f);
+                    UpdateTeamRows();
+                    break;
+            }
+        }
+
+        /// <summary>Shows the upper-middle banner; hides it again after <paramref name="hideAfterSeconds"/> (0 = keep it).</summary>
+        private void ShowBanner(string title, string subtitle, bool? good, float hideAfterSeconds)
+        {
+            if (m_RoundBanner == null) return;
+
+            if (m_BannerHideCoroutine != null)
+            {
+                StopCoroutine(m_BannerHideCoroutine);
+                m_BannerHideCoroutine = null;
+            }
+
+            if (m_RoundBannerTitle != null) m_RoundBannerTitle.text = title;
+            if (m_RoundBannerSubtitle != null) m_RoundBannerSubtitle.text = subtitle ?? "";
+            m_RoundBanner.EnableInClassList("round-banner--good", good == true);
+            m_RoundBanner.EnableInClassList("round-banner--bad", good == false);
+            m_RoundBanner.style.display = DisplayStyle.Flex;
+
+            if (hideAfterSeconds > 0f)
+            {
+                m_BannerHideCoroutine = StartCoroutine(HideBannerAfter(hideAfterSeconds));
+            }
+        }
+
+        private IEnumerator HideBannerAfter(float seconds)
+        {
+            yield return new WaitForSeconds(seconds);
+            m_BannerHideCoroutine = null;
+            if (m_SubscribedRoundTimer != null && m_SubscribedRoundTimer.Phase != RoundTimer.RoundPhase.Playing) yield break;
+            if (m_RoundBanner != null) m_RoundBanner.style.display = DisplayStyle.None;
         }
 
         #endregion
@@ -811,8 +1109,11 @@ namespace Blocks.Gameplay.Core
             // a button. Give the cursor back while the overlay is up, and re-lock it once betting closes
             // so movement/look return to normal. Fully qualified because UnityEngine.UIElements (used
             // throughout this file) also declares its own Cursor type for USS cursor styling.
-            UnityEngine.Cursor.lockState = isActive ? CursorLockMode.None : CursorLockMode.Locked;
-            UnityEngine.Cursor.visible = isActive;
+            if (!InGameMenu.IsOpen) // the Escape menu owns the cursor while it's open
+            {
+                UnityEngine.Cursor.lockState = isActive ? CursorLockMode.None : CursorLockMode.Locked;
+                UnityEngine.Cursor.visible = isActive;
+            }
 
             RefreshChallengeOverlay();
         }
@@ -874,8 +1175,16 @@ namespace Blocks.Gameplay.Core
             if (m_ChallengeBetButtons == null || ChallengeManager.Instance == null) return;
 
             bool isLocalPlayerTheChallenger = OwnerClientId == ChallengeManager.Instance.ActiveChallengerClientId;
-            bool showButtons = !isLocalPlayerTheChallenger && !m_HasPlacedBetThisWindow;
+            bool canWager = ChallengeManager.IsRoundOpenFor(OwnerClientId); // not once you've reached the end point
+            bool showButtons = !isLocalPlayerTheChallenger && !m_HasPlacedBetThisWindow && canWager;
             m_ChallengeBetButtons.style.display = showButtons ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (!canWager && !isLocalPlayerTheChallenger && !m_HasPlacedBetThisWindow && m_ChallengeBetStatusLabel != null
+                && ChallengeManager.Instance.IsBettingWindowActive)
+            {
+                m_ChallengeBetStatusLabel.style.display = DisplayStyle.Flex;
+                m_ChallengeBetStatusLabel.text = "You've finished this round - no more wagers.";
+            }
         }
 
         /// <summary>

@@ -28,7 +28,53 @@ namespace Blocks.Gameplay.Core
         /// the remaining time is reserved for a future faster-completion bonus once rounds have an end condition.
         /// </summary>
         [Header("Round")]
-        [Tooltip("How long, in seconds, the round timer counts down from. Reaching 0 does not end the round today.")]
+        [Tooltip("How long, in seconds, the round timer counts down from. Reaching 0 ends the round.")]
         public float roundDurationSeconds = 120f;
+
+        [Tooltip("How long, in seconds, the bonus timer counts down from (it runs alongside the round timer). Reaching the end point while it's running earns Bonus Points Per Second for every second left.")]
+        public float bonusDurationSeconds = 120f;
+
+        [Header("Team Target")]
+        [Tooltip("Round 1's target score per player - the team target is this times the number of players.")]
+        public int averageTargetScore = 3000;
+
+        [Tooltip("The target is multiplied by this after every round the team clears (1 = never gets harder).")]
+        public float targetScoreGrowth = 1.05f;
+
+        [Header("Scoring")]
+        [Tooltip("Points per whole second left on the bonus timer when a player reaches the end point.")]
+        public int bonusPointsPerSecond = 10;
+
+        [Tooltip("Percent of a player's final score kept (on top of the starting score) going into the next round.")]
+        public int carryOverPercent = 5;
+    }
+
+    /// <summary>
+    /// The rules for the match being played: the host's rules (session properties, set on the Host Game
+    /// screen) when in a real game, or - when a gameplay scene is played directly in the editor - Normal
+    /// defaults overridden by a <see cref="GameRulesConfig"/> asset if one is given.
+    /// </summary>
+    public static class MatchRules
+    {
+        public static HostGameRulesData Get(GameRulesConfig fallback)
+        {
+            if (FusionSessionService.HasInstance && FusionSessionService.Instance.InGame && !FusionSessionService.Instance.IsDevSession)
+            {
+                return FusionSessionService.Instance.SessionRules;
+            }
+
+            var rules = HostGamePresets.Normal;
+            if (fallback != null)
+            {
+                rules.StartingPoints = fallback.startingScore;
+                rules.RoundTimeSeconds = Mathf.RoundToInt(fallback.roundDurationSeconds);
+                rules.BonusTimeSeconds = Mathf.RoundToInt(fallback.bonusDurationSeconds);
+                rules.AverageTargetScore = fallback.averageTargetScore;
+                rules.TargetScoreGrowth = fallback.targetScoreGrowth;
+                rules.BonusPointsPerSecond = fallback.bonusPointsPerSecond;
+                rules.CarryOverPercent = fallback.carryOverPercent;
+            }
+            return rules;
+        }
     }
 }

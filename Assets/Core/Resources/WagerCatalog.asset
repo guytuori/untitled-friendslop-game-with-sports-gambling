@@ -1,0 +1,186 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31229a700ee04ccab8cedbca1ed8cf33, type: 3}
+  m_Name: WagerCatalog
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.WagerCatalog
+  templates:
+  - text: Will [PLAYER] jump [NUMBER] times before the end of the game?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 1
+    scope: 0
+    stat: 0
+    supported: 1
+  - text: Will [PLAYER] jump [NUMBER] times before the end of his current challenge?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 1
+    scope: 1
+    stat: 0
+    supported: 1
+  - text: Will [PLAYER] run for [SECONDS_NUMBER] seconds before the end of the game?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 60
+    trigger: 2
+    scope: 0
+    stat: 1
+    supported: 1
+  - text: Will [PLAYER] run for [SECONDS_NUMBER] seconds before the end of his current
+      challenge?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 60
+    trigger: 2
+    scope: 1
+    stat: 1
+    supported: 1
+  - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on grind rails before the
+      end of the game?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 60
+    trigger: 3
+    scope: 0
+    stat: 2
+    supported: 1
+  - text: Will [PLAYER] jump [NUMBER] times from a grind rail before the end of the
+      game?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 3
+    scope: 0
+    stat: 3
+    supported: 1
+  - text: Will [PLAYER] jump [NUMBER] times from a grind rail before the end of his
+      current challenge?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 3
+    scope: 1
+    stat: 3
+    supported: 1
+  - text: Will [PLAYER] perform [NUMBER] wall jumps before the end of the game?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 4
+    scope: 0
+    stat: 4
+    supported: 1
+  - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a wall before the end of
+      the game?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 60
+    trigger: 4
+    scope: 0
+    stat: 5
+    supported: 1
+  - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a wall before the end of
+      his current challenge?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 60
+    trigger: 4
+    scope: 1
+    stat: 5
+    supported: 1
+  - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a pole before the end of
+      the game?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 60
+    trigger: 5
+    scope: 0
+    stat: 6
+    supported: 1
+  - text: Will [PLAYER] jump [NUMBER] times from a pole before the end of the game?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 5
+    scope: 0
+    stat: 7
+    supported: 1
+  - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a pole before the end of
+      his current challenge?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 60
+    trigger: 5
+    scope: 1
+    stat: 6
+    supported: 1
+  - text: Will [PLAYER] jump [NUMBER] times from a pole before the end of his current
+      challenge?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 5
+    scope: 1
+    stat: 7
+    supported: 1
+  - text: Will [PLAYER] die [NUMBER] times before the end of the game?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 0
+    scope: 0
+    stat: 8
+    supported: 1
+  - text: Will [PLAYER] achieve a score of [SCORE_NUMBER] before the end of the game?
+    numberPlaceholder: SCORE_NUMBER
+    minNumber: 2000
+    maxNumber: 5000
+    trigger: 0
+    scope: 0
+    stat: 10
+    supported: 1
+  - text: Will [PLAYER] end with a score of [SCORE_NUMBER] before the end of the
+      game?
+    numberPlaceholder: SCORE_NUMBER
+    minNumber: 2000
+    maxNumber: 5000
+    trigger: 0
+    scope: 0
+    stat: 11
+    supported: 1
+  - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on slippery floors before
+      the end of the game?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 60
+    trigger: 0
+    scope: 0
+    stat: 9
+    supported: 1
+  - text: Will [PLAYER] collect [NUMBER] pickups by the end of the game?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 0
+    scope: 0
+    stat: 12
+    supported: 0
+  - text: Will [PLAYER] collect [NUMBER] items by the end of the game?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 100
+    trigger: 0
+    scope: 0
+    stat: 13
+    supported: 0

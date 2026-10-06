@@ -80,6 +80,7 @@ namespace Blocks.Gameplay.Core
 
                 // Apply the jump velocity
                 m_Motor.SetVerticalVelocity(jumpVelocity);
+                PlayerActions.Report(m_Motor.gameObject, PlayerAction.Jump); // counted for wagers (LocalActionTracker)
 
                 // Override gravity for this frame to prevent it from immediately reducing the applied jump force
                 // This ensures the character leaves the ground with the full calculated velocity

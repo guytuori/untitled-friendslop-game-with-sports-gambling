@@ -54,8 +54,8 @@ namespace Blocks.Gameplay.Core
     /// Back/Left/Right/Jump/Run/Grab/OpenMenu on keyboard, and Move/Jump/Run/Grab/OpenMenu on gamepad -
     /// see <see cref="GetRealAction"/>/<see cref="GetRealCompositePart"/> for exactly how each row maps to
     /// an action (and, for the four directional keyboard rows, to one part of Move's WASD composite).
-    /// The Wager rows (WagerOption1-3 on keyboard, WagerCursorUp/WagerCursorDown/WagerSelect on gamepad)
-    /// don't correspond to any real action yet - the user's own words: "don't worry about what these mean
+    /// The Wager rows (Wager Yes / Wager No / Dismiss Wager, on both keyboard and gamepad - wagers became a
+    /// pop-up you answer without pausing, 2026-10-06) don't correspond to any real action yet - the user's own words: "don't worry about what these mean
     /// yet, they'll be added to the main part of the game later" - so those stay purely cosmetic, stored
     /// in <see cref="InputBindingsData"/>/<see cref="InputBindingsStore"/> same as before.
     /// <see cref="IsRealCommand"/> is what the rest of this class branches on to tell the two apart.
@@ -193,9 +193,9 @@ namespace Blocks.Gameplay.Core
                 AddRow(list, "JUMP", "Jump");
                 AddRow(list, "RUN", "Run");
                 AddRow(list, "GRAB", "Grab");
-                AddRow(list, "WAGER CURSOR UP", "WagerCursorUp");
-                AddRow(list, "WAGER CURSOR DOWN", "WagerCursorDown");
-                AddRow(list, "WAGER SELECT", "WagerSelect");
+                AddRow(list, "WAGER YES", "WagerYes");
+                AddRow(list, "WAGER NO", "WagerNo");
+                AddRow(list, "DISMISS WAGER", "DismissWager");
                 AddRow(list, "OPEN MENU", "OpenMenu");
                 AddRumbleRow(list);
             }
@@ -208,9 +208,9 @@ namespace Blocks.Gameplay.Core
                 AddRow(list, "JUMP", "Jump");
                 AddRow(list, "RUN", "Run");
                 AddRow(list, "GRAB", "Grab");
-                AddRow(list, "WAGER OPTION1", "WagerOption1");
-                AddRow(list, "WAGER OPTION2", "WagerOption2");
-                AddRow(list, "WAGER OPTION3", "WagerOption3");
+                AddRow(list, "WAGER YES", "WagerYes");
+                AddRow(list, "WAGER NO", "WagerNo");
+                AddRow(list, "DISMISS WAGER", "DismissWager");
                 AddRow(list, "OPEN MENU", "OpenMenu");
             }
 
@@ -681,18 +681,18 @@ namespace Blocks.Gameplay.Core
             {
                 return commandKey switch
                 {
-                    "WagerCursorUp" => m_Bindings.Gamepad.WagerCursorUp,
-                    "WagerCursorDown" => m_Bindings.Gamepad.WagerCursorDown,
-                    "WagerSelect" => m_Bindings.Gamepad.WagerSelect,
+                    "WagerYes" => m_Bindings.Gamepad.WagerYes,
+                    "WagerNo" => m_Bindings.Gamepad.WagerNo,
+                    "DismissWager" => m_Bindings.Gamepad.DismissWager,
                     _ => "?"
                 };
             }
 
             return commandKey switch
             {
-                "WagerOption1" => m_Bindings.Keyboard.WagerOption1,
-                "WagerOption2" => m_Bindings.Keyboard.WagerOption2,
-                "WagerOption3" => m_Bindings.Keyboard.WagerOption3,
+                "WagerYes" => m_Bindings.Keyboard.WagerYes,
+                "WagerNo" => m_Bindings.Keyboard.WagerNo,
+                "DismissWager" => m_Bindings.Keyboard.DismissWager,
                 _ => "?"
             };
         }
@@ -703,18 +703,18 @@ namespace Blocks.Gameplay.Core
             {
                 switch (commandKey)
                 {
-                    case "WagerCursorUp": m_Bindings.Gamepad.WagerCursorUp = rawValue; break;
-                    case "WagerCursorDown": m_Bindings.Gamepad.WagerCursorDown = rawValue; break;
-                    case "WagerSelect": m_Bindings.Gamepad.WagerSelect = rawValue; break;
+                    case "WagerYes": m_Bindings.Gamepad.WagerYes = rawValue; break;
+                    case "WagerNo": m_Bindings.Gamepad.WagerNo = rawValue; break;
+                    case "DismissWager": m_Bindings.Gamepad.DismissWager = rawValue; break;
                 }
                 return;
             }
 
             switch (commandKey)
             {
-                case "WagerOption1": m_Bindings.Keyboard.WagerOption1 = rawValue; break;
-                case "WagerOption2": m_Bindings.Keyboard.WagerOption2 = rawValue; break;
-                case "WagerOption3": m_Bindings.Keyboard.WagerOption3 = rawValue; break;
+                case "WagerYes": m_Bindings.Keyboard.WagerYes = rawValue; break;
+                case "WagerNo": m_Bindings.Keyboard.WagerNo = rawValue; break;
+                case "DismissWager": m_Bindings.Keyboard.DismissWager = rawValue; break;
             }
         }
 

@@ -29,6 +29,18 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Default maximum angle in degrees the camera can look up or down (used when camera doesn't override).")]
         [SerializeField] private float defaultVerticalLookLimit = 70.0f;
 
+        [Header("Gamepad Look")]
+        [Tooltip("How far the right stick has to be pushed (0-1) before the camera turns - ignores the drift of worn or loose sticks.")]
+        [Range(0f, 0.5f)]
+        [SerializeField] private float stickDeadzone = 0.1f;
+        [Tooltip("Degrees per second the camera turns left/right with the right stick pushed all the way.")]
+        [SerializeField] private float stickYawSpeed = 200f;
+        [Tooltip("Degrees per second the camera tilts up/down with the right stick pushed all the way.")]
+        [SerializeField] private float stickPitchSpeed = 140f;
+        [Tooltip("How turn speed follows how far the stick is pushed past the deadzone: 1 = in proportion, higher = slower near the center for finer aiming, full speed at the edge.")]
+        [Range(1f, 3f)]
+        [SerializeField] private float stickResponseCurve = 1f;
+
         [Header("Listening to Events")]
         [Tooltip("Event that provides look input from the CoreInputHandler.")]
         [SerializeField] private Vector2Event onLookInput;
@@ -53,6 +65,8 @@ namespace Blocks.Gameplay.Core
         private float m_CurrentHorizontalLookAngle;
         private float m_LookSensitivity;
         private float m_VerticalLookLimit;
+        private Vector2 m_StickLook;
+        private CoreInputHandler m_StickInputSource;
 
         // Runtime references.
         private CinemachineBrain m_CinemachineBrain;
@@ -95,6 +109,9 @@ namespace Blocks.Gameplay.Core
                 if (enableLookInput)
                 {
                     onLookInput.RegisterListener(SetLookInput);
+
+                    m_StickInputSource = GetComponent<CoreInputHandler>();
+                    if (m_StickInputSource != null) m_StickInputSource.StickLookChanged += SetStickLookInput;
                 }
             }
         }
@@ -119,6 +136,13 @@ namespace Blocks.Gameplay.Core
                 {
                     onLookInput.UnregisterListener(SetLookInput);
                 }
+
+                if (m_StickInputSource != null)
+                {
+                    m_StickInputSource.StickLookChanged -= SetStickLookInput;
+                    m_StickInputSource = null;
+                }
+                m_StickLook = Vector2.zero;
             }
             base.OnNetworkDespawn();
         }
@@ -129,6 +153,8 @@ namespace Blocks.Gameplay.Core
             // This prevents visual jitter.
             if (lookTarget != null && IsOwner && enableLookInput)
             {
+                ApplyStickLook(Time.deltaTime);
+
                 Quaternion horizontalRotation = Quaternion.Euler(0f, m_CurrentHorizontalLookAngle, 0f);
                 Quaternion verticalRotation = Quaternion.Euler(m_CurrentVerticalLookAngle, 0f, 0f);
                 lookTarget.rotation = horizontalRotation * verticalRotation;
@@ -151,6 +177,38 @@ namespace Blocks.Gameplay.Core
 
             // Clamp the vertical angle to prevent the camera from flipping over.
             m_CurrentVerticalLookAngle = Mathf.Clamp(m_CurrentVerticalLookAngle - (lookInput.y * m_LookSensitivity), -m_VerticalLookLimit, m_VerticalLookLimit);
+        }
+
+        /// <summary>
+        /// Sets the right stick's current position (from CoreInputHandler.StickLookChanged). The camera keeps
+        /// turning every frame while the stick is held past the deadzone - see <see cref="ApplyStickLook"/>.
+        /// </summary>
+        public void SetStickLookInput(Vector2 stick)
+        {
+            m_StickLook = stick;
+        }
+
+        /// <summary>
+        /// Turns the camera for one frame from the held right stick: nothing inside the deadzone, then a
+        /// speed that grows with how far the stick is pushed (rescaled so it starts from zero just past the
+        /// deadzone, shaped by stickResponseCurve), in the direction the stick points. Independent of the
+        /// mouse sensitivity, which is tuned for mouse deltas.
+        /// </summary>
+        private void ApplyStickLook(float deltaTime)
+        {
+            if (!Application.isFocused) return; // a pad reaches background windows too (see CoreInputHandler)
+
+            float magnitude = Mathf.Min(1f, m_StickLook.magnitude);
+            if (magnitude <= stickDeadzone) return;
+
+            float amount = Mathf.Clamp01((magnitude - stickDeadzone) / Mathf.Max(0.0001f, 1f - stickDeadzone));
+            amount = Mathf.Pow(amount, stickResponseCurve);
+            Vector2 direction = m_StickLook / m_StickLook.magnitude;
+
+            m_CurrentHorizontalLookAngle += direction.x * amount * stickYawSpeed * deltaTime;
+            m_CurrentVerticalLookAngle = Mathf.Clamp(
+                m_CurrentVerticalLookAngle - direction.y * amount * stickPitchSpeed * deltaTime,
+                -m_VerticalLookLimit, m_VerticalLookLimit);
         }
 
         /// <summary>

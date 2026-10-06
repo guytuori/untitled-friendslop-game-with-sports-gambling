@@ -112,6 +112,9 @@ namespace Blocks.Gameplay.Core
         [MenuItem("Friendslop/Set Object Property/Challenge Finish")]
         private static void SetChallengeFinish() => ApplyToSelection(MapObjectPropertyType.ChallengeFinish);
 
+        [MenuItem("Friendslop/Set Object Property/Player End Point")]
+        private static void SetPlayerEndPoint() => ApplyToSelection(MapObjectPropertyType.PlayerEndPoint);
+
         #endregion
 
         private static void ApplyToSelection(MapObjectPropertyType type)
@@ -210,6 +213,12 @@ namespace Blocks.Gameplay.Core
                     BuildFlatCollider(obj, meshFilter, null);
                     BuildChallengeTrigger(obj, meshFilter, ChallengeZoneKind.Finish);
                     break;
+
+                case MapObjectPropertyType.PlayerEndPoint:
+                    // Walkable tile; PlayerEndPoint builds its own trigger volume when the game runs.
+                    BuildFlatCollider(obj, meshFilter, null);
+                    Undo.AddComponent<PlayerEndPoint>(obj);
+                    break;
             }
 
             tag.PropertyType = type;
@@ -248,6 +257,7 @@ namespace Blocks.Gameplay.Core
             RemoveComponent<BalanceBeam>(obj);
             RemoveComponent<GrindRail>(obj);
             RemoveComponent<PlayerSpawnPoint>(obj);
+            RemoveComponent<PlayerEndPoint>(obj);
             RemoveComponent<ChallengeZoneTrigger>(obj);
 
             foreach (Collider collider in obj.GetComponents<Collider>())

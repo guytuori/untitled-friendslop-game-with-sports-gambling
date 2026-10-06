@@ -21,8 +21,9 @@ namespace Blocks.Gameplay.Core
     ///
     /// Rows, top to bottom: Presets (Normal / Hard / Very Hard), Visibility (host only), Map (2x5 grid of
     /// thumbnails - see <see cref="maps"/> - with the hovered/selected map's name to the right and flavor
-    /// text underneath; unselected maps grayed out), Max Players, Round Time, Bonus Time, Lives, Starting
-    /// Points, Death Penalty, Wager Payout (sliders over fixed option lists, current option shown to the
+    /// text underneath; unselected maps grayed out), Max Players, Round Time, Bonus Time, Average Target
+    /// Score and Target Score Growth (host only - not search filters), Lives, Starting Points, Death
+    /// Penalty, Wager Payout (sliders over fixed option lists, current option shown to the
     /// right), Items and Pickups (On/Off dropdowns). Back is bottom-left; B/Esc while not editing also
     /// acts as Back. Choices aren't saved to disk - they're remembered for as long as the game runs.
     ///
@@ -100,6 +101,8 @@ namespace Blocks.Gameplay.Core
         private static readonly int[] MaxPlayerOptions = BuildRange(2, 16);
         private static readonly int[] RoundTimeOptions = { 60, 90, 120, 150, 180, 240, 300, 360, 420, 480 };
         private static readonly int[] BonusTimeOptions = { 0, 30, 40, 50, 60, 70, 80, 90, 120, 180 };
+        private static readonly int[] AverageTargetScoreOptions = { 3000, 3200, 3400, 3600, 4000, 4200, 4400, 4600, 4800, 5000 };
+        private static readonly float[] TargetScoreGrowthOptions = { 1.0f, 1.05f, 1.1f, 1.15f, 1.2f };
         private static readonly int[] LivesOptions = BuildLivesOptions(); // 1-20, then -1 (Unlimited)
         private static readonly int[] StartingPointsOptions = { 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1500, 2000 };
         private static readonly int[] DeathPenaltyOptions = { 0, 25, 50, 100, 200, 300, 400, 500, -1 }; // -1 = All
@@ -142,7 +145,7 @@ namespace Blocks.Gameplay.Core
         // ----- layout -----
 
         private const float AllToggleWidth = 80f;
-        private const float LabelWidth = 200f;
+        private const float LabelWidth = 240f; // fits AVERAGE TARGET SCORE
         private const float ControlWidth = 550f; // ~ the 5-wide map grid's natural width, so value labels line up with the map name
         private const float ValueWidth = 300f;
         private const float RowSpacing = 8f;
@@ -312,6 +315,22 @@ namespace Blocks.Gameplay.Core
                 i => GameRulesFormat.Time(BonusTimeOptions[i]),
                 i => m_Rules.BonusTimeSeconds = BonusTimeOptions[i],
                 Flag(() => m_Filter.AllBonusTimes, v => m_Filter.AllBonusTimes = v));
+
+            // Host only - the target score isn't something games are searched by.
+            if (!IsFilterMode)
+            {
+                AddSliderRow(column, "AVERAGE TARGET SCORE", AverageTargetScoreOptions.Length,
+                    () => IndexOf(AverageTargetScoreOptions, m_Rules.AverageTargetScore, 0),
+                    i => AverageTargetScoreOptions[i].ToString(CultureInfo.InvariantCulture),
+                    i => m_Rules.AverageTargetScore = AverageTargetScoreOptions[i],
+                    null);
+
+                AddSliderRow(column, "TARGET SCORE GROWTH", TargetScoreGrowthOptions.Length,
+                    () => IndexOf(TargetScoreGrowthOptions, m_Rules.TargetScoreGrowth, 1),
+                    i => "x" + TargetScoreGrowthOptions[i].ToString("0.00", CultureInfo.InvariantCulture),
+                    i => m_Rules.TargetScoreGrowth = TargetScoreGrowthOptions[i],
+                    null);
+            }
 
             // In filter mode the Hard search preset means "more than 5 lives" (GameSearchFilter.LivesMoreThan);
             // the label says so, and any edit to this slider turns it back into an exact match.

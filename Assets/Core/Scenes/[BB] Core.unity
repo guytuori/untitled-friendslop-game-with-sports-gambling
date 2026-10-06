@@ -471,6 +471,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.RoundTimer
   gameRulesConfig: {fileID: 11400000, guid: c51b3671a65601b4b8e53c9e777cc9cc, type: 2}
+  tallySeconds: 1.5
+  resultSeconds: 4
 --- !u!114 &1129721987
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -675,7 +677,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2341912560403749330, guid: 51238ec1086bd4d9abf55bc190cdfd1a, type: 3}
       propertyPath: respawnDelay
-      value: 3
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 2341912560403749330, guid: 51238ec1086bd4d9abf55bc190cdfd1a, type: 3}
       propertyPath: spawnPoints.Array.size

@@ -21,9 +21,11 @@ namespace Blocks.Gameplay.Core
     [Serializable]
     public class KeyboardBindings
     {
-        public string WagerOption1 = "1";
-        public string WagerOption2 = "2";
-        public string WagerOption3 = "3";
+        // Wagers are a pop-up ticker answered without pausing: yes, no, or dismiss it. (Renamed from
+        // WagerOption1-3 on 2026-10-06, so older saves fall back to these defaults.)
+        public string WagerYes = "1";
+        public string WagerNo = "2";
+        public string DismissWager = "3";
     }
 
     /// <summary>
@@ -36,9 +38,11 @@ namespace Blocks.Gameplay.Core
     [Serializable]
     public class GamepadBindings
     {
-        public string WagerCursorUp = "leftTrigger";
-        public string WagerCursorDown = "rightTrigger";
-        public string WagerSelect = "rightShoulder";
+        // Shoulders/triggers, so a wager can be answered without letting go of the sticks or face buttons.
+        // (Renamed from WagerCursorUp/WagerCursorDown/WagerSelect on 2026-10-06.)
+        public string WagerYes = "rightShoulder";
+        public string WagerNo = "rightTrigger";
+        public string DismissWager = "leftTrigger";
 
         /// <summary>Change Keybindings' ENABLE RUMBLE checkbox (gamepad layout only). On by default. Read at runtime through <see cref="GamepadRumble"/>.</summary>
         public bool RumbleEnabled = true;

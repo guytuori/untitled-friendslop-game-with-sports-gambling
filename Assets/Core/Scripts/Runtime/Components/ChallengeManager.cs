@@ -6,6 +6,10 @@ using Fusion;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
+    /// NOTE (2026-10-06): wagers moved to the non-pausing ticker (WagerManager). Claiming a challenge now
+    /// starts the attempt immediately - the betting-window/pause parts described below are no longer
+    /// opened - and tells WagerManager when a challenge starts and ends (for challenge-only wagers).
+    ///
     /// The single, authoritative brain for every <see cref="ChallengeZone"/> in the map, plus the
     /// flat death penalty that applies regardless of any challenge. Lives on one GameObject placed
     /// directly in the gameplay scene (see ChallengeSystemSetup), the same way RoundTimer does.
@@ -260,22 +264,33 @@ namespace Blocks.Gameplay.Core
 
         private void TryClaimChallenge(ChallengeZone zone, ulong challengerId)
         {
-            if (NetIsBettingWindowActive) return; // only one betting window globally at a time
+            if (!IsRoundOpenFor(challengerId)) return; // round over, or this player already reached the end point
             if (zone.HasOwner) return; // first come, first served
             if (zone.HasCompletedThisRound) return; // once and only once per round - see ChallengeZone.HasCompletedThisRound
             if (m_RunningAttemptsByOwner.ContainsKey(challengerId)) return; // already mid-attempt elsewhere
 
             zone.Claim(challengerId);
 
-            m_BettingWindowZone = zone;
-            NetActiveChallengeName = zone.Definition != null ? zone.Definition.challengeName : zone.name;
-            NetActiveChallengerId = (int)challengerId;
-            NetBettingTimeRemaining = bettingWindowSeconds;
-            NetBettorCount = 0;
-            NetIsBettingWindowActive = true;
-            NetIsPaused = true;
-            DetectChanges();
+            // Wagers no longer pause the game (2026-10-06): the attempt starts straight away, and the wager
+            // ticker (WagerManager) may now offer challenge-only wagers about this player. The old betting
+            // window below (CloseBettingWindow / PlaceBet) is no longer opened.
+            zone.BeginAttempt();
+            m_RunningAttemptsByOwner[challengerId] = zone;
+            if (WagerManager.Instance != null) WagerManager.Instance.OnChallengeStarted(challengerId);
+            PlayerChallengeStateRpc((int)challengerId, true);
         }
+
+        /// <summary>Raised on every client when a player starts (true) or finishes (false) a challenge attempt.</summary>
+        public static event Action<ulong, bool> PlayerChallengeStateChanged;
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void PlayerChallengeStateRpc(int playerId, NetworkBool inChallenge)
+        {
+            PlayerChallengeStateChanged?.Invoke((ulong)playerId, inChallenge);
+        }
+
+        /// <summary>Master client only: whether this player is in the middle of a challenge attempt.</summary>
+        public bool IsPlayerInChallenge(ulong playerId) => m_RunningAttemptsByOwner.ContainsKey(playerId);
 
         private void CloseBettingWindow()
         {
@@ -310,6 +325,7 @@ namespace Blocks.Gameplay.Core
 
             if (!NetIsBettingWindowActive || m_BettingWindowZone == null) return;
             if (bettorId == ActiveChallengerClientId) return; // can't bet on yourself
+            if (!IsRoundOpenFor(bettorId)) return; // finished players (and everyone, once the round is over) can't wager
 
             var bettorScore = GetPlayerScore(bettorId);
             if (bettorScore == null) return;
@@ -353,6 +369,10 @@ namespace Blocks.Gameplay.Core
 
             m_RunningAttemptsByOwner.Remove(ownerId);
             zone.ResetToIdle();
+
+            // Settle this player's challenge-only wagers now that the challenge is over.
+            if (WagerManager.Instance != null) WagerManager.Instance.OnChallengeEnded(ownerId);
+            PlayerChallengeStateRpc((int)ownerId, false);
         }
 
         #endregion
@@ -412,6 +432,14 @@ namespace Blocks.Gameplay.Core
         #endregion
 
         #region Helpers
+
+        /// <summary>False once the round is over, or for a player who has reached the end point (see RoundTimer).</summary>
+        public static bool IsRoundOpenFor(ulong playerId)
+        {
+            RoundTimer round = RoundTimer.Instance;
+            if (round == null || !round.IsSpawned) return true; // no round rules in this scene
+            return round.IsPlaying && !round.IsPlayerFinished(playerId);
+        }
 
         private static PlayerScore GetPlayerScore(ulong clientId)
         {

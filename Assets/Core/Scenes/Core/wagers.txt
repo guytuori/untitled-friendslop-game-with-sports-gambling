@@ -1,0 +1,33 @@
+On jump:
+Will [PLAYER] jump [NUMBER] times before the end of the game?
+!CHALLENGE! Will [PLAYER] jump [NUMBER] times before the end of his current challenge?
+On pressing the run button on the ground:
+Will [PLAYER] run for [SECONDS_NUMBER] seconds before the end of the game?
+!CHALLENGE! Will [PLAYER] run for [SECONDS_NUMBER] seconds before the end of his current challenge?
+On grind rail:
+Will [PLAYER] spend [SECONDS_NUMBER] seconds on grind rails before the end of the game?
+Will [PLAYER] jump [NUMBER] times from a grind rail before the end of the game?
+!CHALLENGE! Will [PLAYER] jump [NUMBER] times from a grind rail before the end of his current challenge?
+On wall run:
+Will [PLAYER] perform [NUMBER] wall jumps before the end of the game?
+Will [PLAYER] spend [SECONDS_NUMBER] seconds on a wall before the end of the game?
+!CHALLENGE! Will [PLAYER] spend [SECONDS_NUMBER] seconds on a wall before the end of his current challenge?
+On pole climb:
+Will [PLAYER] spend [SECONDS_NUMBER] seconds on a pole before the end of the game?
+Will [PLAYER] jump [NUMBER] times from a pole before the end of the game?
+!CHALLENGE! Will [PLAYER] spend [SECONDS_NUMBER] seconds on a pole before the end of his current challenge?
+!CHALLENGE! Will [PLAYER] jump [NUMBER] times from a pole before the end of his current challenge?
+No particular trigger:
+Will [PLAYER] die [NUMBER] times before the end of the game?
+Will [PLAYER] achieve a score of [SCORE_NUMBER] before the end of the game?
+Will [PLAYER] end with a score of [SCORE_NUMBER] before the end of the game?
+Will [PLAYER] spend [SECONDS_NUMBER] seconds on slippery floors before the end of the game?
+Will [PLAYER] collect [NUMBER] pickups by the end of the game?
+Will [PLAYER] collect [NUMBER] items by the end of the game?
+RANDOM SPANS
+SCORE_NUMBER
+2000-5000
+SECONDS_NUMBER
+1-60
+NUMBER
+1-100

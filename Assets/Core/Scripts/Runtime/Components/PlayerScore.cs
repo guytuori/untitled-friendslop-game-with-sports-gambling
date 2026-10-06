@@ -16,7 +16,8 @@ namespace Blocks.Gameplay.Core
     /// Every client can read everyone's current score, which is exactly what the scoreboard needs.
     ///
     /// The starting score is the session's Starting Points rule from the Host Game screen (falling back to
-    /// <see cref="gameRulesConfig"/> when the scene is played directly for testing).
+    /// <see cref="gameRulesConfig"/> when the scene is played directly for testing), plus - from round 2 on -
+    /// the share of last round's final score this player keeps (MatchProgress.LocalCarryOverPoints).
     /// </summary>
     public class PlayerScore : CoreNetworkBehaviour, IPlayerRequiredComponent
     {
@@ -126,11 +127,8 @@ namespace Blocks.Gameplay.Core
 
         private int GetStartingScore()
         {
-            if (FusionSessionService.HasInstance && FusionSessionService.Instance.InGame && !FusionSessionService.Instance.IsDevSession)
-            {
-                return FusionSessionService.Instance.SessionRules.StartingPoints;
-            }
-            return gameRulesConfig != null ? gameRulesConfig.startingScore : DefaultStartingScore;
+            int startingPoints = MatchRules.Get(gameRulesConfig).StartingPoints;
+            return startingPoints + MatchProgress.LocalCarryOverPoints;
         }
 
         private void DetectChanges()

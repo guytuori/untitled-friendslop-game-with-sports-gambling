@@ -295,6 +295,8 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private int wallJumpStyle;
         private void PerformWallJump()
         {
+            PlayerActions.Report(m_Motor.gameObject, PlayerAction.WallJump); // counted for wagers (LocalActionTracker)
+
             if (wallJumpStyle == 1)
             {
                 ControlledWallJump();

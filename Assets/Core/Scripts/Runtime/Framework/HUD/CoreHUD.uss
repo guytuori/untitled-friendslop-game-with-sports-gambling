@@ -46,24 +46,103 @@
     justify-content: center;
 }
 
-/* Round Timer (top-middle) */
-#round-timer-container {
+/* Round + Bonus timers (top-middle, side by side, centered as a pair) */
+#timers-container {
     position: absolute;
     top: 20px;
-    left: 50%;
-    width: 160px;
-    margin-left: -80px;
-    background-color: rgba(0, 0, 0, 0.5);
-    border-radius: 5px;
-    padding: 8px;
+    left: 0;
+    right: 0;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.hud-timer {
+    width: 150px;
+    margin-left: 6px;
+    margin-right: 6px;
+    border-radius: 6px;
+    border-width: 2px;
+    padding: 4px 8px 6px 8px;
     align-items: center;
 }
 
-#round-timer-label {
+.hud-timer-caption {
+    font-size: 13px;
+    -unity-font-style: bold;
+    letter-spacing: 2px;
+    -unity-text-align: middle-center;
+}
+
+.hud-timer-value {
     font-size: 32px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+/* Round timer: cool blue */
+#round-timer-container {
+    background-color: rgba(18, 52, 120, 0.85);
+    border-color: rgb(110, 190, 255);
+}
+
+#round-timer-caption {
+    color: rgb(170, 220, 255);
+}
+
+#round-timer-label {
+    color: rgb(255, 255, 255);
+}
+
+/* Bonus timer: warm gold */
+#bonus-timer-container {
+    background-color: rgba(120, 70, 0, 0.85);
+    border-color: rgb(255, 200, 60);
+}
+
+#bonus-timer-caption {
+    color: rgb(255, 215, 110);
+}
+
+#bonus-timer-label {
+    color: rgb(255, 236, 160);
+}
+
+.hud-timer--expired {
+    opacity: 0.4;
+}
+
+/* Round-over / finished banner (upper middle) */
+#round-banner {
+    position: absolute;
+    top: 22%;
+    left: 0;
+    right: 0;
+    align-items: center;
+}
+
+#round-banner-title {
+    font-size: 54px;
     color: rgb(255, 255, 255);
     -unity-font-style: bold;
     -unity-text-align: middle-center;
+    text-shadow: 2px 2px 4px rgb(0, 0, 0);
+}
+
+#round-banner-subtitle {
+    font-size: 22px;
+    color: rgb(235, 235, 235);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    text-shadow: 1px 1px 3px rgb(0, 0, 0);
+    margin-top: 6px;
+}
+
+.round-banner--good #round-banner-title {
+    color: rgb(140, 230, 110);
+}
+
+.round-banner--bad #round-banner-title {
+    color: rgb(255, 110, 100);
 }
 
 /* Scoreboard (left-middle) */
@@ -72,8 +151,8 @@
     top: 50%;
     left: 20px;
     width: 240px;
-    margin-top: -100px;
-    max-height: 260px;
+    margin-top: -120px;
+    max-height: 340px;
     background-color: rgba(0, 0, 0, 0.5);
     border-radius: 5px;
     padding: 10px;
@@ -95,6 +174,35 @@
     color: rgb(145, 213, 97);
     font-size: 16px;
     -unity-font-style: bold;
+}
+
+/* Team rows at the top of the scoreboard */
+.scoreboard-team-row {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    margin-bottom: 2px;
+}
+
+.scoreboard-total-score {
+    color: rgb(255, 215, 90);
+}
+
+.scoreboard-target-score {
+    color: rgb(170, 220, 255);
+}
+
+.scoreboard-target-met {
+    color: rgb(140, 230, 110);
+}
+
+.scoreboard-divider {
+    height: 2px;
+    background-color: rgba(255, 255, 255, 0.25);
+    margin: 4px 2px 4px 2px;
+}
+
+.scoreboard-name--finished {
+    color: rgb(150, 150, 150);
 }
 
 /* Notification Styles */

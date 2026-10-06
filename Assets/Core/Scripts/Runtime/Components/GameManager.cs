@@ -49,7 +49,7 @@ namespace Blocks.Gameplay.Core
 
         [Header("Game Rules")]
         [Tooltip("Time in seconds before the local player respawns.")]
-        [SerializeField] private float respawnDelay = 5.0f;
+        [SerializeField] private float respawnDelay = 0.5f;
 
         [Tooltip("If true, the local player respawns automatically.")]
         [SerializeField] private bool autoRespawn = true;
@@ -330,9 +330,18 @@ namespace Blocks.Gameplay.Core
                 onRespawnStatus.Raise(new RespawnStatusPayload { playerId = localId, message = "", subtext = "", showSubtext = false });
             }
 
-            // Respawn at a random spawn point, same as the initial spawn.
+            // Respawn on safe ground near where they died - or by their challenge's entrance if they're in one
+            // (LocalRespawnTracker) - falling back to a random spawn point, same as the initial spawn.
             var coreMovement = playerState.GetComponent<CoreMovement>();
-            if (coreMovement != null)
+            var respawnTracker = playerState.GetComponent<LocalRespawnTracker>();
+            if (coreMovement != null && respawnTracker != null && respawnTracker.TryGetRespawnPoint(out Vector3 safePosition, out Quaternion safeRotation))
+            {
+                coreMovement.transform.rotation = safeRotation;
+                coreMovement.SetPosition(safePosition);
+                coreMovement.ResetMovementForces();
+                PlayRespawnTimerSFX();
+            }
+            else if (coreMovement != null)
             {
                 int spawnIndex = GetRandomSpawnIndex();
                 if (TryGetSpawnTransform(spawnIndex, out Transform spawnTransform))
