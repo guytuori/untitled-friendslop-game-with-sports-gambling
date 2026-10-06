@@ -90,6 +90,7 @@ whores
 *raghead
 *towelhead
 
+
 # --- Whole words only (they turn up inside innocent words: Scunthorpe, peacock, therapist, canal, raccoon) ---
 cock
 cocks
@@ -119,3 +120,6 @@ dyke
 dykes
 kike
 kikes
+wop
+dago
+muklo

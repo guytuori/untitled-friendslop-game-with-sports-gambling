@@ -123,7 +123,9 @@ namespace Blocks.Gameplay.Core
         // Written by the owner (State Authority), read by everyone - see SyncNetworkState.
         [Networked] private NetworkBool NetIsOnRail { get; set; }
         [Networked] private float NetBalance { get; set; }
-
+        //m_InputLocks.Add(reason)
+        
+        private CorePlayerManager m_playerManager;
         private CoreMovement m_Motor;
         private CharacterController m_Controller;
         private bool m_IsActive = true;
@@ -190,7 +192,7 @@ namespace Blocks.Gameplay.Core
 
             if (!IsOnRail)
             {
-                if (TryDetectRail(out GrindRail rail, out float arc, out float travelSign))
+                if (m_Motor.IsGrabHeld && TryDetectRail(out GrindRail rail, out float arc, out float travelSign))
                 {
                     EnterRail(rail, arc, travelSign);
                 }
@@ -383,6 +385,7 @@ namespace Blocks.Gameplay.Core
 
         private void EnterRail(GrindRail rail, float arc, float travelSign)
         {
+
             previousPosition = (transform.position - transform.forward);
             m_CurrentRail = rail;
             IsOnRail = true;
@@ -668,6 +671,13 @@ namespace Blocks.Gameplay.Core
 
             return animationControls;
         }
-
+        public CorePlayerManager PlayerManager()
+        {
+            if (m_playerManager == null)
+            {
+                m_playerManager = GetComponent<CorePlayerManager>();
+            }
+            return m_playerManager;
+        }
     }
 }
