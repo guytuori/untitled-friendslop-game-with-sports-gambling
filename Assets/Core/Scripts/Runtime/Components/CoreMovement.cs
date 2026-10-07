@@ -185,6 +185,9 @@ namespace Blocks.Gameplay.Core
         /// Gets a value indicating whether the character is currently sprinting.
         /// </summary>
         public bool IsSprinting { get; private set; }
+        public bool IsGrinding { get; private set; }
+        public bool IsClimbing { get; private set; }
+        public bool IsPoleGrabbing { get; private set; }
 
         /// <summary>
         /// Gets a value indicating whether the Grab button is currently held. On its own this does
@@ -281,14 +284,13 @@ namespace Blocks.Gameplay.Core
         private void Update()
         {
             if (!IsOwner) return;
-
             // Update landing timer when grounded
             if (IsGrounded)
             {
                 m_TimeSinceLanded += Time.deltaTime;
             }
 
-            if (!isMovementEnabled)
+            if (!isMovementEnabled && MovementAbilityActive() == false)
             {
                 // If movement is disabled, we still want to apply gravity and ground checks to prevent floating.
                 GroundedCheck();
@@ -335,7 +337,9 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         /// <param name="isSprinting">True to enable sprinting, false otherwise.</param>
         public void SetSprintState(bool isSprinting) => IsSprinting = isSprinting;
-
+        public void SetGrindState(bool isGrinding) => IsGrinding = isGrinding;
+        public void SetClimbState(bool isClimbing) => IsClimbing = isClimbing;
+        public void SetPoleGrabState(bool isPoleGrabbing) => IsPoleGrabbing = isPoleGrabbing;
         /// <summary>
         /// Sets whether the Grab button is currently held.
         /// </summary>
@@ -631,9 +635,9 @@ namespace Blocks.Gameplay.Core
                     m_VerticalVelocity += gravity * Time.deltaTime;
                 }
             }
-            
-            // Apply rotation based on coupling mode and movement
+
             ApplyRotation(finalModifier.ArealVelocity);
+
 
             // Combine horizontal and vertical movement and apply it
             Vector3 movement = finalModifier.ArealVelocity;
@@ -752,6 +756,14 @@ namespace Blocks.Gameplay.Core
                     OnLanded?.Invoke(new Vector3(0, m_VerticalVelocity, 0));
                 }
             }
+        }
+
+        public bool MovementAbilityActive()
+        {
+            if (IsGrinding) { return true; }
+            if (IsClimbing) { return true; }
+            if (IsPoleGrabbing) { return true; }
+            return false;
         }
 
         /// <summary>

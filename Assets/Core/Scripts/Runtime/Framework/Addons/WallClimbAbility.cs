@@ -97,6 +97,7 @@ namespace Blocks.Gameplay.Core
         private CoreMovement m_Motor;
         private CharacterController m_Controller;
         private CoreStatsHandler m_CoreStats;
+        [SerializeField] private CoreAnimator animationControls;
         private bool m_IsActive = true;
         private bool m_ListenersRegistered;
         private float m_RegrabTimer;
@@ -158,12 +159,12 @@ namespace Blocks.Gameplay.Core
 
             // Re-check the wall is still there each frame (shimmying along a surface, or the surface
             // stepping/curving) rather than trusting the normal captured on entry.
-            if (!TryFindClimbableWall(out Vector3 currentNormal))
-            {
-                ExitClimb();
-                return modifier;
-            }
-            WallNormal = currentNormal;
+            //if (!TryFindClimbableWall(out Vector3 currentNormal))
+            //{
+            //    ExitClimb();
+            //    return modifier;
+            //}
+           // WallNormal = currentNormal;
 
             ProcessClimbMovement(ref modifier);
             return modifier;
@@ -246,12 +247,24 @@ namespace Blocks.Gameplay.Core
         {
             WallNormal = wallNormal;
             IsClimbing = true;
-            m_Motor.SetVerticalVelocity(0f);
-            //NOTE: I think the user should maintain their orientation when wall grabbing
-            //starting the wall movement is when the override should kick it, otherwise it should
-            //just feel like a quick spiderman stick
-            //m_Motor.RotationOverride = () => Quaternion.LookRotation(-WallNormal, Vector3.up);
-            m_Motor.RotationOverride = () => Quaternion.LookRotation(transform.forward, Vector3.up);
+            if (m_Motor != null)
+            {
+                m_Motor.SetVerticalVelocity(0f);
+                //NOTE: I think the user should maintain their orientation when wall grabbing
+                //starting the wall movement is when the override should kick it, otherwise it should
+                //just feel like a quick spiderman stick
+                m_Motor.RotationOverride = () => Quaternion.LookRotation(-WallNormal, Vector3.up);
+                //m_Motor.RotationOverride = () => Quaternion.LookRotation(transform.forward, Vector3.up);
+
+                m_Motor.SetClimbState(true);
+            }
+            
+
+            if (Animator())
+            {
+                Animator().Animator.ResetTrigger(Animator().m_AnimIDTrigger_exitAbility);
+                Animator().PlayAnimation(Animator().ANIMATION_wall_hang);
+            }
         }
 
         private void ExitClimb()
@@ -261,8 +274,12 @@ namespace Blocks.Gameplay.Core
             IsClimbing = false;
             if (m_Motor != null)
             {
+                m_Motor.SetClimbState(false);
                 m_Motor.RotationOverride = null;
             }
+            
+            //Set the trigger on the primary animator to exit the ability state
+            if (Animator()) { Animator().SetAnimationTrigger(Animator().m_AnimIDTrigger_exitAbility); }
         }
 
         #endregion
@@ -434,6 +451,16 @@ namespace Blocks.Gameplay.Core
         }
 
         #endregion
+
+        public CoreAnimator Animator()
+        {
+            if (animationControls == null)
+            {
+                animationControls = GetComponentInChildren<CoreAnimator>();
+            }
+
+            return animationControls;
+        }
 
         #region Debug
 

@@ -37,16 +37,19 @@ namespace Blocks.Gameplay.Core
         [Header("Sound Effects")]
         [Tooltip("Sound definition for footstep sounds.")]
         [SerializeField] private SoundDef soundDefFootstep;
-
+        
         private readonly int m_AnimIDSpeed = Animator.StringToHash("Speed");
         private readonly int m_AnimIDGrounded = Animator.StringToHash("Grounded");
         private readonly int m_AnimIDJump = Animator.StringToHash("Jump");
         private readonly int m_AnimIDFreeFall = Animator.StringToHash("FreeFall");
         private readonly int m_AnimIDMotionSpeed = Animator.StringToHash("MotionSpeed");
 
+        private readonly int m_AnimIDActionIndex = Animator.StringToHash("ActionIndex");
+
         public readonly int m_AnimIDTrigger_exitAbility = Animator.StringToHash("ExitAbility");
 
         public readonly string ANIMATION_grindrail_slide = "slide";
+        public readonly string ANIMATION_wall_hang = "wall_hang_idle";
 
         #endregion
 
@@ -145,17 +148,26 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void UpdateLocomotionParameters()
         {
+            bool isGrinding = coreMovement.IsGrinding;
+            bool isClimbing = coreMovement.IsClimbing;
+            bool isPoleGrabbing = coreMovement.IsPoleGrabbing;
+
             bool isGrounded = coreMovement.IsGrounded;
+            bool inAir = !isGrounded && !isClimbing && !isPoleGrabbing;
+
             float verticalVelocity = coreMovement.VerticalVelocity;
+
+            
 
             // Set booleans for grounded, jumping, and falling states.
             Animator.SetBool(m_AnimIDGrounded, isGrounded);
-            Animator.SetBool(m_AnimIDJump, !isGrounded && verticalVelocity > 0.1f);
-            Animator.SetBool(m_AnimIDFreeFall, !isGrounded && verticalVelocity <= 0.1f);
+            Animator.SetBool(m_AnimIDJump, inAir && verticalVelocity > 0.1f);
+            Animator.SetBool(m_AnimIDFreeFall, inAir && verticalVelocity <= 0.1f);
 
             // Set floats for speed and input magnitude to drive blend trees.
             Animator.SetFloat(m_AnimIDSpeed, coreMovement.CurrentSpeed);
             Animator.SetFloat(m_AnimIDMotionSpeed, coreMovement.InputMagnitude);
+
         }
 
         public void TurnInPlaceStart()

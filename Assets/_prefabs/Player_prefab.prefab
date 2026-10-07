@@ -303,8 +303,8 @@ MonoBehaviour:
   moveSpeed: 9
   sprintSpeed: 3
   rotationSmoothTime: 0.1
-  speedChangeRate: 25
-  forceDecayRate: 1
+  speedChangeRate: 50
+  forceDecayRate: 5
   gravity: -30
   jumpHeight: 5
   groundedOffset: -0.14
@@ -363,6 +363,10 @@ MonoBehaviour:
   enableLookInput: 1
   defaultLookSensitivity: 3
   defaultVerticalLookLimit: 70
+  stickDeadzone: 0.1
+  stickYawSpeed: 200
+  stickPitchSpeed: 140
+  stickResponseCurve: 1
   onLookInput: {fileID: 11400000, guid: 8af931367978e4bc9bae53b88856ff5b, type: 2}
 --- !u!114 &8699074915247716374
 MonoBehaviour:
@@ -596,14 +600,15 @@ MonoBehaviour:
   wallCheckRadius: 0.15
   maxWallSurfaceAngle: 20
   minPressInto: 0.4
-  climbSpeedMultiplier: 0.5
-  shimmySpeedMultiplier: 0.5
-  staminaCostPerSecond: 10
-  stickForce: 2
+  climbSpeedMultiplier: 1
+  shimmySpeedMultiplier: 1
+  staminaCostPerSecond: 0
+  stickForce: 5
   wallJumpHeight: 2.2
   wallJumpPushForce: 25
   regrabCooldown: 0.25
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+  animationControls: {fileID: 0}
   wallJumpStyle: 0
 --- !u!114 &1069646715921968806
 MonoBehaviour:
