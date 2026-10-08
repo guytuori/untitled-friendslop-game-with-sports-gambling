@@ -157,6 +157,16 @@ namespace Blocks.Gameplay.Core
 
             if (type != MapObjectPropertyType.PlayerSpawnPoint && !hasMesh)
             {
+                // A glb with entities in it (challenge markers, pickups...) imports as a root object with the
+                // geometry on a "map" child next to the entity children - set the property on that child.
+                GameObject meshChild = FindGeometryChild(obj);
+                if (meshChild != null)
+                {
+                    RemoveRootCopies(obj, meshChild.GetComponent<MeshFilter>().sharedMesh);
+                    Debug.Log($"[Friendslop] '{obj.name}' has its geometry on its '{meshChild.name}' child - setting that to '{type}'.", meshChild);
+                    return ApplyProperty(meshChild, type);
+                }
+
                 Debug.LogError($"[Friendslop] '{obj.name}' needs a MeshFilter (with a mesh assigned) to be set to '{type}'.");
                 return false;
             }
@@ -243,6 +253,37 @@ namespace Blocks.Gameplay.Core
         /// Restores a Player Spawn Point's hidden material first, if any, since the object might be about
         /// to become something other than a spawn point.
         /// </summary>
+        /// <summary>The child holding a glb's geometry: a direct child called "map" with a mesh, or else the only mesh under the object.</summary>
+        private static GameObject FindGeometryChild(GameObject obj)
+        {
+            foreach (Transform child in obj.transform)
+            {
+                if (child.name == "map" && child.TryGetComponent(out MeshFilter filter) && filter.sharedMesh != null) return child.gameObject;
+            }
+
+            GameObject only = null;
+            foreach (MeshFilter filter in obj.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.gameObject == obj || filter.sharedMesh == null) continue;
+                if (only != null) return null; // several meshes - ambiguous, set them one by one
+                only = filter.gameObject;
+            }
+            return only;
+        }
+
+        /// <summary>
+        /// Removes a collider for <paramref name="mesh"/> (and a MapObjectProperty) sitting on the glb's root
+        /// instead of on its geometry child, so the map doesn't end up with two copies of the same collider.
+        /// </summary>
+        private static void RemoveRootCopies(GameObject root, Mesh mesh)
+        {
+            foreach (MeshCollider collider in root.GetComponents<MeshCollider>())
+            {
+                if (collider.sharedMesh == mesh) Undo.DestroyObjectImmediate(collider);
+            }
+            if (root.TryGetComponent(out MapObjectProperty rootTag)) Undo.DestroyObjectImmediate(rootTag);
+        }
+
         private static void TearDown(GameObject obj, MapObjectProperty tag)
         {
             if (tag.SavedMaterialsBeforeHidden != null && tag.SavedMaterialsBeforeHidden.Length > 0

@@ -167,6 +167,9 @@ namespace Blocks.Gameplay.Core
         /// <summary>True while in a session started by <see cref="StartDevSessionAsync"/> (a gameplay scene played directly).</summary>
         public bool IsDevSession { get; private set; }
 
+        /// <summary>True while in a Practice Map session (see <see cref="StartPracticeAsync"/> and <see cref="PracticeMode"/>).</summary>
+        public bool IsPracticeSession { get; private set; }
+
         /// <summary>The rules the host published for the current session (Normal defaults if none).</summary>
         public HostGameRulesData SessionRules
         {
@@ -474,6 +477,66 @@ namespace Blocks.Gameplay.Core
             return null;
         }
 
+        /// <summary>
+        /// Practice Map (Single Player menu): starts a private, closed one-player session that plays
+        /// <paramref name="mapPrefab"/> and loads the gameplay scene straight away - no lobby. The session
+        /// is marked as practice (<see cref="PracticeMode"/>): no time limit, no wagers, score starts at 0.
+        /// Returns null on success, or a player-facing error message.
+        /// </summary>
+        public async Task<string> StartPracticeAsync(string mapPrefab, string mapName)
+        {
+            if (m_GameRunner != null) return m_Starting ? "Already starting." : "Already in a game.";
+            if (string.IsNullOrWhiteSpace(mapPrefab)) return "That map isn't set up yet.";
+            await ShutdownLobbyAsync();
+
+            var rules = new HostGameRulesData
+            {
+                IsPublic = false,
+                MaxPlayers = 1,
+                MapName = mapName ?? "",
+                MapPrefab = mapPrefab.Trim(),
+                Lives = -1,          // unlimited
+                StartingPoints = 0,  // the score only counts pickups
+                DeathPenalty = 0,
+                ItemsEnabled = true,
+                PickupsEnabled = true,
+            };
+
+            string sessionName = "PRACTICE-" + Guid.NewGuid().ToString("N");
+            var args = new StartGameArgs
+            {
+                GameMode = GameMode.Shared,
+                SessionName = sessionName,
+                PlayerCount = 1,
+                IsVisible = false,
+                IsOpen = false, // nobody else can ever join a practice session
+                SessionProperties = BuildSessionProperties(rules, NewNonce()),
+                CustomPhotonAppSettings = CreateAppSettings(),
+            };
+
+            StartOutcome result = await StartGameRunner(args);
+            if (!result.Ok) return DescribeFailure(result.Reason);
+
+            IsPracticeSession = true;
+            RoomCode = sessionName;
+            IsPublic = false;
+            MaxPlayers = 1;
+            OnSessionReady();
+
+            var sceneManager = m_GameRunner.GetComponent<NetworkSceneManagerDefault>();
+            SceneRef scene = sceneManager != null ? sceneManager.GetSceneRef(GameplaySceneName) : SceneRef.None;
+            if (!scene.IsValid)
+            {
+                Debug.LogError($"[Fusion] '{GameplaySceneName}' isn't in the build settings - can't start practice.");
+                await LeaveGameAsync();
+                return "The gameplay scene is missing from the build.";
+            }
+
+            MatchProgress.Reset();
+            _ = m_GameRunner.LoadScene(scene, LoadSceneMode.Single, LocalPhysicsMode.None, true);
+            return null;
+        }
+
         /// <summary>Leaves the current game. If this player was the host, another player becomes the host.</summary>
         public async Task LeaveGameAsync()
         {
@@ -600,6 +663,7 @@ namespace Blocks.Gameplay.Core
             IsPublic = false;
             MaxPlayers = 0;
             IsDevSession = false;
+            IsPracticeSession = false;
             m_RosterMasterId = -1;
             m_Players.Clear();
             SessionProfiles.Clear();

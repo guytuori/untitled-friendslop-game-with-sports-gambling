@@ -28,7 +28,8 @@ namespace Blocks.Gameplay.Core
     /// from a grind rail" = rail jumps, "seconds on a wall" = wall time, "end with a score" = final score).
     /// To force one, put it in braces anywhere in the line, e.g. {RailSeconds} - see WagerStat for names.
     /// The summary after an update lists what each line was read as, so check it after adding wagers.
-    /// Pickups and items aren't in the game yet, so wagers about them are kept but never offered.
+    /// Items aren't in the game yet, so wagers about them are kept but never offered. Pickup wagers are
+    /// offered on maps that have pickups (see PickupManager).
     ///
     /// Run from Friendslop > Wagers > Update Wager Master List From Text File; it also runs by itself
     /// whenever the text file is saved, and when the editor loads if there's no list yet.
@@ -199,7 +200,7 @@ namespace Blocks.Gameplay.Core
 
                 template.text = text;
                 template.stat = stat.Value;
-                template.supported = stat != WagerStat.Pickups && stat != WagerStat.Items;
+                template.supported = stat != WagerStat.Items;
 
                 foreach (Match m in Placeholder.Matches(text))
                 {

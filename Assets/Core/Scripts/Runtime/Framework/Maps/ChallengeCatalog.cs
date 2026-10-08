@@ -31,6 +31,12 @@ namespace Blocks.Gameplay.Core
 
         [SerializeField] private List<Entry> challenges = new List<Entry>();
 
+        [Tooltip("Practice Map fills every 16x16 hole with this (the Challenge16 prefab - no underscore, so not in the rotation).")]
+        [SerializeField] private GameObject practice16;
+
+        [Tooltip("Practice Map fills every 32x32 hole with this (the Challenge32 prefab).")]
+        [SerializeField] private GameObject practice32;
+
         private static ChallengeCatalog s_Loaded;
 
         public IReadOnlyList<Entry> Challenges => challenges;
@@ -44,6 +50,9 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>The entry at <paramref name="index"/>, or null if out of range.</summary>
         public Entry Get(int index) => index >= 0 && index < challenges.Count ? challenges[index] : null;
+
+        /// <summary>The plain piece Practice Map puts in a hole of this size (null if there isn't one).</summary>
+        public GameObject GetPracticePiece(int size) => size == 16 ? practice16 : size == 32 ? practice32 : null;
 
         /// <summary>Indices of every challenge that fits a hole of this size.</summary>
         public List<int> IndicesForSize(int size)
@@ -61,6 +70,13 @@ namespace Blocks.Gameplay.Core
         public void SetChallenges(List<Entry> entries)
         {
             challenges = entries;
+        }
+
+        /// <summary>Editor only - used by MatchCatalogBuilder.</summary>
+        public void SetPracticePieces(GameObject piece16, GameObject piece32)
+        {
+            practice16 = piece16;
+            practice32 = piece32;
         }
 #endif
     }

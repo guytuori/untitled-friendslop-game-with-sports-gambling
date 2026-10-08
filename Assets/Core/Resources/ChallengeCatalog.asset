@@ -37,3 +37,5 @@ MonoBehaviour:
   - id: Challenge_32_04
     size: 32
     prefab: {fileID: 3940840670075306491, guid: fc51ea915fc15db469d9b29ce063d9f1, type: 3}
+  practice16: {fileID: 7995870167889056463, guid: 69a3b2a870c642f4b8a5a12d17563556, type: 3}
+  practice32: {fileID: 915372512405286612, guid: d87f519ff8386404e86f17c21c89662b, type: 3}

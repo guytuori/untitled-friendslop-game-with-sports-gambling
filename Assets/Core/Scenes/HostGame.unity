@@ -236,7 +236,7 @@ MonoBehaviour:
   - displayName: Dinosaur Zoo
     thumbnail: {fileID: 2800000, guid: 94a1043d74a1d2f4e8f7c589d81f1417, type: 3}
     flavorText: Map 2 flavor text
-    mapPrefab: LastStop
+    mapPrefab: DinosaurZoo
   - displayName: Ninja Pirate Tower
     thumbnail: {fileID: 2800000, guid: 0e815fa450cae02429b3ebb9aba439c9, type: 3}
     flavorText: Map 3 flavor text

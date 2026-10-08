@@ -231,6 +231,47 @@ MonoBehaviour:
   titleImage: {fileID: 2800000, guid: a6c66037b0d4c464f887ac0bb4232b9d, type: 3}
   changeProfileSceneName: ChangeProfile
   backSceneName: MainMenu
+  maps:
+  - displayName: Airship
+    thumbnail: {fileID: 2800000, guid: df0c627b9bda5104c87d341391d8c1fc, type: 3}
+    flavorText: Map 1 flavor text
+    mapPrefab: 
+  - displayName: Dinosaur Zoo
+    thumbnail: {fileID: 2800000, guid: 94a1043d74a1d2f4e8f7c589d81f1417, type: 3}
+    flavorText: Map 2 flavor text
+    mapPrefab: DinosaurZoo
+  - displayName: Ninja Pirate Tower
+    thumbnail: {fileID: 2800000, guid: 0e815fa450cae02429b3ebb9aba439c9, type: 3}
+    flavorText: Map 3 flavor text
+    mapPrefab: 
+  - displayName: Red Rocks
+    thumbnail: {fileID: 2800000, guid: 6e62309371949c34eb8be7d70fdc5025, type: 3}
+    flavorText: Map 4 flavor text
+    mapPrefab: 
+  - displayName: Sea Base
+    thumbnail: {fileID: 2800000, guid: 1c1bb80c414d38243987057f1380d27d, type: 3}
+    flavorText: Map 5 flavor text
+    mapPrefab: 
+  - displayName: Wizard Academy
+    thumbnail: {fileID: 2800000, guid: b81cb528e002d4743977eef3c98d3101, type: 3}
+    flavorText: Map 6 flavor text
+    mapPrefab: 
+  - displayName: Map 9
+    thumbnail: {fileID: 2800000, guid: 91f57b706159af848a1e6b3de3bd3f7b, type: 3}
+    flavorText: Map 7 flavor text
+    mapPrefab: 
+  - displayName: Map 8
+    thumbnail: {fileID: 2800000, guid: 4b19122d9ad8e5c458f10c3f8d454e95, type: 3}
+    flavorText: Map 8 flavor text
+    mapPrefab: 
+  - displayName: Last Stop
+    thumbnail: {fileID: 2800000, guid: e454e0b0395729645b4241bd36951c6b, type: 3}
+    flavorText: Map 9 flavor text
+    mapPrefab: LastStop
+  - displayName: Random
+    thumbnail: {fileID: 2800000, guid: 0e8af1d8d6656504ea2512ddf5458531, type: 3}
+    flavorText: Map 10 flavor text
+    mapPrefab: 
   selectSound: {fileID: 8300000, guid: 94cf81bf6cc94189874acf02a7153b02, type: 3}
   cancelSound: {fileID: 8300000, guid: 5d86e8758d304cdfb08984ec18e3857e, type: 3}
 --- !u!114 &141277180

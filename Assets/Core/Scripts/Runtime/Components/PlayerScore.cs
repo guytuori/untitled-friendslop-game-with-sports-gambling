@@ -127,6 +127,8 @@ namespace Blocks.Gameplay.Core
 
         private int GetStartingScore()
         {
+            if (PracticeMode.IsActive) return 0; // practice: the score only counts pickups
+
             int startingPoints = MatchRules.Get(gameRulesConfig).StartingPoints;
             return startingPoints + MatchProgress.LocalCarryOverPoints;
         }

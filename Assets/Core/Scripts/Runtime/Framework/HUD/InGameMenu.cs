@@ -234,7 +234,17 @@ namespace Blocks.Gameplay.Core
             m_ConfirmPanel.style.display = DisplayStyle.Flex;
 
             StopYesDelay();
-            m_YesDelayCoroutine = StartCoroutine(EnableYesAfterDelay());
+            if (PracticeMode.IsActive)
+            {
+                // Nothing to lose in practice - Yes works straight away.
+                m_YesButton.text = "Yes";
+                m_YesButton.focusable = true;
+                m_YesButton.SetEnabled(true);
+            }
+            else
+            {
+                m_YesDelayCoroutine = StartCoroutine(EnableYesAfterDelay());
+            }
             MenuUI.FocusFirst(m_NoButton); // No is the safe default
         }
 

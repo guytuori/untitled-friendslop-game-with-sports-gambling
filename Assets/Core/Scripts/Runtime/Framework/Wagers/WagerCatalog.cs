@@ -35,7 +35,7 @@ namespace Blocks.Gameplay.Core
         ScoreReached = 10,
         /// <summary>Score at the end of the round (only resolves then).</summary>
         FinalScore = 11,
-        /// <summary>Not tracked yet (no pickups in the game) - wagers about it are imported but never offered.</summary>
+        /// <summary>Pickups collected this round (PickupManager). Only offered on maps that have pickups left.</summary>
         Pickups = 12,
         /// <summary>Not tracked yet (no items in the game) - wagers about it are imported but never offered.</summary>
         Items = 13
@@ -76,7 +76,7 @@ namespace Blocks.Gameplay.Core
             public WagerScope scope;
             public WagerStat stat;
 
-            [Tooltip("False for stats the game doesn't track yet (pickups, items) - never offered.")]
+            [Tooltip("False for stats the game doesn't track yet (items) - never offered. Pickups wagers are offered whenever the map has pickups left.")]
             public bool supported = true;
 
             /// <summary>Seconds-based stats are stored in tenths of a second.</summary>

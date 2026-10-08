@@ -33,6 +33,9 @@ namespace Blocks.Gameplay.Core
         /// <summary>Most holes a map can have (networked array capacity).</summary>
         public const int MaxSockets = 128;
 
+        /// <summary>A hole's pick meaning "the plain Practice Map piece" (ChallengeCatalog.GetPracticePiece) instead of a challenge.</summary>
+        public const int PracticePiecePick = -2;
+
         [Tooltip("Map prefab (file name in Assets/Core/Prefabs/Maps) used when this scene is played directly instead of through Host Game.")]
         [SerializeField] private string devMapPrefab = "LastStop";
 
@@ -105,7 +108,17 @@ namespace Blocks.Gameplay.Core
                 Debug.LogError($"[MatchLayout] Map '{mapId}' has {sockets.Count} holes - only the first {MaxSockets} get challenges.", this);
             }
 
-            int[] picks = PickChallenges(sockets, ChallengeCatalog.Load(), new System.Random());
+            int[] picks;
+            if (PracticeMode.IsActive)
+            {
+                // Practice Map is about the map itself: every hole gets the plain piece, no challenges.
+                picks = new int[sockets.Count];
+                for (int i = 0; i < picks.Length; i++) picks[i] = PracticePiecePick;
+            }
+            else
+            {
+                picks = PickChallenges(sockets, ChallengeCatalog.Load(), new System.Random());
+            }
             int count = Mathf.Min(picks.Length, MaxSockets);
             for (int i = 0; i < count; i++) NetPicks.Set(i, picks[i]);
 
@@ -203,11 +216,34 @@ namespace Blocks.Gameplay.Core
             int placed = 0;
             for (int i = 0; i < Mathf.Min(count, sockets.Count); i++)
             {
-                ChallengeCatalog.Entry entry = catalog != null ? catalog.Get(NetPicks[i]) : null;
-                if (entry == null || entry.prefab == null) continue;
+                GameObject prefab;
+                string id;
+                if (NetPicks[i] == PracticePiecePick)
+                {
+                    prefab = catalog != null ? catalog.GetPracticePiece(sockets[i].Size) : null;
+                    id = prefab != null ? prefab.name : "";
+                    if (prefab == null)
+                    {
+                        Debug.LogWarning($"[MatchLayout] No practice piece for {sockets[i].Size}x{sockets[i].Size} holes - add Challenge{sockets[i].Size}.prefab to Assets/Core/Prefabs/Challenges and rebuild the lists.", this);
+                        continue;
+                    }
+                }
+                else
+                {
+                    ChallengeCatalog.Entry entry = catalog != null ? catalog.Get(NetPicks[i]) : null;
+                    if (entry == null || entry.prefab == null) continue;
+                    prefab = entry.prefab;
+                    id = entry.id;
+                }
 
-                string instanceName = $"{i:D3}_{entry.id}";
-                if (ChallengeSockets.Place(entry.prefab, sockets[i], challengesRoot, instanceName) != null) placed++;
+                string instanceName = $"{i:D3}_{id}";
+                GameObject placedInstance = ChallengeSockets.Place(prefab, sockets[i], challengesRoot, instanceName);
+                if (placedInstance == null) continue;
+                placed++;
+
+                // The plain practice pieces come straight from a glb, without the collision a real
+                // challenge's set-up gives it - make sure they can be stood on.
+                if (NetPicks[i] == PracticePiecePick) AddMissingColliders(placedInstance);
             }
 
             // Zones are indexed by hierarchy - make ChallengeManager re-scan now that the challenges exist.
@@ -215,6 +251,15 @@ namespace Blocks.Gameplay.Core
 
             Debug.Log($"[MatchLayout] Built map '{mapId}' with {placed} challenge(s) in {sockets.Count} hole(s).", this);
             Built?.Invoke(this);
+        }
+
+        private static void AddMissingColliders(GameObject root)
+        {
+            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.sharedMesh == null || filter.GetComponent<Collider>() != null) continue;
+                filter.gameObject.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;
+            }
         }
 
         /// <summary>Instantiates the map prefab (once) under this object, at the position saved in the prefab.</summary>

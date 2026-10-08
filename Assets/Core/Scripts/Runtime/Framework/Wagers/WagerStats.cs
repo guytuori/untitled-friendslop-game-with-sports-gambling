@@ -40,6 +40,8 @@ namespace Blocks.Gameplay.Core
                 return NetworkPlayers.TryGetComponent((ulong)playerId, out PlayerScore score) ? score.Score : 0;
             }
 
+            if (stat == WagerStat.Pickups) return PickupManager.CollectedBy(playerId);
+
             int index = (int)stat;
             if (index < 0 || index >= StatCount) return 0;
             return s_Players.TryGetValue(playerId, out Entry entry) ? entry.Values[index] : 0;

@@ -168,6 +168,7 @@ namespace Blocks.Gameplay.Core
         public override void FixedUpdateNetwork()
         {
             if (!IsOwner || !NetInitialized) return;
+            if (PracticeMode.IsActive) return; // no time limit - the round never ends
 
             switch ((RoundPhase)NetPhase)
             {
@@ -236,6 +237,7 @@ namespace Blocks.Gameplay.Core
         /// <summary>Called by PlayerEndPoint on the touching player's own machine.</summary>
         public void ReportLocalPlayerFinished()
         {
+            if (PracticeMode.IsActive) return; // the end point does nothing in practice
             if (!IsPlaying || LocalPlayerFinished) return;
             ReportFinishedRpc();
         }

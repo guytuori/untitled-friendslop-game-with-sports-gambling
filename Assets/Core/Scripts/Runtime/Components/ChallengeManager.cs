@@ -201,7 +201,7 @@ namespace Blocks.Gameplay.Core
             if (!IsOwner) return;
             if (payload.statID != StatKeys.Health) return;
 
-            GetPlayerScore(payload.playerId)?.AddScore(-deathPenalty);
+            if (!PracticeMode.IsActive) GetPlayerScore(payload.playerId)?.AddScore(-deathPenalty); // no penalty in practice
 
             if (m_RunningAttemptsByOwner.TryGetValue(payload.playerId, out var zone))
             {

@@ -18,6 +18,9 @@ namespace Blocks.Gameplay.Core
     ///   - <see cref="ChallengeCatalog"/> (Resources/ChallengeCatalog): every prefab in
     ///     <see cref="ChallengesFolder"/> that has a challenge16/challenge32 corner marker (its start/finish
     ///     glbs carry one); the marker's name gives its size. Prefabs without one are skipped with a warning.
+    ///     Prefabs WITHOUT an underscore in their name (Challenge16, Challenge32) are not challenges: they're
+    ///     the plain pieces Practice Map fills the holes with, so they're kept out of the random rotation and
+    ///     stored as the catalog's practice pieces instead.
     /// Rebuilt automatically when anything in those folders (or a glb in Assets/Maps, since the markers live
     /// there) is imported, moved or deleted, and once when the editor loads if a list doesn't exist yet.
     ///
@@ -92,9 +95,11 @@ namespace Blocks.Gameplay.Core
                 mapCatalog.SetMaps(maps);
                 EditorUtility.SetDirty(mapCatalog);
 
-                List<ChallengeCatalog.Entry> challenges = BuildChallengeEntries(log);
+                List<ChallengeCatalog.Entry> challenges = BuildChallengeEntries(log, out GameObject practice16, out GameObject practice32);
                 var challengeCatalog = LoadOrCreate<ChallengeCatalog>(ChallengeCatalogPath);
                 challengeCatalog.SetChallenges(challenges);
+                challengeCatalog.SetPracticePieces(practice16, practice32);
+                log.AppendLine($"Practice Map pieces: 16x16 = {(practice16 != null ? practice16.name : "none")}, 32x32 = {(practice32 != null ? practice32.name : "none")}.");
                 EditorUtility.SetDirty(challengeCatalog);
 
                 AssetDatabase.SaveAssets();
@@ -122,6 +127,31 @@ namespace Blocks.Gameplay.Core
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 if (prefab == null) continue;
 
+                // Sanity check: every hole is marked by four corner entities, so each size's count should be a multiple of 4.
+                // (Corner markers count too - each hole is three plain markers plus one challengeNNcorner.)
+                int markers16 = 0, markers32 = 0, corners16 = 0, corners32 = 0;
+                foreach (Transform t in prefab.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t == prefab.transform || !ChallengeSockets.TryParseMarker(t.name, out int markerSize, out bool isCorner)) continue;
+                    if (markerSize == 16) { markers16++; if (isCorner) corners16++; }
+                    else { markers32++; if (isCorner) corners32++; }
+                }
+                foreach ((int size, int count, int corners) in new[] { (16, markers16, corners16), (32, markers32, corners32) })
+                {
+                    if (count % 4 != 0)
+                    {
+                        string message = $"Map {prefab.name} has {count} challenge{size} / challenge{size}corner entities, which isn't a multiple of 4 (each hole needs one in every corner). Check for a missing or extra marker.";
+                        Debug.LogWarning("[Maps] " + message, prefab);
+                        log.AppendLine(message);
+                    }
+                    if (count > 0 && corners * 4 != count)
+                    {
+                        string message = $"Map {prefab.name} has {corners} challenge{size}corner entities for {count} challenge{size} markers - each hole should have exactly one corner marker ({count / 4} expected).";
+                        Debug.LogWarning("[Maps] " + message, prefab);
+                        log.AppendLine(message);
+                    }
+                }
+
                 List<ChallengeSockets.Socket> sockets = ChallengeSockets.FindSockets(prefab.transform);
                 entries.Add(new MapCatalog.Entry
                 {
@@ -134,8 +164,10 @@ namespace Blocks.Gameplay.Core
             return entries;
         }
 
-        private static List<ChallengeCatalog.Entry> BuildChallengeEntries(StringBuilder log)
+        private static List<ChallengeCatalog.Entry> BuildChallengeEntries(StringBuilder log, out GameObject practice16, out GameObject practice32)
         {
+            practice16 = null;
+            practice32 = null;
             var entries = new List<ChallengeCatalog.Entry>();
             foreach (string path in FindPrefabs(ChallengesFolder))
             {
@@ -147,6 +179,14 @@ namespace Blocks.Gameplay.Core
                     string message = $"Skipped challenge {prefab.name}: no challenge16/challenge32 corner marker (its start/finish glbs should have one).";
                     Debug.LogWarning("[Maps] " + message, prefab);
                     log.AppendLine(message);
+                    continue;
+                }
+
+                if (!prefab.name.Contains("_"))
+                {
+                    // Challenge16 / Challenge32: Practice Map's hole fillers, never part of the random rotation.
+                    if (size == 16 && practice16 == null) practice16 = prefab;
+                    else if (size == 32 && practice32 == null) practice32 = prefab;
                     continue;
                 }
 

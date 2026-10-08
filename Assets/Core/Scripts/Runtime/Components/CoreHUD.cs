@@ -172,9 +172,17 @@ namespace Blocks.Gameplay.Core
                 m_InGameMenu = gameObject.AddComponent<InGameMenu>();
                 m_InGameMenu.Initialize(m_UIDocument.rootVisualElement);
 
-                // Wager ticker (top) and this player's phone of active bets (bottom right).
-                m_WagerHUD = gameObject.AddComponent<WagerHUD>();
-                m_WagerHUD.Initialize(m_UIDocument.rootVisualElement, AddNotification);
+                // Wager ticker (top) and this player's phone of active bets (bottom right) - not in practice.
+                if (!PracticeMode.IsActive)
+                {
+                    m_WagerHUD = gameObject.AddComponent<WagerHUD>();
+                    m_WagerHUD.Initialize(m_UIDocument.rootVisualElement, AddNotification);
+                }
+            }
+
+            if (PracticeMode.IsActive)
+            {
+                SetUpPracticeTimer();
             }
 
             m_SubscribedChallengeManager = ChallengeManager.Instance;
@@ -839,11 +847,15 @@ namespace Blocks.Gameplay.Core
             ClearScoreboardRows();
 
             // Semi-cooperative: the team's total (and the target it's chasing) sit above everyone's own score.
-            m_TotalScoreLabel = AddTeamRow("TOTAL", "scoreboard-total-score");
-            m_TargetScoreLabel = AddTeamRow("TARGET", "scoreboard-target-score");
-            var divider = new VisualElement();
-            divider.AddToClassList("scoreboard-divider");
-            m_ScoreboardContainer.Add(divider);
+            // Practice has no target - just the player's own (pickup) score.
+            if (!PracticeMode.IsActive)
+            {
+                m_TotalScoreLabel = AddTeamRow("TOTAL", "scoreboard-total-score");
+                m_TargetScoreLabel = AddTeamRow("TARGET", "scoreboard-target-score");
+                var divider = new VisualElement();
+                divider.AddToClassList("scoreboard-divider");
+                m_ScoreboardContainer.Add(divider);
+            }
 
             foreach (ulong clientId in NetworkPlayers.Ids)
             {
@@ -946,7 +958,7 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void UpdateTimerLabel(float secondsRemaining)
         {
-            if (m_RoundTimerLabel == null) return;
+            if (m_RoundTimerLabel == null || PracticeMode.IsActive) return;
             m_RoundTimerLabel.text = FormatTime(secondsRemaining);
         }
 
@@ -958,6 +970,7 @@ namespace Blocks.Gameplay.Core
         /// <summary>The bonus timer, dimmed once it has run out (finishing then earns no bonus).</summary>
         private void UpdateBonusTimerLabel(float secondsRemaining)
         {
+            if (PracticeMode.IsActive) return;
             if (m_BonusTimerLabel != null) m_BonusTimerLabel.text = FormatTime(secondsRemaining);
             m_BonusTimerContainer?.EnableInClassList("hud-timer--expired", Mathf.CeilToInt(secondsRemaining) <= 0);
         }
@@ -968,8 +981,28 @@ namespace Blocks.Gameplay.Core
             return $"{totalSeconds / 60}:{totalSeconds % 60:00}";
         }
 
+        /// <summary>
+        /// Practice has no time limit: the bonus box goes away and the round box becomes a "PRACTICE"
+        /// stopwatch counting up from when the player arrived, handy for timing routes.
+        /// </summary>
+        private void SetUpPracticeTimer()
+        {
+            if (m_BonusTimerContainer != null) m_BonusTimerContainer.style.display = DisplayStyle.None;
+            if (m_RoundTimerCaption != null) m_RoundTimerCaption.text = "PRACTICE";
+            if (m_RoundTimerLabel == null) return;
+
+            float start = Time.time;
+            m_RoundTimerLabel.text = "0:00";
+            m_RoundTimerLabel.schedule.Execute(() =>
+            {
+                int seconds = Mathf.FloorToInt(Time.time - start);
+                m_RoundTimerLabel.text = $"{seconds / 60}:{seconds % 60:00}";
+            }).Every(250);
+        }
+
         private void HandleRoundInfoChanged()
         {
+            if (PracticeMode.IsActive) { UpdateTeamRows(); return; }
             if (m_RoundTimerCaption != null && m_SubscribedRoundTimer != null)
             {
                 m_RoundTimerCaption.text = $"ROUND {m_SubscribedRoundTimer.RoundNumber}";

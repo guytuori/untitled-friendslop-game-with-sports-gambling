@@ -154,6 +154,7 @@ namespace Blocks.Gameplay.Core
         public override void FixedUpdateNetwork()
         {
             if (!IsOwner) return;
+            if (PracticeMode.IsActive) return; // no wagers in practice
             float now = Runner.SimulationTime;
 
             if (!m_SpawnClockStarted)
@@ -368,7 +369,7 @@ namespace Blocks.Gameplay.Core
                 for (int i = 0; i < Catalog.Templates.Count; i++)
                 {
                     WagerCatalog.Template template = Catalog.Templates[i];
-                    if (!template.supported) continue;
+                    if (!IsOfferable(template)) continue;
                     if (template.scope == WagerScope.Challenge && !inChallenge) continue;
                     bool matches = trigger == WagerTrigger.ChallengeStart
                         ? template.scope == WagerScope.Challenge
@@ -395,7 +396,7 @@ namespace Blocks.Gameplay.Core
                     for (int i = 0; i < Catalog.Templates.Count; i++)
                     {
                         WagerCatalog.Template template = Catalog.Templates[i];
-                        if (template.supported && template.trigger == WagerTrigger.None && template.scope == WagerScope.Round) candidates.Add(i);
+                        if (IsOfferable(template) && template.trigger == WagerTrigger.None && template.scope == WagerScope.Round) candidates.Add(i);
                     }
                     if (TryCreateFromCandidates(candidates, subject))
                     {
@@ -405,6 +406,17 @@ namespace Blocks.Gameplay.Core
                 }
             }
             return false;
+        }
+
+        /// <summary>Whether the game can track this wager here: pickup wagers only on maps with pickups left.</summary>
+        private static bool IsOfferable(WagerCatalog.Template template)
+        {
+            if (template.stat == WagerStat.Pickups)
+            {
+                return !string.IsNullOrEmpty(template.numberPlaceholder) &&
+                       PickupManager.Instance != null && PickupManager.Instance.RemainingCount > 0;
+            }
+            return template.supported;
         }
 
         /// <summary>A player wagers can be about: spawned, still in the round.</summary>
@@ -453,6 +465,11 @@ namespace Blocks.Gameplay.Core
             // Roll a number the player hasn't reached yet.
             int low = Mathf.Max(template.minNumber, alreadyDone + 1);
             int high = Mathf.Max(template.minNumber, template.maxNumber);
+            if (template.stat == WagerStat.Pickups && PickupManager.Instance != null)
+            {
+                // Never more than there are left to collect.
+                high = Mathf.Min(high, alreadyDone + PickupManager.Instance.RemainingCount);
+            }
             if (low > high) return false;
             int target = Random.Range(low, high + 1);
 
