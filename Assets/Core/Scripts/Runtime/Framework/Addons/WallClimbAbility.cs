@@ -224,7 +224,7 @@ namespace Blocks.Gameplay.Core
             Vector2 rawInput = m_Motor.MoveInput;
             // From here on this ability owns the horizontal movement while attached - zero out
             // WalkAbility's contribution before it runs (see the Priority discussion above).
-            m_Motor.SetMoveInput(Vector2.zero);
+            //m_Motor.SetMoveInput(Vector2.zero);
 
             Vector3 up = Vector3.up;
             Vector3 alongWall = Vector3.Cross(WallNormal, up).normalized;
@@ -232,14 +232,22 @@ namespace Blocks.Gameplay.Core
             float vertSpeed = m_Motor.moveSpeed * climbSpeedMultiplier;
             float horizSpeed = m_Motor.moveSpeed * shimmySpeedMultiplier;
 
-            Vector3 velocity = up * (rawInput.y * vertSpeed) + alongWall * (rawInput.x * horizSpeed);
-            // A small constant push into the wall on top of the climb/shimmy movement, so the
-            // CharacterController.Move() this frame's ArealVelocity drives doesn't drift off the
-            // surface across uneven geometry.
-            velocity += -WallNormal * stickForce;
+            Vector3 velocity = up * (rawInput.y * vertSpeed) + (transform.right * (rawInput.x * horizSpeed));
 
+            velocity = (Vector3.Cross(-WallNormal, alongWall) * (rawInput.y * vertSpeed)) + (alongWall * (rawInput.x * horizSpeed));
+
+            float magnitude = velocity.magnitude;
+            //get a vector that is only along the wall and not going away or into it
+            //NOTE: this means climbing walls have to be a flat surface, if we want them to curve at all
+            //multiple walls would need to be used, or this logic changed
+            velocity = velocity.normalized - WallNormal.normalized;
+
+            velocity = velocity * magnitude;
+            m_Motor.SetVerticalVelocity(velocity.y);
+            //because of the way claude handles movement vectors we need to seperate the Y component
+            velocity.y = 0;
             modifier.ArealVelocity = velocity;
-            m_Motor.SetVerticalVelocity(0f);
+            
             modifier.OverrideGravity = true;
         }
 

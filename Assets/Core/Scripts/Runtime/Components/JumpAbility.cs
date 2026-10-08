@@ -22,11 +22,11 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Gets the stamina cost required to perform a jump.
         /// </summary>
-        public float StaminaCost => 10f;
+        public float StaminaCost => 0f;
 
         [Header("Jump Settings")]
         [Tooltip("Time in seconds after landing before the player can jump again.")]
-        [SerializeField] private float landingCooldown = 0.5f;
+        [SerializeField] private float landingCooldown = 0.00f;
 
         // Reference to the CoreMovement controller that owns this ability
         private CoreMovement m_Motor;
@@ -45,6 +45,8 @@ namespace Blocks.Gameplay.Core
         public void Initialize(CoreMovement motor)
         {
             m_Motor = motor;
+            landingCooldown = 0;
+            
         }
 
         /// <summary>
@@ -69,8 +71,9 @@ namespace Blocks.Gameplay.Core
             // 1. A jump has been requested via CoreMovement
             // 2. The character is grounded and landing cooldown has expired
             // 3. The jump cooldown has expired
-            if (m_Motor.JumpRequested && canJump && m_JumpCooldown <= 0)
+            if (m_Motor.JumpRequested && canJump && m_JumpCooldown <= 0 && m_Motor.MovementAbilityActive() == false)
             {
+                
                 // Set the cooldown to prevent immediate re-jumping
                 m_JumpCooldown = 0.5f;
 

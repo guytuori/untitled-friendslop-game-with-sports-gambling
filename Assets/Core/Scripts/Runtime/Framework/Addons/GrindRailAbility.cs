@@ -370,12 +370,12 @@ namespace Blocks.Gameplay.Core
                 Quaternion targetRot = Quaternion.LookRotation((ridePos - previousPosition).normalized, hit.normal);
 
                 //to avoid jittering or extreme angle snapping, check that the calculated angle difference is not extreme
-                if (Quaternion.Angle(transform.rotation, targetRot) < 45.0f)
-                {
-                    //Lerp here to avoid weird snapping, its alright that it never reaches 1
-                    m_Motor.RotationOverride = () => Quaternion.Lerp(transform.rotation, targetRot, rotateToSurfaceSpeed * Time.deltaTime);
-                }
+                //if (Quaternion.Angle(transform.rotation, targetRot) < 45.0f)
+                //{
+                //    //Lerp here to avoid weird snapping, its alright that it never reaches 1
                     
+                //}
+                m_Motor.RotationOverride = () => Quaternion.Lerp(transform.rotation, targetRot, rotateToSurfaceSpeed * Time.deltaTime);
                 previousPosition = ridePos;
             }
 
@@ -404,7 +404,7 @@ namespace Blocks.Gameplay.Core
 
             m_Motor.SetGrindState(true);
 
-            // m_Motor.RotationOverride = () => m_CurrentRail != null ? CurrentTangentRotation() : m_Motor.transform.rotation;
+            m_Motor.RotationOverride = () => m_CurrentRail != null ? CurrentTangentRotation() : m_Motor.transform.rotation;
             if (Animator()) 
             { 
                 Animator().Animator.ResetTrigger(Animator().m_AnimIDTrigger_exitAbility); 

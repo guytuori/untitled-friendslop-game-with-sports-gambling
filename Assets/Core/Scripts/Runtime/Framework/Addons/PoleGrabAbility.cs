@@ -135,7 +135,7 @@ namespace Blocks.Gameplay.Core
             // contribution before it runs (see the Priority discussion above), same as
             // BalanceBeamAbility/GrindRailAbility.
             Vector2 rawInput = m_Motor.MoveInput;
-            m_Motor.SetMoveInput(Vector2.zero);
+           // m_Motor.SetMoveInput(Vector2.zero);
 
             ProcessPoleMovement(rawInput, ref modifier);
             return modifier;
