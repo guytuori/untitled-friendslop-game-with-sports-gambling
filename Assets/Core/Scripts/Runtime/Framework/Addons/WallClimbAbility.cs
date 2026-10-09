@@ -218,13 +218,39 @@ namespace Blocks.Gameplay.Core
         #endregion
 
         #region Climbing
+        [Header("Wall Detection")]
+        [SerializeField] private float topCheckOffsetY = 1.0f; // Height offset to check above character's origin/hands
+        [SerializeField] private LayerMask wallLayer;
 
+        private bool HasReachedWallEnd(Vector2 rawInput)
+        {
+                Vector3 origin = transform.position + (transform.up * (rawInput.y)) + (transform.right * (rawInput.x));
+
+                RaycastHit hit ;
+
+                if (Physics.Raycast(origin, -WallNormal, out hit, 5))
+                {
+                    Debug.Log(hit.transform.gameObject.name);
+                    return false;
+                }
+
+            return true;
+        }
         private void ProcessClimbMovement(ref MovementModifier modifier)
         {
             Vector2 rawInput = m_Motor.MoveInput;
             // From here on this ability owns the horizontal movement while attached - zero out
             // WalkAbility's contribution before it runs (see the Priority discussion above).
             //m_Motor.SetMoveInput(Vector2.zero);
+
+            if (HasReachedWallEnd(rawInput))
+            {
+                modifier.ArealVelocity = Vector3.zero;
+                m_Motor.SetMoveInput(Vector2.zero);
+                m_Motor.SetVerticalVelocity(0);
+                return;
+            }
+
 
             Vector3 up = Vector3.up;
             Vector3 alongWall = Vector3.Cross(WallNormal, up).normalized;

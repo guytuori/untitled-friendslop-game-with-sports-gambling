@@ -581,6 +581,13 @@ namespace Blocks.Gameplay.Core
             return foundRail != null;
         }
 
+        public GrindRail TryGetRail()
+        {
+
+            return null;
+        }
+
+
         #endregion
 
         #region Networking
