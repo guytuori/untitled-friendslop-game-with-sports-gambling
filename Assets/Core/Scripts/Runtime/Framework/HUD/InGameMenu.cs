@@ -12,8 +12,11 @@ namespace Blocks.Gameplay.Core
     /// Game, drawn over the local player's HUD (CoreHUD adds this component at runtime - no scene setup).
     ///
     /// Opened and closed with the gameplay Menu action (Esc / gamepad Start, rebindable on Change
-    /// Keybindings). B / Esc inside the menu goes back: out of the "Are you sure?" box first, then out of
-    /// the menu. The game keeps running while it's open, but this player's gameplay input is blocked
+    /// Keybindings). Esc / gamepad B inside the menu goes back: out of the "Are you sure?" box first,
+    /// otherwise straight back to the game (same as Return to Game). Those two are read straight from
+    /// the keyboard and gamepads (see Update) rather than relying on UI Toolkit's Cancel event, which
+    /// doesn't reliably reach the HUD's panel in the gameplay scene. Space presses the focused button,
+    /// the same as Enter / gamepad A. The game keeps running while it's open, but this player's gameplay input is blocked
     /// (<see cref="CoreInputHandler.SetGameplayInputBlocked"/>), so the stick and WASD drive the menu, not the
     /// character, and the mouse cursor is freed.
     ///
@@ -40,6 +43,10 @@ namespace Blocks.Gameplay.Core
         private Coroutine m_YesDelayCoroutine;
         private float m_OpenedTime = float.NegativeInfinity;
         private bool m_Leaving;
+        private float m_LastBackTime = float.NegativeInfinity;
+
+        /// <summary>Ignore back presses this soon after opening (the press that opened the menu).</summary>
+        private const float OpenGraceSeconds = 0.2f;
 
         /// <summary>Builds the (hidden) menu on <paramref name="root"/> and starts listening for the Menu button.</summary>
         public void Initialize(VisualElement root)
@@ -85,8 +92,8 @@ namespace Blocks.Gameplay.Core
             {
                 evt.StopPropagation();
                 // The Esc that opened the menu also reaches the UI as Cancel a moment later - ignore it.
-                if (Time.unscaledTime - m_OpenedTime < 0.2f) return;
-                Back();
+                if (Time.unscaledTime - m_OpenedTime < OpenGraceSeconds) return;
+                BackOncePerFrame();
             });
 
             // Main menu panel
@@ -208,6 +215,59 @@ namespace Blocks.Gameplay.Core
             bool bettingOpen = ChallengeManager.Instance != null && ChallengeManager.Instance.IsBettingWindowActive;
             UnityEngine.Cursor.lockState = bettingOpen ? CursorLockMode.None : CursorLockMode.Locked;
             UnityEngine.Cursor.visible = bettingOpen;
+        }
+
+        /// <summary>Esc and gamepad B, read directly: back out of the confirm box, or close the menu.</summary>
+        private void Update()
+        {
+            if (!IsOpen || m_Leaving) return;
+            if (Time.unscaledTime - m_OpenedTime < OpenGraceSeconds) return;
+
+            bool back = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+            if (!back && Application.isFocused)
+            {
+                foreach (Gamepad pad in Gamepad.all)
+                {
+                    if (pad.TryGetChildControl<ButtonControl>(GamepadUIBindingFix.CancelControl) is ButtonControl cancel && cancel.wasPressedThisFrame)
+                    {
+                        back = true;
+                        break;
+                    }
+                }
+            }
+
+            if (back)
+            {
+                BackOncePerFrame();
+                return;
+            }
+
+            // Space selects too (as well as Enter) - the thumb is already on it, the other hand on the mouse.
+            if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame) SubmitFocusedButton();
+        }
+
+        /// <summary>Presses the focused menu button, exactly as Enter / gamepad A would (sound included).</summary>
+        private void SubmitFocusedButton()
+        {
+            if (!(m_Overlay.panel?.focusController?.focusedElement is Button button)) return;
+            if (!button.enabledInHierarchy) return; // e.g. "Yes" during its 2-second delay
+
+            using (NavigationSubmitEvent evt = NavigationSubmitEvent.GetPooled())
+            {
+                evt.target = button;
+                button.SendEvent(evt);
+            }
+        }
+
+        /// <summary>
+        /// The UI's Cancel event and the direct read above can both see the same press (possibly a frame
+        /// apart) - only act on it once, so one press never backs out two steps.
+        /// </summary>
+        private void BackOncePerFrame()
+        {
+            if (Time.unscaledTime - m_LastBackTime < 0.15f) return;
+            m_LastBackTime = Time.unscaledTime;
+            Back();
         }
 
         private void Back()
