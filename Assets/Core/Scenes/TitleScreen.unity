@@ -150,7 +150,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.TitleScreenController
   backgroundImage: {fileID: 2800000, guid: 325a8a06bbfd4c039562e8a22831ee85, type: 3}
-  titleImage: {fileID: 2800000, guid: a6c66037b0d4c464f887ac0bb4232b9d, type: 3}
+  titleImage: {fileID: 2800000, guid: 4f158bbff16dd1c4cbed048bf029ee2c, type: 3}
   promptText: Press Enter/Start
   nextSceneName: MainMenu
   promptFlashInterval: 0.5
