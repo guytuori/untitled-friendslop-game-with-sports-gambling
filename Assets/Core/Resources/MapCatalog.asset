@@ -17,11 +17,14 @@ MonoBehaviour:
     prefab: {fileID: 5870600805053538376, guid: 1a5166b95eea03f45b040907cdf1ac9a, type: 3}
     sockets16: 16
     sockets32: 13
+    skybox: {fileID: 2100000, guid: 4aa50dda884624f4da98682ed27b7643, type: 2}
   - id: LastStop
     prefab: {fileID: 3715106239626743101, guid: 7e158edeb48278e4e972b9310b370505, type: 3}
     sockets16: 17
     sockets32: 7
+    skybox: {fileID: 2100000, guid: 3d73a4f0316a1914893dd596ff402cdb, type: 2}
   - id: NinjaPirateTower
     prefab: {fileID: 8936819955389711067, guid: 87fd790e7cd90c040a937bfb45217f46, type: 3}
     sockets16: 3
     sockets32: 1
+    skybox: {fileID: 0}

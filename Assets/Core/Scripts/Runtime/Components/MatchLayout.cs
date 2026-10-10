@@ -52,6 +52,8 @@ namespace Blocks.Gameplay.Core
 
         private GameObject m_MapInstance;
         private string m_MapInstanceId;
+        private Material m_DefaultSkybox;
+        private bool m_DefaultSkyboxSaved;
         private bool m_Built;
 
         /// <summary>True once this client has built the map and challenges (or there was nothing to build).</summary>
@@ -285,7 +287,27 @@ namespace Blocks.Gameplay.Core
             m_MapInstance = Instantiate(entry.prefab, source.position, source.rotation, transform);
             m_MapInstance.name = "Map_" + entry.id;
             m_MapInstanceId = mapId;
+            ApplySkybox(entry);
             return m_MapInstance;
+        }
+
+        /// <summary>
+        /// Switches the sky to the map's own (MapCatalog entry, from its <c>map_name_skybox</c> image), or back to
+        /// the scene's default sky if the map hasn't got one.
+        /// </summary>
+        private void ApplySkybox(MapCatalog.Entry entry)
+        {
+            if (!m_DefaultSkyboxSaved)
+            {
+                m_DefaultSkybox = RenderSettings.skybox;
+                m_DefaultSkyboxSaved = true;
+            }
+
+            Material sky = entry != null && entry.skybox != null ? entry.skybox : m_DefaultSkybox;
+            if (RenderSettings.skybox == sky) return;
+
+            RenderSettings.skybox = sky;
+            DynamicGI.UpdateEnvironment();
         }
 
         #endregion

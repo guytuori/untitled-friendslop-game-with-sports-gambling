@@ -21,6 +21,13 @@ namespace Blocks.Gameplay.Core
     ///     Prefabs WITHOUT an underscore in their name (Challenge16, Challenge32) are not challenges: they're
     ///     the plain pieces Practice Map fills the holes with, so they're kept out of the random rotation and
     ///     stored as the catalog's practice pieces instead.
+    /// Each map's sky also goes in the MapCatalog: a Skybox material or image named after the map plus
+    /// "_skybox", anywhere under Assets (dinosaur_zoo_skybox.png for DinosaurZoo - case, underscores and
+    /// spaces don't matter). For an image, a Skybox/Panoramic material of the same name is made next to it
+    /// the first time (180 degrees, mirrored on the back, so there's no seam and the image isn't stretched
+    /// all the way round) and the image is set to import at full size without mipmaps. After that the
+    /// material is left alone, so tweak it (Rotation, Exposure, Image Type) as you like. Maps with no sky
+    /// keep [BB] Core's default.
     /// Rebuilt automatically when anything in those folders (or a glb in Assets/Maps, since the markers live
     /// there) is imported, moved or deleted, and once when the editor loads if a list doesn't exist yet.
     ///
@@ -76,7 +83,18 @@ namespace Blocks.Gameplay.Core
         internal static bool IsWatchedPath(string path) =>
             path.StartsWith(MapsFolder + "/", StringComparison.Ordinal) ||
             path.StartsWith(ChallengesFolder + "/", StringComparison.Ordinal) ||
-            (path.StartsWith(GlbFolder + "/", StringComparison.Ordinal) && path.EndsWith(".glb", StringComparison.OrdinalIgnoreCase));
+            (path.StartsWith(GlbFolder + "/", StringComparison.Ordinal) && path.EndsWith(".glb", StringComparison.OrdinalIgnoreCase)) ||
+            (path.StartsWith("Assets/", StringComparison.Ordinal) && IsSkyboxFileName(path));
+
+        private static readonly string[] SkyboxExtensions = { ".mat", ".png", ".jpg", ".jpeg", ".tga", ".psd", ".exr", ".hdr" };
+
+        private static bool IsSkyboxFileName(string path) =>
+            SkyboxKey(Path.GetFileNameWithoutExtension(path)).EndsWith("skybox", StringComparison.Ordinal) &&
+            SkyboxExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
+
+        /// <summary>A name with case, underscores, spaces etc. ignored: "dinosaur_zoo_skybox" and "DinosaurZooSkybox" match.</summary>
+        private static string SkyboxKey(string name) =>
+            new string(name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
         /// <summary>Rebuilds both lists. Returns a summary (also logged).</summary>
         public static string Rebuild()
@@ -158,7 +176,8 @@ namespace Blocks.Gameplay.Core
                     id = prefab.name,
                     prefab = prefab,
                     sockets16 = sockets.Count(s => s.Size == 16),
-                    sockets32 = sockets.Count(s => s.Size == 32)
+                    sockets32 = sockets.Count(s => s.Size == 32),
+                    skybox = FindSkybox(prefab.name, log)
                 });
             }
             return entries;
@@ -203,6 +222,82 @@ namespace Blocks.Gameplay.Core
                 .Select(AssetDatabase.GUIDToAssetPath)
                 .Distinct()
                 .OrderBy(Path.GetFileNameWithoutExtension, StringComparer.Ordinal);
+        }
+
+        /// <summary>
+        /// The map's sky: a material named &lt;map&gt;_skybox, or one made from an image of that name. Null if
+        /// there's neither (the map keeps [BB] Core's default sky).
+        /// </summary>
+        private static Material FindSkybox(string mapId, StringBuilder log)
+        {
+            string key = SkyboxKey(mapId) + "skybox";
+
+            foreach (string path in FindSkyboxAssets("t:Material"))
+            {
+                if (SkyboxKey(Path.GetFileNameWithoutExtension(path)) != key) continue;
+                var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (material != null) return material;
+            }
+
+            foreach (string path in FindSkyboxAssets("t:Texture2D"))
+            {
+                if (SkyboxKey(Path.GetFileNameWithoutExtension(path)) != key) continue;
+                Material made = CreateSkyboxMaterial(path, log);
+                if (made != null) return made;
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<string> FindSkyboxAssets(string typeFilter) =>
+            AssetDatabase.FindAssets("skybox " + typeFilter, new[] { "Assets" })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Where(p => p.StartsWith("Assets/", StringComparison.Ordinal))
+                .Distinct()
+                .OrderBy(p => p, StringComparer.Ordinal);
+
+        /// <summary>Makes a Skybox/Panoramic material next to the image (same name, .mat) and sets the image up for it.</summary>
+        private static Material CreateSkyboxMaterial(string texturePath, StringBuilder log)
+        {
+            Shader shader = Shader.Find("Skybox/Panoramic");
+            if (shader == null)
+            {
+                string message = $"Couldn't make a sky from {texturePath}: the Skybox/Panoramic shader wasn't found.";
+                Debug.LogWarning("[Maps] " + message);
+                log.AppendLine(message);
+                return null;
+            }
+
+            // Full size (no shrinking to a power of two or 2048), no mipmaps (they leave a thin line in the sky),
+            // and clamped at the sides (the image is mirrored there, not wrapped).
+            if (AssetImporter.GetAtPath(texturePath) is TextureImporter importer)
+            {
+                bool changed = false;
+                if (importer.mipmapEnabled) { importer.mipmapEnabled = false; changed = true; }
+                if (importer.npotScale != TextureImporterNPOTScale.None) { importer.npotScale = TextureImporterNPOTScale.None; changed = true; }
+                if (importer.maxTextureSize < 4096) { importer.maxTextureSize = 4096; changed = true; }
+                if (importer.wrapMode != TextureWrapMode.Clamp) { importer.wrapMode = TextureWrapMode.Clamp; changed = true; }
+                if (changed) importer.SaveAndReimport();
+            }
+
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            if (texture == null) return null;
+
+            string materialPath = Path.ChangeExtension(texturePath, ".mat").Replace('\\', '/');
+            var material = new Material(shader) { name = Path.GetFileNameWithoutExtension(materialPath) };
+            material.SetTexture("_MainTex", texture);
+            material.SetFloat("_Mapping", 1f); // Latitude Longitude Layout
+            material.DisableKeyword("_MAPPING_6_FRAMES_LAYOUT");
+            material.SetFloat("_ImageType", 1f); // 180 degrees...
+            material.SetFloat("_MirrorOnBack", 1f); // ...mirrored behind, so there's no seam
+            material.EnableKeyword("_MIRRORONBACK_ON");
+            material.SetFloat("_Exposure", 1f);
+            AssetDatabase.CreateAsset(material, materialPath);
+
+            string done = $"Made sky material {materialPath} from {Path.GetFileName(texturePath)}.";
+            Debug.Log("[Maps] " + done, material);
+            log.AppendLine(done);
+            return material;
         }
 
         private static T LoadOrCreate<T>(string path) where T : ScriptableObject

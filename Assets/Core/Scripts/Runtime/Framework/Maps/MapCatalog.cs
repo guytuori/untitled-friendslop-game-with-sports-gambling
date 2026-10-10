@@ -28,6 +28,10 @@ namespace Blocks.Gameplay.Core
 
             [Tooltip("How many 32x32 holes (challenge32 entities) the map has. Informational.")]
             public int sockets32;
+
+            [Tooltip("The map's sky (a Skybox material), or empty to keep [BB] Core's default sky. Filled in from a " +
+                     "texture or material named <map>_skybox, e.g. dinosaur_zoo_skybox.png for DinosaurZoo.")]
+            public Material skybox;
         }
 
         public const string ResourcePath = "MapCatalog";
