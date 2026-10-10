@@ -129,7 +129,6 @@ namespace Blocks.Gameplay.Core
                 row.Text.style.whiteSpace = WhiteSpace.NoWrap;
                 row.Text.style.overflow = Overflow.Hidden;
                 row.Text.style.textOverflow = TextOverflow.Ellipsis;
-                row.Text.style.unityFontStyleAndWeight = current ? FontStyle.Bold : FontStyle.Normal;
                 row.Root.Add(row.Text);
 
                 int index = i;
@@ -149,9 +148,9 @@ namespace Blocks.Gameplay.Core
         private static Button MakeTickerButton(Color color, bool current, Action onClick)
         {
             var button = new Button(onClick) { focusable = false };
+            MenuUI.ApplyButtonFont(button);
             button.style.backgroundColor = color;
             button.style.color = Color.white;
-            button.style.unityFontStyleAndWeight = FontStyle.Bold;
             button.style.fontSize = current ? 15 : 12;
             button.style.width = current ? 132 : 92;
             button.style.height = current ? 34 : 26;
@@ -193,7 +192,6 @@ namespace Blocks.Gameplay.Core
             header.style.unityTextAlign = TextAnchor.MiddleCenter;
             header.style.color = new Color(1f, 0.8f, 0.3f);
             header.style.fontSize = 11;
-            header.style.unityFontStyleAndWeight = FontStyle.Bold;
             m_PhoneViewport.Add(header);
 
             // The scrolling list lives in its own clipped area under the header.
@@ -434,7 +432,6 @@ namespace Blocks.Gameplay.Core
                 chip.style.paddingTop = 1;
                 chip.style.paddingBottom = 1;
                 chip.style.fontSize = 10;
-                chip.style.unityFontStyleAndWeight = FontStyle.Bold;
                 chip.style.color = Color.white;
                 chip.style.backgroundColor = entry.Yes ? YesColor : NoColor;
                 item.Add(chip);

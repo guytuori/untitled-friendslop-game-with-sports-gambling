@@ -137,7 +137,6 @@ namespace Blocks.Gameplay.Core
 
             var title = new Label("PRACTICE MAP");
             title.style.fontSize = 26;
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
             title.style.color = Color.white;
             title.style.marginBottom = 4;
             panel.Add(title);
@@ -193,14 +192,12 @@ namespace Blocks.Gameplay.Core
 
             m_MapNameLabel = new Label("");
             m_MapNameLabel.style.fontSize = 22;
-            m_MapNameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             m_MapNameLabel.style.color = Color.white;
             m_MapNameLabel.style.marginTop = 10;
             panel.Add(m_MapNameLabel);
 
             m_FlavorLabel = new Label("");
             m_FlavorLabel.style.fontSize = 15;
-            m_FlavorLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
             m_FlavorLabel.style.color = new Color(0.8f, 0.8f, 0.8f);
             m_FlavorLabel.style.whiteSpace = WhiteSpace.Normal;
             m_FlavorLabel.style.maxWidth = MapColumns * (ThumbnailWidth + 14f);

@@ -74,6 +74,7 @@ namespace Blocks.Gameplay.Core
                 onClick();
             })
             { text = text };
+            ApplyButtonFont(button);
             button.style.width = width;
             button.style.height = 40;
             button.style.marginTop = 8;
@@ -85,6 +86,12 @@ namespace Blocks.Gameplay.Core
             button.RegisterCallback<FocusOutEvent>(_ => SetButtonFocusedVisual(button, false));
             return button;
         }
+
+        /// <summary>
+        /// Gives a button the game font straight away. <see cref="GameFont"/> puts it on every screen anyway;
+        /// this just makes sure a button has it from its very first frame.
+        /// </summary>
+        public static void ApplyButtonFont(VisualElement element) => GameFont.Apply(element);
 
         public static void SetButtonFocusedVisual(Button button, bool focused)
         {

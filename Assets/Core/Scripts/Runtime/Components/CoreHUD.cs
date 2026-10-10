@@ -441,6 +441,9 @@ namespace Blocks.Gameplay.Core
             m_ChallengeBetSuccessButton = root.Q<Button>("challenge-bet-success-button");
             m_ChallengeBetFailureButton = root.Q<Button>("challenge-bet-failure-button");
             m_ChallengeBetDeclineButton = root.Q<Button>("challenge-bet-decline-button");
+            MenuUI.ApplyButtonFont(m_ChallengeBetSuccessButton);
+            MenuUI.ApplyButtonFont(m_ChallengeBetFailureButton);
+            MenuUI.ApplyButtonFont(m_ChallengeBetDeclineButton);
             m_ChallengeBetStatusLabel = root.Q<Label>("challenge-bet-status-label");
             m_ChallengeBetAnnouncements = root.Q<VisualElement>("challenge-bet-announcements");
         }

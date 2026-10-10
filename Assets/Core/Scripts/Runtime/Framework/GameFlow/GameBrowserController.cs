@@ -95,7 +95,6 @@ namespace Blocks.Gameplay.Core
             var title = new Label("PUBLIC GAMES");
             title.style.color = Color.white;
             title.style.fontSize = 26;
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
             panel.Add(title);
 
             m_StatusLabel = new Label("");
@@ -111,7 +110,6 @@ namespace Blocks.Gameplay.Core
             {
                 Label label = MakeCell(column.Header, column.Weight);
                 label.style.color = HeaderText;
-                label.style.unityFontStyleAndWeight = FontStyle.Bold;
                 header.Add(label);
             }
             panel.Add(header);

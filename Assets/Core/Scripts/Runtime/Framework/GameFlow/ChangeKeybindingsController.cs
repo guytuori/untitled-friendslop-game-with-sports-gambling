@@ -263,6 +263,7 @@ namespace Blocks.Gameplay.Core
             {
                 text = GetBindingDisplay(commandKey)
             };
+            MenuUI.ApplyButtonFont(bindingButton);
             bindingButton.style.width = 160;
             bindingButton.style.height = 34;
             bindingButton.style.marginTop = 4;
@@ -412,6 +413,7 @@ namespace Blocks.Gameplay.Core
                 onClick();
             })
             { text = text };
+            MenuUI.ApplyButtonFont(button);
             button.style.width = 200;
             button.style.height = 40;
             button.style.marginTop = 8;

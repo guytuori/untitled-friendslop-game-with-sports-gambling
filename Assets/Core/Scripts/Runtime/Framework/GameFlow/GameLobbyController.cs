@@ -76,7 +76,6 @@ namespace Blocks.Gameplay.Core
 
             center.Add(MakeLabel("ROOM CODE", 18, new Color(0.8f, 0.8f, 0.8f)));
             m_CodeLabel = MakeLabel("", 64, Color.white);
-            m_CodeLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             m_CodeLabel.style.letterSpacing = 12;
             center.Add(m_CodeLabel);
 

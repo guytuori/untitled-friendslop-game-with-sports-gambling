@@ -695,7 +695,6 @@ namespace Blocks.Gameplay.Core
             m_MapFlavorLabel = new Label("");
             m_MapFlavorLabel.style.color = new Color(0.8f, 0.8f, 0.8f);
             m_MapFlavorLabel.style.fontSize = 15;
-            m_MapFlavorLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
             m_MapFlavorLabel.style.width = ControlWidth;
             m_MapFlavorLabel.style.whiteSpace = WhiteSpace.Normal;
             flavorRow.Add(m_MapFlavorLabel);
@@ -1099,6 +1098,7 @@ namespace Blocks.Gameplay.Core
                 onClick();
             })
             { text = text };
+            MenuUI.ApplyButtonFont(button);
             button.style.width = width;
             button.style.height = 40;
             button.style.fontSize = 18;

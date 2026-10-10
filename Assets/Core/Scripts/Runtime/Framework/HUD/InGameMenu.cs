@@ -151,7 +151,6 @@ namespace Blocks.Gameplay.Core
             var titleLabel = new Label(title);
             titleLabel.style.color = Color.white;
             titleLabel.style.fontSize = 28;
-            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             titleLabel.style.marginBottom = 12;
             panel.Add(titleLabel);
             return panel;

@@ -141,6 +141,7 @@ namespace Blocks.Gameplay.Core
                 onClick();
             })
             { text = text };
+            MenuUI.ApplyButtonFont(button);
             button.style.width = 200;
             button.style.height = 40;
             button.style.marginTop = 8;

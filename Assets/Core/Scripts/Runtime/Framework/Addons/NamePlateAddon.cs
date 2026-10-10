@@ -50,6 +50,7 @@ namespace Blocks.Gameplay.Core
                 nameDisplayCanvas.gameObject.SetActive(!m_PlayerManager.IsOwner);
             }
 
+            GameFont.Apply(nameDisplayText);
             UpdateNameDisplay(m_PlayerManager.PlayerName);
         }
 

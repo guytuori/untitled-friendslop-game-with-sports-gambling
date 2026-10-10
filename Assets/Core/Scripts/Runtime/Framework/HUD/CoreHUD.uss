@@ -68,14 +68,12 @@
 
 .hud-timer-caption {
     font-size: 13px;
-    -unity-font-style: bold;
     letter-spacing: 2px;
     -unity-text-align: middle-center;
 }
 
 .hud-timer-value {
     font-size: 32px;
-    -unity-font-style: bold;
     -unity-text-align: middle-center;
 }
 
@@ -123,7 +121,6 @@
 #round-banner-title {
     font-size: 54px;
     color: rgb(255, 255, 255);
-    -unity-font-style: bold;
     -unity-text-align: middle-center;
     text-shadow: 2px 2px 4px rgb(0, 0, 0);
 }
@@ -131,7 +128,6 @@
 #round-banner-subtitle {
     font-size: 22px;
     color: rgb(235, 235, 235);
-    -unity-font-style: bold;
     -unity-text-align: middle-center;
     text-shadow: 1px 1px 3px rgb(0, 0, 0);
     margin-top: 6px;
@@ -167,13 +163,11 @@
 .scoreboard-name {
     color: rgb(255, 255, 255);
     font-size: 16px;
-    -unity-font-style: bold;
 }
 
 .scoreboard-score {
     color: rgb(145, 213, 97);
     font-size: 16px;
-    -unity-font-style: bold;
 }
 
 /* Team rows at the top of the scoreboard */
@@ -230,7 +224,6 @@
 .notification-item Label {
     color: rgb(229, 229, 229);
     font-size: 11px;
-    -unity-font-style: bold;
     white-space: normal;
     -unity-text-align: middle-center;
 }
@@ -254,7 +247,6 @@
 #challenge-title-label {
     font-size: 30px;
     color: rgb(255, 255, 255);
-    -unity-font-style: bold;
     -unity-text-align: middle-center;
     margin-bottom: 6px;
 }
@@ -285,14 +277,12 @@
     height: 40px;
     margin-bottom: 8px;
     font-size: 14px;
-    -unity-font-style: bold;
     white-space: normal;
 }
 
 #challenge-bet-status-label {
     font-size: 16px;
     color: rgb(145, 213, 97);
-    -unity-font-style: bold;
     margin-bottom: 10px;
 }
 
@@ -323,7 +313,6 @@
 #message-label {
     font-size: 28px;
     color: white;
-    -unity-font-style: bold;
     text-shadow: 1px 1px 2px rgb(0, 0, 0);
     margin-bottom: 12px;
 }
@@ -339,6 +328,5 @@
 #countdown-label {
     font-size: 150px;
     color: rgb(255, 255, 255);
-    -unity-font-style: bold;
     letter-spacing: -5px;
 }

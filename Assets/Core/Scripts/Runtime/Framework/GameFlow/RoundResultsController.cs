@@ -130,7 +130,6 @@ namespace Blocks.Gameplay.Core
             label.style.fontSize = size;
             label.style.color = color;
             label.style.unityTextAlign = TextAnchor.MiddleCenter;
-            if (bold) label.style.unityFontStyleAndWeight = FontStyle.Bold;
             return label;
         }
 
@@ -145,13 +144,11 @@ namespace Blocks.Gameplay.Core
             var nameLabel = new Label(name);
             nameLabel.style.fontSize = 18;
             nameLabel.style.color = nameColor;
-            nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             row.Add(nameLabel);
 
             var valueLabel = new Label(value);
             valueLabel.style.fontSize = 18;
             valueLabel.style.color = valueColor;
-            valueLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             row.Add(valueLabel);
             return row;
         }
