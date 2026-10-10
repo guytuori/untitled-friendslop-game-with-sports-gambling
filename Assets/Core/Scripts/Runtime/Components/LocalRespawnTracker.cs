@@ -109,6 +109,13 @@ namespace Blocks.Gameplay.Core
             {
                 Kill();
             }
+
+            // Rising water (RisingWaterManager) - a death plane that moves.
+            if (alive && !m_Dying && RisingWaterManager.TryGetWaterTop(out float waterTop)
+                && transform.position.y < waterTop - RisingWaterManager.DeathDepth)
+            {
+                Kill();
+            }
         }
 
         private void RecordSafeSpot(Vector3 position, float yaw)
@@ -192,6 +199,14 @@ namespace Blocks.Gameplay.Core
                         chosen = spot;
                     }
                 }
+            }
+
+            // Rising water: never bring them back somewhere the water is (or is about to be) - put them on the
+            // pump that set the current level instead.
+            if ((!chosen.HasValue || RisingWaterManager.IsUnderwaterSoon(chosen.Value.Position))
+                && RisingWaterManager.TryGetPumpRespawn(out position, out rotation))
+            {
+                return true;
             }
 
             if (!chosen.HasValue) return false;

@@ -240,7 +240,7 @@ MonoBehaviour:
   - displayName: Ninja Pirate Tower
     thumbnail: {fileID: 2800000, guid: 0e815fa450cae02429b3ebb9aba439c9, type: 3}
     flavorText: Map 3 flavor text
-    mapPrefab: LastStop
+    mapPrefab: NinjaPirateTower
   - displayName: Red Rocks
     thumbnail: {fileID: 2800000, guid: 6e62309371949c34eb8be7d70fdc5025, type: 3}
     flavorText: Map 4 flavor text

@@ -451,6 +451,10 @@ MonoBehaviour:
   regrabCooldown: 0.25
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   animationControls: {fileID: 0}
+  topCheckOffsetY: 1
+  wallLayer:
+    serializedVersion: 2
+    m_Bits: 0
   wallJumpStyle: 0
 --- !u!114 &6234546863735232799
 MonoBehaviour:
