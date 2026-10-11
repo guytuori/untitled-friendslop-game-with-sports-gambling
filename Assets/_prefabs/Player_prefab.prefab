@@ -284,6 +284,8 @@ MonoBehaviour:
   onJumpReleased: {fileID: 11400000, guid: 4c295680fb10f4080ae6688f6a96a009, type: 2}
   onSprintStateChanged: {fileID: 11400000, guid: c3ec94fe2e7dd47aaadddb5e98e7c375, type: 2}
   onGrabStateChanged: {fileID: 11400000, guid: 8f025844fa794da8b5eab619f5139e5c, type: 2}
+  onGrabPressed: {fileID: 0}
+  onGrabReleased: {fileID: 0}
   onPrimaryActionPressed: {fileID: 11400000, guid: f48adbe17161042ef8cf65a5a455594a, type: 2}
   onPrimaryActionReleased: {fileID: 11400000, guid: a670f0da4a4d64cea91ff13081e68da8, type: 2}
   onMenuPressed: {fileID: 11400000, guid: 5f76e3427057c467fa2f4de049753b9e, type: 2}
@@ -576,7 +578,7 @@ MonoBehaviour:
   grabDetectionRange: 1
   climbSpeedMultiplier: 0.5
   shimmySpeedMultiplier: 0.5
-  staminaCostPerSecond: 8
+  staminaCostPerSecond: 0
   jumpOffHeightMultiplier: 1
   jumpOffPushForce: 6
   regrabCooldown: 0.25
@@ -602,12 +604,15 @@ MonoBehaviour:
   minPressInto: 0.4
   climbSpeedMultiplier: 1
   shimmySpeedMultiplier: 1
+  slideSpeedMultiplier: 1
   staminaCostPerSecond: 0
   stickForce: 5
   wallJumpHeight: 2.2
   wallJumpPushForce: 25
   regrabCooldown: 0.25
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+  onGrabPressed: {fileID: 11400000, guid: 87f393b1f11a6d248835e1af7c403761, type: 2}
+  onGrabReleased: {fileID: 11400000, guid: 13c5794a2c1524644a2467dac99c665c, type: 2}
   animationControls: {fileID: 0}
   topCheckOffsetY: 1
   wallLayer:

@@ -59,9 +59,10 @@ namespace Blocks.Gameplay.Core
 
         [Header("Jump Off")]
         [Tooltip("Multiplier applied to the player's normal jumpHeight when jumping off a pole.")]
-        [SerializeField] private float jumpOffHeightMultiplier = 1f;
+        [SerializeField] private float jumpHeight = 2.2f;
+        
         [Tooltip("Outward push away from the pole, applied as an instantaneous force - same shape as a wall jump's push.")]
-        [SerializeField] private float jumpOffPushForce = 6f;
+        [SerializeField] private float jumpPushForce = 7f;
         [Tooltip("How long after jumping off before the same pole can be re-grabbed - stops immediately re-sticking to the pole you just launched off of.")]
         [SerializeField] private float regrabCooldown = 0.25f;
 
@@ -109,7 +110,7 @@ namespace Blocks.Gameplay.Core
 
             if (!IsOnPole)
             {
-                if (m_Motor.IsGrabHeld && TryDetectPole(out Pole pole, out float angle, out float height, out Vector3 outward))
+                if (m_Motor.IsGrabHeld && m_RegrabTimer <= 0f && TryDetectPole(out Pole pole, out float angle, out float height, out Vector3 outward))
                 {
                     EnterPole(pole, angle, height, outward);
                 }
@@ -184,8 +185,20 @@ namespace Blocks.Gameplay.Core
 
         #region Pole Movement
 
+        public bool IsPoleHorizontal(Pole _pole)
+        {
+
+            return Mathf.Abs(_pole.transform.eulerAngles.x) < 125 && Mathf.Abs(_pole.transform.eulerAngles.x) > 50;
+        }
+
         private void ProcessPoleMovement(Vector2 rawInput, ref MovementModifier modifier)
         {
+            if (IsPoleHorizontal(m_CurrentPole))
+            {
+                ProcessHorizontalPoleMovement(rawInput, ref modifier);
+                return;
+            }
+
             float climbSpeed = m_Motor.moveSpeed * climbSpeedMultiplier;
             float shimmySpeed = m_Motor.moveSpeed * shimmySpeedMultiplier;
 
@@ -212,6 +225,37 @@ namespace Blocks.Gameplay.Core
             modifier.OverrideGravity = true;
         }
 
+        private void ProcessHorizontalPoleMovement(Vector2 rawInput, ref MovementModifier modifier)
+        {
+
+            float climbSpeed = m_Motor.moveSpeed * climbSpeedMultiplier;
+            float shimmySpeed = m_Motor.moveSpeed * shimmySpeedMultiplier;
+
+            float halfHeight = m_CurrentPole.WorldHalfHeight;
+            m_HeightAlongAxis = Mathf.Clamp(m_HeightAlongAxis + rawInput.x * climbSpeed * Time.deltaTime, -halfHeight, halfHeight);
+
+            float radius = m_CurrentPole.WorldRadius + m_Controller.radius;
+            float circumference = 2f * Mathf.PI * Mathf.Max(0.01f, radius);
+            float degreesPerSecond = (shimmySpeed / circumference) * 360f;
+            // Positive stick-right shimmies clockwise, viewed from above looking down the pole's axis.
+            m_AngleDegrees += rawInput.y * degreesPerSecond * Time.deltaTime;
+
+            Vector3 axis = m_CurrentPole.Axis;
+            Vector3 refDir = Vector3.Cross(axis, Vector3.up).sqrMagnitude > 0.0001f
+                ? Vector3.Cross(axis, Vector3.up).normalized
+                : Vector3.forward;
+            Vector3 outward = Quaternion.AngleAxis(m_AngleDegrees, axis) * refDir;
+            m_LastOutwardDir = outward;
+
+            Vector3 targetPos = m_CurrentPole.Center + axis * m_HeightAlongAxis + outward * radius;
+
+            m_Motor.SetPosition(targetPos, teleport: false);
+            m_Motor.SetVerticalVelocity(0f);
+            modifier.OverrideGravity = true;
+        }
+
+
+
         private void EnterPole(Pole pole, float angleDegrees, float height, Vector3 outward)
         {
             m_CurrentPole = pole;
@@ -220,10 +264,23 @@ namespace Blocks.Gameplay.Core
             m_HeightAlongAxis = height;
             m_LastOutwardDir = outward; // so RotationOverride below faces the right way from frame one
             m_Motor.SetVerticalVelocity(0f);
-
+            if (m_CurrentPole == null) { return; }
+            if (IsPoleHorizontal(m_CurrentPole))
+            {
+                m_Motor.RotationOverride = () => m_CurrentPole != null
+                ? Quaternion.LookRotation(transform.forward, Vector3.up)
+                : m_Motor.transform.rotation;
+                return;
+            }
             m_Motor.RotationOverride = () => m_CurrentPole != null
                 ? Quaternion.LookRotation(-m_LastOutwardDir, Vector3.up)
                 : m_Motor.transform.rotation;
+            return;
+            m_Motor.RotationOverride = () => m_CurrentPole != null
+                ? Quaternion.LookRotation(new Vector3(m_CurrentPole.transform.position.x, transform.position.y, m_CurrentPole.transform.position.z) - transform.position, Vector3.up)
+                : m_Motor.transform.rotation;
+            return;
+            
         }
 
         private void ExitPole(bool applyRegrabCooldown)
@@ -274,7 +331,7 @@ namespace Blocks.Gameplay.Core
         {
             if (!m_IsActive || !IsOwner || m_Motor == null) return;
             if (!IsOnPole) return;
-
+            ExitPole(applyRegrabCooldown: true);
             PerformJumpOff();
         }
 
@@ -282,13 +339,14 @@ namespace Blocks.Gameplay.Core
         {
             PlayerActions.Report(m_Motor.gameObject, PlayerAction.PoleJump); // counted for wagers (LocalActionTracker)
 
-            float jumpVelocity = Mathf.Sqrt(Mathf.Max(0.01f, jumpOffHeightMultiplier * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
-            m_Motor.SetVerticalVelocity(jumpVelocity);
-            m_Motor.ApplyExternalForce(m_LastOutwardDir * jumpOffPushForce, ForceMode.Impulse);
+            float jumpVelocity = Mathf.Sqrt(Mathf.Max(0.01f, jumpHeight * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
+            m_Motor.SetVerticalVelocity(5);
+            m_Motor.ApplyExternalForce(Vector3.right * jumpPushForce * 10, ForceMode.Impulse);
 
-            ExitPole(applyRegrabCooldown: true);
+            
         }
 
+ 
         #endregion
 
         #region Detection

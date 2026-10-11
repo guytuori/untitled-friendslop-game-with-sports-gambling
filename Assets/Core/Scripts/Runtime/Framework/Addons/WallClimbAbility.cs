@@ -71,6 +71,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float climbSpeedMultiplier = 0.5f;
         [Tooltip("Sideways shimmy speed along the wall's surface, as a fraction of CoreMovement.moveSpeed.")]
         [SerializeField] private float shimmySpeedMultiplier = 0.5f;
+        [SerializeField] private float slideSpeedMultiplier = 1f;
         [Tooltip("Stamina drained per second while stuck to a wall.")]
         [SerializeField] private float staminaCostPerSecond = 10f;
         [Tooltip("Small constant push into the wall (on top of climb/shimmy movement) so the CharacterController doesn't drift off the surface across uneven geometry.")]
@@ -87,7 +88,9 @@ namespace Blocks.Gameplay.Core
         [Header("Input Event")]
         [Tooltip("Same GameEvent CoreInputHandler raises on jump press (drag the same asset assigned there). Wired directly here - see the class summary for why.")]
         [SerializeField] private GameEvent onJumpPressed;
-
+        [SerializeField] private GameEvent onGrabPressed;
+        [SerializeField] private GameEvent onGrabReleased;
+        
         /// <summary>True while actively stuck to and climbing a wall.</summary>
         public bool IsClimbing { get; private set; }
 
@@ -142,29 +145,14 @@ namespace Blocks.Gameplay.Core
                 return modifier;
             }
 
-            if (!m_Motor.IsGrabHeld)
-            {
-                // Letting go simply drops you into freefall.
-                ExitClimb();
-                return modifier;
-            }
-
+            
             float cost = staminaCostPerSecond * Time.deltaTime;
-            if (m_CoreStats != null && !m_CoreStats.TryConsumeStat(StatKeys.Stamina, cost, OwnerClientId))
+            if (m_CoreStats == null || !m_CoreStats.TryConsumeStat(StatKeys.Stamina, cost, OwnerClientId) || !m_Motor.IsGrabHeld)
             {
-                // Ran out of stamina mid-climb - lose your grip rather than quietly stopping in place.
                 ExitClimb();
                 return modifier;
             }
 
-            // Re-check the wall is still there each frame (shimmying along a surface, or the surface
-            // stepping/curving) rather than trusting the normal captured on entry.
-            //if (!TryFindClimbableWall(out Vector3 currentNormal))
-            //{
-            //    ExitClimb();
-            //    return modifier;
-            //}
-           // WallNormal = currentNormal;
 
             ProcessClimbMovement(ref modifier);
             return modifier;
@@ -278,6 +266,44 @@ namespace Blocks.Gameplay.Core
             modifier.OverrideGravity = true;
         }
 
+        private void ProcessWallSLideMovement(ref MovementModifier modifier)
+        {
+            Vector2 rawInput = m_Motor.MoveInput;
+
+            if (HasReachedWallEnd( new Vector2(rawInput.x, -slideSpeedMultiplier * m_Motor.moveSpeed)))
+            {
+                modifier.ArealVelocity = Vector3.zero;
+                m_Motor.SetMoveInput(Vector2.zero);
+                m_Motor.SetVerticalVelocity(-slideSpeedMultiplier * m_Motor.moveSpeed);
+
+                //slide off the wall
+                ExitClimb();
+                return;
+            }
+
+
+            Vector3 up = Vector3.up;
+            Vector3 alongWall = Vector3.Cross(WallNormal, up).normalized;
+
+            float vertSpeed = m_Motor.moveSpeed * -slideSpeedMultiplier;
+            float horizSpeed = m_Motor.moveSpeed * shimmySpeedMultiplier;
+            Vector3 velocity = (up  * vertSpeed) + (transform.right * (rawInput.x * horizSpeed));
+
+            float magnitude = velocity.magnitude;
+            //get a vector that is only along the wall and not going away or into it
+            //NOTE: this means climbing walls have to be a flat surface, if we want them to curve at all
+            //multiple walls would need to be used, or this logic changed
+            velocity = velocity.normalized - WallNormal.normalized;
+
+            velocity = velocity * magnitude;
+            m_Motor.SetVerticalVelocity(velocity.y);
+            //because of the way claude handles movement vectors we need to seperate the Y component
+            velocity.y = 0;
+            modifier.ArealVelocity = velocity;
+
+            modifier.OverrideGravity = true;
+        }
+
         private void EnterClimb(Vector3 wallNormal)
         {
             WallNormal = wallNormal;
@@ -307,6 +333,7 @@ namespace Blocks.Gameplay.Core
             if (!IsClimbing) return;
 
             IsClimbing = false;
+
             if (m_Motor != null)
             {
                 m_Motor.SetClimbState(false);
@@ -326,7 +353,12 @@ namespace Blocks.Gameplay.Core
             if (m_ListenersRegistered || onJumpPressed == null) return;
 
             onJumpPressed.RegisterListener(HandleJumpPressed);
+
             m_ListenersRegistered = true;
+            //if the events were not set on the prefab skip
+            if (onGrabPressed == null || onGrabReleased == null) { return; }
+            onGrabPressed.RegisterListener(HandleGrabPressed);
+            onGrabReleased.RegisterListener(HandleGrabPressed);
         }
 
         private void UnregisterListener()
@@ -335,6 +367,11 @@ namespace Blocks.Gameplay.Core
 
             onJumpPressed.UnregisterListener(HandleJumpPressed);
             m_ListenersRegistered = false;
+
+            //if the events were not set on the prefab skip
+            if (onGrabPressed == null || onGrabReleased == null) { return; }
+            onGrabPressed.UnregisterListener(HandleGrabPressed);
+            onGrabReleased.UnregisterListener(HandleGrabReleased);
         }
 
         private void HandleJumpPressed()
@@ -343,6 +380,19 @@ namespace Blocks.Gameplay.Core
             if (!IsClimbing) return;
 
             PerformWallJump();
+        }
+        private void HandleGrabPressed()
+        {
+            if (!m_IsActive || !IsOwner || m_Motor == null) return;
+            if (!IsClimbing) return;
+
+        }
+        private void HandleGrabReleased()
+        {
+            if (!m_IsActive || !IsOwner || m_Motor == null) return;
+            if (!IsClimbing) return;
+            
+            //ExitClimb();
         }
         [SerializeField] private int wallJumpStyle;
         private void PerformWallJump()
@@ -472,7 +522,7 @@ namespace Blocks.Gameplay.Core
             if (input == Vector2.zero) return Vector3.zero;
 
             Vector3 inputDirection = new Vector3(input.x, 0f, input.y).normalized;
-
+            return inputDirection;
             switch (m_Motor.directionMode)
             {
                 case CoreMovement.MovementDirectionMode.CharacterRelative:

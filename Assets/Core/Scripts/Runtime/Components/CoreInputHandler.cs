@@ -43,6 +43,8 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private BoolEvent onSprintStateChanged;
         [Tooltip("Raised when the grab state changes (held or released) - see PoleGrabAbility / WallClimbAbility.")]
         [SerializeField] private BoolEvent onGrabStateChanged;
+        [SerializeField] private GameEvent onGrabPressed;
+        [SerializeField] private GameEvent onGrabReleased;
         [Tooltip("Raised when the primary action button is pressed.")]
         [SerializeField] private GameEvent onPrimaryActionPressed;
         [Tooltip("Raised when the primary action button is released.")]
@@ -187,6 +189,9 @@ namespace Blocks.Gameplay.Core
             m_InputActions.Player.Grab.started += HandleGrabState;
             m_InputActions.Player.Grab.canceled += HandleGrabState;
 
+            m_InputActions.Player.Grab.canceled += HandleGrabReleased;
+            m_InputActions.Player.Grab.performed += HandleGrabPressed;
+
             m_InputActions.Player.PrimaryAction.started += HandlePrimaryActionPressed;
             m_InputActions.Player.PrimaryAction.canceled += HandlePrimaryActionReleased;
 
@@ -209,6 +214,10 @@ namespace Blocks.Gameplay.Core
 
             m_InputActions.Player.Grab.started -= HandleGrabState;
             m_InputActions.Player.Grab.canceled -= HandleGrabState;
+
+
+            m_InputActions.Player.Grab.canceled -= HandleGrabReleased;
+            m_InputActions.Player.Grab.performed -= HandleGrabPressed;
 
             m_InputActions.Player.PrimaryAction.started -= HandlePrimaryActionPressed;
             m_InputActions.Player.PrimaryAction.canceled -= HandlePrimaryActionReleased;
@@ -238,6 +247,8 @@ namespace Blocks.Gameplay.Core
         private void HandleJumpReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onJumpReleased?.Raise(); }
         private void HandleSprintState(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onSprintStateChanged?.Raise(context.ReadValueAsButton()); }
         private void HandleGrabState(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabStateChanged?.Raise(context.ReadValueAsButton()); }
+        private void HandleGrabPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabPressed?.Raise(); }
+        private void HandleGrabReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabReleased?.Raise(); }
         private void HandlePrimaryActionPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onPrimaryActionPressed?.Raise(); }
         private void HandlePrimaryActionReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onPrimaryActionReleased?.Raise(); }
         private void HandleMenuPressed(InputAction.CallbackContext context)
