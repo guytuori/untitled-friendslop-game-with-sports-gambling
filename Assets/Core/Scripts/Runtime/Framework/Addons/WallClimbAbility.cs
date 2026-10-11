@@ -243,6 +243,8 @@ namespace Blocks.Gameplay.Core
             // WalkAbility's contribution before it runs (see the Priority discussion above).
             //m_Motor.SetMoveInput(Vector2.zero);
 
+           // if (rawInput == Vector2.zero) { return; }
+
             if (HasReachedWallEnd(rawInput))
             {
                 modifier.ArealVelocity = Vector3.zero;
@@ -257,7 +259,6 @@ namespace Blocks.Gameplay.Core
 
             float vertSpeed = m_Motor.moveSpeed * climbSpeedMultiplier;
             float horizSpeed = m_Motor.moveSpeed * shimmySpeedMultiplier;
-
             Vector3 velocity = up * (rawInput.y * vertSpeed) + (transform.right * (rawInput.x * horizSpeed));
 
             velocity = (Vector3.Cross(-WallNormal, alongWall) * (rawInput.y * vertSpeed)) + (alongWall * (rawInput.x * horizSpeed));

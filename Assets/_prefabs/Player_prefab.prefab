@@ -303,7 +303,7 @@ MonoBehaviour:
   moveSpeed: 9
   sprintSpeed: 3
   rotationSmoothTime: 0.1
-  speedChangeRate: 50
+  speedChangeRate: 12
   forceDecayRate: 5
   gravity: -30
   jumpHeight: 5
@@ -532,25 +532,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3059ff576b05e5442a365c1d1c610564, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GrindRailAbility
-  maxSpeedMultiplier: 2.5
-  railAcceleration: 4
-  sprintAccelerationBonus: 4
+  maxSpeedMultiplier: 12
+  railAcceleration: 2
+  sprintAccelerationBonus: 1
   minSpeedMultiplier: 0.5
-  entrySpeedMultiplier: 0.6
+  entrySpeedMultiplier: 1
   slopeSpeedInfluence: 6
-  rotateToSurfaceSpeed: 5
-  ambientTippingStrength: 1.2
+  rotateToSurfaceSpeed: 25
+  ambientTippingStrength: 5
   minGustInterval: 0.2
   maxGustInterval: 0.45
-  turnLeanStrength: 0.05
+  turnLeanStrength: 5
   balanceControlRate: 2.5
   fallOffPushForce: 3
   fallOffHop: 2
   sameRailReentryGuard: 0.2
   snapDetectionRadius: 0.9
-  jumpOffHeightMultiplier: 1
-  momentumDecayDelay: 0.35
-  airborneMomentumDecayPerSecond: 1.2
+  jumpOffHeightMultiplier: 0.3
+  momentumDecayDelay: 9
+  airborneMomentumDecayPerSecond: 0.5
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   barWorldWidth: 1.2
   barWorldHeight: 0.14
