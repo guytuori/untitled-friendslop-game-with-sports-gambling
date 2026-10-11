@@ -115,6 +115,9 @@ namespace Blocks.Gameplay.Core
         [MenuItem("Friendslop/Set Object Property/Player End Point")]
         private static void SetPlayerEndPoint() => ApplyToSelection(MapObjectPropertyType.PlayerEndPoint);
 
+        [MenuItem("Friendslop/Set Object Property/Water")]
+        private static void SetWater() => ApplyToSelection(MapObjectPropertyType.Water);
+
         #endregion
 
         private static void ApplyToSelection(MapObjectPropertyType type)
@@ -229,6 +232,11 @@ namespace Blocks.Gameplay.Core
                     BuildFlatCollider(obj, meshFilter, null);
                     Undo.AddComponent<PlayerEndPoint>(obj);
                     break;
+
+                case MapObjectPropertyType.Water:
+                    // No collider - you fall into water. WaterVolume uses the mesh itself as the deadly volume.
+                    Undo.AddComponent<WaterVolume>(obj);
+                    break;
             }
 
             tag.PropertyType = type;
@@ -299,6 +307,7 @@ namespace Blocks.Gameplay.Core
             RemoveComponent<GrindRail>(obj);
             RemoveComponent<PlayerSpawnPoint>(obj);
             RemoveComponent<PlayerEndPoint>(obj);
+            RemoveComponent<WaterVolume>(obj);
             RemoveComponent<ChallengeZoneTrigger>(obj);
 
             foreach (Collider collider in obj.GetComponents<Collider>())

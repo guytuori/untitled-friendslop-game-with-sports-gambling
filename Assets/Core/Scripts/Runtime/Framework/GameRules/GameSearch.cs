@@ -211,7 +211,7 @@ namespace Blocks.Gameplay.Core
         private static readonly string[] MapNames =
         {
             "Airship", "Dinosaur Zoo", "Ninja Pirate Tower", "Red Rocks", "Sea Base", "Wizard Academy",
-            "Map 8", "Map 9", "Last Stop", "Random"
+            "Invasion Mothership", "Map 9", "Last Stop", "Random"
         };
 
         private static readonly int[] MaxPlayerChoices = { 4, 6, 8, 10, 12, 16 };
