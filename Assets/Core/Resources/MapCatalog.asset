@@ -25,6 +25,6 @@ MonoBehaviour:
     skybox: {fileID: 2100000, guid: 3d73a4f0316a1914893dd596ff402cdb, type: 2}
   - id: NinjaPirateTower
     prefab: {fileID: 8936819955389711067, guid: 87fd790e7cd90c040a937bfb45217f46, type: 3}
-    sockets16: 3
-    sockets32: 1
+    sockets16: 6
+    sockets32: 2
     skybox: {fileID: 0}

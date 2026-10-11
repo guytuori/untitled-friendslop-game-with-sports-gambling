@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 5870600805053538376}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -510.9, y: 20.92426, z: 230.39859}
+  m_LocalPosition: {x: -510.9, y: 20.8, z: 228.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -317,7 +317,7 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -3910990755373119420, guid: 6608ce41a7603e54c9f9cc5d9034cb79, type: 3}
   m_PrefabInstance: {fileID: 6179683178153044545}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1942204613791728800 stripped
+--- !u!1 &3205305752487668230 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8771091787928289351, guid: 6608ce41a7603e54c9f9cc5d9034cb79, type: 3}
   m_PrefabInstance: {fileID: 6179683178153044545}
@@ -328,7 +328,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1942204613791728800}
+  m_GameObject: {fileID: 3205305752487668230}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9441cee1083afaf44b9d7973fc639036, type: 3}
@@ -342,7 +342,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1942204613791728800}
+  m_GameObject: {fileID: 3205305752487668230}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c0f40ef6cfc24c2ab1e736aef6a2d9d0, type: 3}

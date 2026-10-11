@@ -251,8 +251,8 @@ MonoBehaviour:
   - displayName: Map 9
     thumbnail: {fileID: 2800000, guid: 91f57b706159af848a1e6b3de3bd3f7b, type: 3}
     flavorText: Map 7 flavor text
-  - displayName: Map 8
-    thumbnail: {fileID: 2800000, guid: 4b19122d9ad8e5c458f10c3f8d454e95, type: 3}
+  - displayName: Invasion Mothership
+    thumbnail: {fileID: 2800000, guid: fe84e1183a21c8640a38c1c38c41e25b, type: 3}
     flavorText: Map 8 flavor text
   - displayName: Last Stop
     thumbnail: {fileID: 2800000, guid: e454e0b0395729645b4241bd36951c6b, type: 3}
