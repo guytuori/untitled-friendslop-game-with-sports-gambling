@@ -6,6 +6,9 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// The death plane and "where do I come back" for this client's own player.
     ///
+    /// WATER: getting your feet into a Water object (<see cref="WaterVolume"/>) kills you the same way, and you
+    /// come back on the safe ground nearest to where you went in.
+    ///
     /// DEATH PLANE: falling more than <see cref="DeathPlaneMargin"/> meters below the lowest part of the map
     /// (the map and its challenges, measured once the map is built) kills the player - their health is
     /// emptied, so it's a normal death (death penalty, death counted for challenge pars and wagers, the usual
@@ -110,6 +113,13 @@ namespace Blocks.Gameplay.Core
                 Kill();
             }
 
+            // Water objects (Set Object Property > Water): feet a little way into the water.
+            if (alive && !m_Dying && WaterVolume.All.Count > 0
+                && WaterVolume.IsInWater(transform.position + Vector3.up * WaterVolume.DeathDepth))
+            {
+                Kill();
+            }
+
             // Rising water (RisingWaterManager) - a death plane that moves.
             if (alive && !m_Dying && RisingWaterManager.TryGetWaterTop(out float waterTop)
                 && transform.position.y < waterTop - RisingWaterManager.DeathDepth)
@@ -190,6 +200,7 @@ namespace Blocks.Gameplay.Core
                 float best = float.MaxValue;
                 foreach (SafeSpot spot in m_History)
                 {
+                    if (WaterVolume.All.Count > 0 && WaterVolume.IsInWater(spot.Position + Vector3.up * WaterVolume.DeathDepth)) continue;
                     Vector3 d = spot.Position - target;
                     // Sideways distance matters most (a fall is straight down); height breaks ties.
                     float score = d.x * d.x + d.z * d.z + 0.1f * d.y * d.y;

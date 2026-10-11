@@ -46,7 +46,10 @@ namespace Blocks.Gameplay.Core
         ChallengeFinish,
 
         /// <summary>The map's end point - see <see cref="PlayerEndPoint"/>. Ordinary walkable geometry that additionally gets an invisible trigger above it (built at runtime). Added last so existing values keep their numbers.</summary>
-        PlayerEndPoint
+        PlayerEndPoint,
+
+        /// <summary>Water - see <see cref="WaterVolume"/>. No collider (you fall in); touching it kills you and you respawn on safe ground near where you went in, like the death plane. Added last so existing values keep their numbers.</summary>
+        Water
     }
 
     /// <summary>
