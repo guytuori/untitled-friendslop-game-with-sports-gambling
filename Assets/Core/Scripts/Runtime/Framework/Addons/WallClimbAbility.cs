@@ -53,7 +53,8 @@ namespace Blocks.Gameplay.Core
         public float StaminaCost => 0f;
 
         #endregion
-
+        private CorePlayerManager corePlayerManager;
+        private Camera playerCamera;
         [Header("Wall Detection")]
         [Tooltip("Layers that count as a climbable wall. Defaults to Everything; the surface-angle check below already filters out floors, ceilings and shallow ramps, so most projects can leave this alone.")]
         [SerializeField] private LayerMask wallLayers = ~0;
@@ -129,7 +130,7 @@ namespace Blocks.Gameplay.Core
 
             if (m_Motor.IsGrounded)
             {
-                IsClimbing = false;
+                ExitClimb();
                 return modifier;
             }
 
@@ -218,7 +219,6 @@ namespace Blocks.Gameplay.Core
 
                 if (Physics.Raycast(origin, -WallNormal, out hit, 5))
                 {
-                    Debug.Log(hit.transform.gameObject.name);
                     return false;
                 }
 
@@ -394,12 +394,16 @@ namespace Blocks.Gameplay.Core
             
             //ExitClimb();
         }
-        [SerializeField] private int wallJumpStyle;
+        [SerializeField] private float angleToconsiderJumpControlled=100.0f;
         private void PerformWallJump()
         {
             PlayerActions.Report(m_Motor.gameObject, PlayerAction.WallJump); // counted for wagers (LocalActionTracker)
-
-            if (wallJumpStyle == 1)
+            Vector3 jumpDirection = WallNormal;
+            
+            float angle = Vector3.Angle(WallNormal, PlayerCamera().transform.forward * wallJumpPushForce);
+            //if the player is looking away from the wall, jump in the direction they are looking
+            //otherwise jump upward on the wall
+            if (angle < angleToconsiderJumpControlled)
             {
                 ControlledWallJump();
                 return;
@@ -408,7 +412,6 @@ namespace Blocks.Gameplay.Core
 
             float jumpVelocity = Mathf.Sqrt(wallJumpHeight * -2f * m_Motor.gravity);
             m_Motor.SetVerticalVelocity(jumpVelocity);
-            m_Motor.ApplyExternalForce(WallNormal * wallJumpPushForce, ForceMode.Impulse);
 
             ExitClimb();
             m_RegrabTimer = regrabCooldown;
@@ -424,9 +427,11 @@ namespace Blocks.Gameplay.Core
             if (rawInput.sqrMagnitude > 0.1f)
             {
                 jumpDirection = rawInput.normalized;
+                
             }
-          //  m_Motor.SetVerticalVelocity(jumpVelocity);
-            m_Motor.ApplyExternalForce(jumpDirection * wallJumpPushForce, ForceMode.Impulse);
+            jumpDirection = PlayerCamera().transform.forward * wallJumpPushForce;
+            m_Motor.SetVerticalVelocity(jumpDirection.y );
+            m_Motor.ApplyExternalForce(jumpDirection, ForceMode.Impulse);
 
             ExitClimb();
             m_RegrabTimer = regrabCooldown;
@@ -546,7 +551,19 @@ namespace Blocks.Gameplay.Core
 
             return animationControls;
         }
-
+        public CorePlayerManager CorePlayer()
+        {
+            if (corePlayerManager == null) { corePlayerManager = GetComponent<CorePlayerManager>(); }
+            return corePlayerManager;
+        }
+        public Camera PlayerCamera()
+        {
+            //because the the player was not set up to know its camera, use camera.main until
+            //the player controller is fixed
+            if (playerCamera == null) { playerCamera = Camera.main; }
+            return playerCamera;
+        }
+        
         #region Debug
 
         private void OnDrawGizmosSelected()

@@ -305,8 +305,8 @@ MonoBehaviour:
   moveSpeed: 9
   sprintSpeed: 3
   rotationSmoothTime: 0.1
-  speedChangeRate: 12
-  forceDecayRate: 5
+  speedChangeRate: 5
+  forceDecayRate: 2
   gravity: -30
   jumpHeight: 5
   groundedOffset: -0.14
@@ -579,8 +579,8 @@ MonoBehaviour:
   climbSpeedMultiplier: 0.5
   shimmySpeedMultiplier: 0.5
   staminaCostPerSecond: 0
-  jumpOffHeightMultiplier: 1
-  jumpOffPushForce: 6
+  jumpHeight: 2.2
+  jumpPushForce: 7
   regrabCooldown: 0.25
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!114 &7587005557142702197
@@ -608,7 +608,7 @@ MonoBehaviour:
   staminaCostPerSecond: 0
   stickForce: 5
   wallJumpHeight: 2.2
-  wallJumpPushForce: 25
+  wallJumpPushForce: 50
   regrabCooldown: 0.25
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   onGrabPressed: {fileID: 11400000, guid: 87f393b1f11a6d248835e1af7c403761, type: 2}
@@ -619,6 +619,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   wallJumpStyle: 0
+  angleToconsiderJumpControlled: 100
 --- !u!114 &1069646715921968806
 MonoBehaviour:
   m_ObjectHideFlags: 0
