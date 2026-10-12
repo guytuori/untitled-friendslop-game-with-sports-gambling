@@ -12,7 +12,8 @@ namespace Blocks.Gameplay.Core
     /// that size), over a black background, with the menu buttons stacked in the bottom-right corner
     /// instead of centered.
     ///
-    /// Buttons are Graphics / Audio / Change Keybindings / Back. Graphics loads
+    /// Buttons are Gameplay / Graphics / Audio / Change Keybindings / Back (Gameplay added above Graphics
+    /// 2026-10-12 - it loads <see cref="gameplaySettingsSceneName"/>, see GameplaySettingsController). Graphics loads
     /// <see cref="graphicsSettingsSceneName"/> (see GraphicsSettingsController), Audio loads
     /// <see cref="audioSettingsSceneName"/> (see AudioSettingsController) and Change Keybindings loads
     /// <see cref="keybindingsSceneName"/>. Back returns to <see cref="mainMenuSceneName"/> - same as
@@ -48,6 +49,9 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("Scene to load when Change Keybindings is clicked.")]
         [SerializeField] private string keybindingsSceneName = "ChangeKeybindings";
+
+        [Tooltip("Scene to load when Gameplay is clicked.")]
+        [SerializeField] private string gameplaySettingsSceneName = "GameplaySettings";
 
         [Tooltip("Scene to load when Graphics is clicked.")]
         [SerializeField] private string graphicsSettingsSceneName = "GraphicsSettings";
@@ -102,8 +106,9 @@ namespace Blocks.Gameplay.Core
             buttonColumn.style.flexDirection = FlexDirection.Column;
             buttonColumn.style.alignItems = Align.FlexEnd;
 
-            Button graphicsButton = MakeButton("Graphics", OnGraphicsClicked, selectSound);
-            buttonColumn.Add(graphicsButton);
+            Button gameplayButton = MakeButton("Gameplay", OnGameplayClicked, selectSound);
+            buttonColumn.Add(gameplayButton);
+            buttonColumn.Add(MakeButton("Graphics", OnGraphicsClicked, selectSound));
             buttonColumn.Add(MakeButton("Audio", OnAudioClicked, selectSound));
             buttonColumn.Add(MakeButton("Change Keybindings", OnChangeKeybindingsClicked, selectSound));
             buttonColumn.Add(MakeButton("Back", OnBackClicked, cancelSound));
@@ -111,8 +116,8 @@ namespace Blocks.Gameplay.Core
 
             // See MainMenuController.BuildUI for why this is needed: nothing has focus by default, and
             // gamepad Move/Submit only act on whatever's currently focused.
-            graphicsButton.Focus();
-            SetFocusedVisual(graphicsButton, true);
+            gameplayButton.Focus();
+            SetFocusedVisual(gameplayButton, true);
         }
 
         // Same grayed-out/bright-pill focus treatment as MainMenuController - see that class for why.
@@ -168,6 +173,11 @@ namespace Blocks.Gameplay.Core
                 }
                 OnBackClicked();
             }
+        }
+
+        private void OnGameplayClicked()
+        {
+            SceneManager.LoadScene(gameplaySettingsSceneName);
         }
 
         private void OnGraphicsClicked()

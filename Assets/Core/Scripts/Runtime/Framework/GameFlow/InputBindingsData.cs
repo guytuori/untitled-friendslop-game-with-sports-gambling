@@ -6,12 +6,16 @@ using UnityEngine.InputSystem;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// Keyboard+mouse commands that ChangeKeybindingsController still stores cosmetically, purely for its
-    /// own settings-screen JSON - the "real" movement/action commands (Forwards/Back/Left/Right/Jump/
-    /// Run/Grab/OpenMenu) moved to actual Input System binding overrides (see
-    /// <see cref="InputBindingOverridesStore"/> below) once real gameplay input started reading from this
-    /// screen's rebinds. What's left here is the Wager commands, which don't correspond to any action in
-    /// GameplayInputSystem_Actions yet - see ChangeKeybindingsController for how each field maps to a row.
+    /// Keyboard+mouse commands that ChangeKeybindingsController stores here in settings.json rather than as
+    /// Input System binding overrides, because they don't have an action in GameplayInputSystem_Actions
+    /// (yet): Interact, Use Item, the three Bet buttons, Dismiss Current Bet and Open Wagers Menu. The
+    /// commands that DO have a real action (Move, Jump, Parkour = Grab, Toggle Walk = Sprint, Open Escape
+    /// Menu = Menu) are real binding overrides instead (see <see cref="InputBindingOverridesStore"/> below).
+    /// See ChangeKeybindingsController for how each field maps to a row.
+    ///
+    /// Controls overhaul (2026-10-12): the old WagerYes/WagerNo/DismissWager fields were renamed to
+    /// BetYes/BetNo/DismissBet when the new defaults came in, so older saves fall back to the new defaults
+    /// instead of keeping bindings that now clash with Interact / Use Item.
     ///
     /// Every field stores the bare Input System control name for a <see cref="UnityEngine.InputSystem.Keyboard"/>
     /// control (e.g. "1", "w", "escape" - i.e. what <c>KeyControl.name</c> returns), the same format
@@ -21,16 +25,23 @@ namespace Blocks.Gameplay.Core
     [Serializable]
     public class KeyboardBindings
     {
-        // Wagers are a pop-up ticker answered without pausing: yes, no, or dismiss it. (Renamed from
-        // WagerOption1-3 on 2026-10-06, so older saves fall back to these defaults.)
-        public string WagerYes = "1";
-        public string WagerNo = "2";
-        public string DismissWager = "3";
+        public string Interact = "e";
+        public string UseItem = "r";
+
+        // Bets are a pop-up ticker answered without pausing: yes, no, or dismiss it. Bet Multiplier cycles
+        // the stake x1 -> x3 -> x5 -> x10 -> x1 (it doesn't reset after a bet).
+        public string BetYes = "1";
+        public string BetNo = "2";
+        public string BetMultiplier = "3";
+        public string DismissBet = "4";
+
+        public string OpenWagersMenu = "5";
     }
 
     /// <summary>
-    /// Gamepad Wager commands - see <see cref="KeyboardBindings"/> above for why only the Wager commands
-    /// live here now. Every field stores the bare Input System control name for a
+    /// Gamepad commands that aren't Input System actions yet - see <see cref="KeyboardBindings"/> above.
+    /// Face buttons use this project's Nintendo-style names: buttonWest = Y, buttonNorth = X, buttonEast = A,
+    /// buttonSouth = B. Every field stores the bare Input System control name for a
     /// <see cref="UnityEngine.InputSystem.Gamepad"/> control ("leftTrigger", "rightShoulder", etc. - i.e.
     /// what the control's own <c>.name</c> returns), matching the format used after the "&lt;Gamepad&gt;/"
     /// device prefix in a real binding path.
@@ -38,11 +49,15 @@ namespace Blocks.Gameplay.Core
     [Serializable]
     public class GamepadBindings
     {
-        // Shoulders/triggers, so a wager can be answered without letting go of the sticks or face buttons.
-        // (Renamed from WagerCursorUp/WagerCursorDown/WagerSelect on 2026-10-06.)
-        public string WagerYes = "rightShoulder";
-        public string WagerNo = "rightTrigger";
-        public string DismissWager = "leftTrigger";
+        public string Interact = "rightShoulder";   // R1
+        public string UseItem = "leftTrigger";      // L2
+
+        public string BetYes = "buttonWest";        // left face button (Y on a Switch)
+        public string BetNo = "buttonNorth";        // top face button (X)
+        public string BetMultiplier = "buttonEast"; // right face button (A)
+        public string DismissBet = "rightTrigger";  // R2
+
+        public string OpenWagersMenu = "select";    // Select (- on a Switch)
 
         /// <summary>Change Keybindings' ENABLE RUMBLE checkbox (gamepad layout only). On by default. Read at runtime through <see cref="GamepadRumble"/>.</summary>
         public bool RumbleEnabled = true;
@@ -93,6 +108,27 @@ namespace Blocks.Gameplay.Core
         public bool Fullscreen = true;
     }
 
+    /// <summary>
+    /// The Gameplay Settings screen (Settings > Gameplay, added 2026-10-12). Read at runtime through
+    /// <see cref="GameplaySettings"/>.
+    ///   - Language: an <see cref="Loc"/> language code ("en", "es", "it", "fr", "de", "pt"). English default.
+    ///   - ShowDisplayNames: moved here from Change Profile - off shows other players as "Player 1", ...
+    ///   - MatureLanguageFilter: bad words in player names show as *** (NameFilter.Mask). On by default.
+    ///   - ArachnophobiaMode / ArachnophiliaMode: never both on. Nothing reads them yet - phobia mode will swap
+    ///     any spiders for something else, philia mode swaps some objects for obviously fake cartoon spiders.
+    /// </summary>
+    [Serializable]
+    public class GameplaySettingsData
+    {
+        public string Language = Loc.DefaultLanguageCode;
+        public bool ShowDisplayNames = true;
+        public bool MatureLanguageFilter = true;
+        public bool ArachnophobiaMode = false;
+        public bool ArachnophiliaMode = false;
+
+        public GameplaySettingsData Clone() => (GameplaySettingsData)MemberwiseClone();
+    }
+
     [Serializable]
     public class InputBindingsData
     {
@@ -100,6 +136,7 @@ namespace Blocks.Gameplay.Core
         public GamepadBindings Gamepad = new GamepadBindings();
         public AudioSettingsData Audio = new AudioSettingsData();
         public GraphicsSettingsData Graphics = new GraphicsSettingsData();
+        public GameplaySettingsData Gameplay = new GameplaySettingsData();
     }
 
     /// <summary>

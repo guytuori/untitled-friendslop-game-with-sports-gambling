@@ -146,15 +146,15 @@ namespace Blocks.Gameplay.Core
             m_VisibilityLabel.text = m_Service.IsPublic ? "PUBLIC GAME" : "PRIVATE GAME - share the code to invite players";
 
             int count = m_Service.Players.Count;
-            m_CountLabel.text = m_Service.MaxPlayers > 0 ? $"PLAYERS {count} / {m_Service.MaxPlayers}" : $"PLAYERS {count}";
+            m_CountLabel.text = m_Service.MaxPlayers > 0 ? Loc.F("PLAYERS {0} / {1}", count, m_Service.MaxPlayers) : Loc.F("PLAYERS {0}", count);
 
             var list = new StringBuilder();
             for (int i = 0; i < m_Service.Players.Count; i++)
             {
                 LobbyPlayer player = m_Service.Players[i];
                 list.Append(NetworkPlayers.GetPlayerLabel((ulong)player.PlayerId));
-                if (player.IsHost) list.Append(" (Host)");
-                if (player.IsLocal) list.Append(" (You)");
+                if (player.IsHost) list.Append(" ").Append(Loc.T("(Host)"));
+                if (player.IsLocal) list.Append(" ").Append(Loc.T("(You)"));
                 if (i < m_Service.Players.Count - 1) list.Append('\n');
             }
             m_PlayersLabel.text = list.ToString();

@@ -72,8 +72,8 @@ namespace Blocks.Gameplay.Core
         {
             string name = GetSharedName(clientId);
             bool isLocal = clientId != 0 && clientId == LocalClientId;
-            if (!string.IsNullOrEmpty(name) && (isLocal || PlayerProfile.ShowDisplayNames)) return name;
-            return $"Player {GetPlayerNumber(clientId)}";
+            if (!string.IsNullOrEmpty(name) && (isLocal || PlayerProfile.ShowDisplayNames)) return NameFilter.ForDisplay(name);
+            return Loc.F("Player {0}", GetPlayerNumber(clientId));
         }
 
         /// <summary>"Player 1: Name", or just "Player 1" when there's no name to show (see <see cref="GetDisplayName"/>).</summary>
@@ -81,7 +81,7 @@ namespace Blocks.Gameplay.Core
         {
             int number = GetPlayerNumber(clientId);
             string name = GetDisplayName(clientId);
-            string numbered = $"Player {number}";
+            string numbered = Loc.F("Player {0}", number);
             return name == numbered ? numbered : $"{numbered}: {name}";
         }
 
@@ -120,7 +120,7 @@ namespace Blocks.Gameplay.Core
             if (TryGet(clientId, out CorePlayerManager player))
             {
                 string name = NameFilter.Clean(player.PlayerName);
-                if (name.Length > 0 && name != CorePlayerManager.UninitializedName && NameFilter.IsAllowed(name)) return name;
+                if (name.Length > 0 && name != CorePlayerManager.UninitializedName) return name;
             }
             return string.Empty;
         }
