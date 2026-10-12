@@ -207,7 +207,7 @@ namespace Blocks.Gameplay.Core
 
             m_StatusLabel.text = matches.Count == 0
                 ? "No games match these filters."
-                : matches.Count == 1 ? "1 game found." : Loc.F("{0} games found.", matches.Count);
+                : matches.Count == 1 ? "1 game found." : $"{matches.Count} games found.";
 
             if (m_Rows.Count > 0 && (focusedRow >= 0 || !IsAnythingFocused()))
             {
@@ -330,12 +330,12 @@ namespace Blocks.Gameplay.Core
 
             if (useSampleSessions)
             {
-                m_StatusLabel.text = Loc.F("\"{0}\" is a sample game - it can't be joined.", session.SessionName);
+                m_StatusLabel.text = $"\"{session.SessionName}\" is a sample game - it can't be joined.";
                 return;
             }
 
             m_Joining = true;
-            m_StatusLabel.text = Loc.F("Joining {0}...", session.SessionName);
+            m_StatusLabel.text = $"Joining {session.SessionName}...";
             string error = await FusionSessionService.Instance.JoinGameAsync(session.SessionName);
             if (this == null) return; // screen closed while joining
 

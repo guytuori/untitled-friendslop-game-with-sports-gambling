@@ -12,9 +12,6 @@ namespace Blocks.Gameplay.Core
     /// at) and only replaces what's under it: the new model's skeleton and meshes move in, the Animator
     /// takes the new model's Humanoid avatar and rebinds. The shared Humanoid animations then just play on
     /// the new skeleton.
-    ///
-    /// What's shown also follows THIS player's spider settings (CharacterCatalog.ResolveForViewer):
-    /// Arachnophobia shows other players' spiders as Girl, Arachnophilia shows everyone as the spider.
     /// </summary>
     [DisallowMultipleComponent]
     public class PlayerCharacterModel : MonoBehaviour
@@ -35,13 +32,11 @@ namespace Blocks.Gameplay.Core
         private void OnEnable()
         {
             SessionProfiles.Changed += Refresh;
-            GameplaySettings.Changed += Refresh;
         }
 
         private void OnDisable()
         {
             SessionProfiles.Changed -= Refresh;
-            GameplaySettings.Changed -= Refresh;
         }
 
         private void Refresh()
@@ -49,30 +44,21 @@ namespace Blocks.Gameplay.Core
             if (m_Player == null || !m_Player.IsSpawned) return;
 
             int playerId = (int)m_Player.OwnerClientId;
-            string pickedId = SessionProfiles.TryGet(playerId, out SessionProfile profile) ? profile.CharacterId : string.Empty;
+            if (!SessionProfiles.TryGet(playerId, out SessionProfile profile)) return;
+            if (string.IsNullOrEmpty(profile.CharacterId) || profile.CharacterId == m_AppliedId) return;
 
             CharacterCatalog catalog = CharacterCatalog.Load();
-            if (catalog == null) return;
-
-            // What THIS player sees for that pick, after their spider settings.
-            GameplaySettingsData settings = GameplaySettings.Current;
-            CharacterCatalog.Entry entry = catalog.ResolveForViewer(pickedId, settings.ArachnophobiaMode, settings.ArachnophiliaMode);
-            if (entry == null)
+            CharacterCatalog.Entry entry = catalog != null ? catalog.Find(profile.CharacterId) : null;
+            if (entry == null || entry.model == null)
             {
-                if (!string.IsNullOrEmpty(pickedId) && catalog.Find(pickedId) == null && pickedId != m_AppliedId)
-                {
-                    Debug.LogWarning($"[PlayerCharacterModel] Unknown character '{pickedId}' for player {playerId} - keeping the default model.");
-                    m_AppliedId = pickedId;
-                }
-                return; // the default model
+                Debug.LogWarning($"[PlayerCharacterModel] Unknown character '{profile.CharacterId}' for player {playerId} - keeping the default model.");
+                m_AppliedId = profile.CharacterId;
+                return;
             }
-
-            if (entry.id == m_AppliedId) return;
-            if (entry.model == null) return;
 
             if (Apply(entry.model))
             {
-                m_AppliedId = entry.id;
+                m_AppliedId = profile.CharacterId;
             }
         }
 

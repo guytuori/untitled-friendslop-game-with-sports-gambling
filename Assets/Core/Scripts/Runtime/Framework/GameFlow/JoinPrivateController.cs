@@ -141,7 +141,7 @@ namespace Blocks.Gameplay.Core
             }
 
             m_Joining = true;
-            m_StatusLabel.text = Loc.F("Joining {0}...", code);
+            m_StatusLabel.text = $"Joining {code}...";
             string error = await FusionSessionService.Instance.JoinGameAsync(code);
             if (this == null) return; // screen closed meanwhile
 

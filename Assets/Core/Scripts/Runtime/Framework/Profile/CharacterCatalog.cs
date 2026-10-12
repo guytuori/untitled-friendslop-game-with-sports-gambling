@@ -17,12 +17,6 @@ namespace Blocks.Gameplay.Core
     ///
     /// The id is what player profiles save, so don't change it once people have picked that character (they
     /// would fall back to the first character in the list).
-    ///
-    /// SPIDERS (2026-10-12): entries ticked <see cref="Entry.isSpider"/> (Arachne) follow the viewer's
-    /// Settings > Gameplay spider options - see <see cref="ResolveForViewer"/>:
-    ///   - Arachnophobia Mode: spiders aren't offered on Change Profile, and other players who picked one are
-    ///     shown as <see cref="ArachnophobiaStandInId"/> (Girl) on this player's screen;
-    ///   - Arachnophilia Mode: every player, this one included, is shown as the first spider in the list.
     /// </summary>
     public class CharacterCatalog : ScriptableObject
     {
@@ -41,9 +35,6 @@ namespace Blocks.Gameplay.Core
             [Tooltip("Picture for the Change Profile screen. Leave blank and a front view of the model's T-pose is rendered automatically.")]
             public Texture2D thumbnail;
 
-            [Tooltip("A spider. Hidden from (and swapped out for) players with Arachnophobia Mode on; with Arachnophilia Mode on, everyone becomes the first spider in the list.")]
-            public bool isSpider;
-
             /// <summary>Has what the game needs to offer it (an id and a model).</summary>
             public bool IsUsable => !string.IsNullOrWhiteSpace(id) && model != null;
 
@@ -54,11 +45,6 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("Shown on the Change Profile screen in this order, 3 per row. The first one is the default for new players.")]
         [SerializeField] private List<Entry> characters = new List<Entry>();
-
-        [Tooltip("The character a spider is shown as on the screen of a player with Arachnophobia Mode on.")]
-        [SerializeField] private string arachnophobiaStandInId = "Girl";
-
-        public string ArachnophobiaStandInId => arachnophobiaStandInId;
 
         private static CharacterCatalog s_Loaded;
 
@@ -82,44 +68,6 @@ namespace Blocks.Gameplay.Core
                 if (entry != null && entry.IsUsable && seen.Add(entry.id)) result.Add(entry);
             }
             return result;
-        }
-
-        /// <summary><see cref="GetSelectable()"/>, without the spiders when <paramref name="hideSpiders"/> (Arachnophobia Mode).</summary>
-        public List<Entry> GetSelectable(bool hideSpiders)
-        {
-            List<Entry> result = GetSelectable();
-            if (hideSpiders) result.RemoveAll(e => e.isSpider);
-            return result;
-        }
-
-        /// <summary>
-        /// The character this player should SEE for a player who picked <paramref name="pickedId"/> (empty =
-        /// the default model), given this player's spider settings: Arachnophilia turns everyone into the first
-        /// spider; Arachnophobia shows a spider as <see cref="ArachnophobiaStandInId"/>. Null means "the default
-        /// model". Purely local - nothing about it is networked.
-        /// </summary>
-        public Entry ResolveForViewer(string pickedId, bool arachnophobia, bool arachnophilia)
-        {
-            if (arachnophilia)
-            {
-                foreach (Entry entry in characters)
-                {
-                    if (entry != null && entry.IsUsable && entry.isSpider) return entry;
-                }
-            }
-
-            Entry picked = Find(pickedId);
-            if (picked != null && picked.isSpider && arachnophobia)
-            {
-                Entry standIn = Find(arachnophobiaStandInId);
-                if (standIn != null && !standIn.isSpider) return standIn;
-                foreach (Entry entry in characters)
-                {
-                    if (entry != null && entry.IsUsable && !entry.isSpider) return entry;
-                }
-                return null;
-            }
-            return picked;
         }
 
         /// <summary>The usable entry with this id, or null.</summary>

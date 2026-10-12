@@ -337,7 +337,7 @@ namespace Blocks.Gameplay.Core
             AddSliderRow(column, "LIVES", LivesOptions.Length,
                 () => IndexOf(LivesOptions, m_Rules.Lives, LivesOptions.Length - 1),
                 i => m_Filter != null && m_Filter.LivesMoreThan
-                    ? Loc.F("More than {0}", GameRulesFormat.Lives(LivesOptions[i]))
+                    ? $"More than {GameRulesFormat.Lives(LivesOptions[i])}"
                     : GameRulesFormat.Lives(LivesOptions[i]),
                 i =>
                 {

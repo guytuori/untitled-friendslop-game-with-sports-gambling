@@ -41,24 +41,13 @@ namespace Blocks.Gameplay.Core
             public readonly int Size;
             public readonly Quaternion Rotation;
 
-            /// <summary>
-            /// The hole's square in world space, out to the outer edges of its four corner cels (only x and z
-            /// mean anything). Empty (size 0) for an old-style one-marker hole, whose extent isn't known.
-            /// </summary>
-            public readonly Bounds Area;
-
-            public bool HasArea => Area.size.x > 0f && Area.size.z > 0f;
-
             public Socket(Transform transform, int size) : this(transform, size, transform != null ? transform.rotation : Quaternion.identity) { }
 
-            public Socket(Transform transform, int size, Quaternion rotation) : this(transform, size, rotation, default) { }
-
-            public Socket(Transform transform, int size, Quaternion rotation, Bounds area)
+            public Socket(Transform transform, int size, Quaternion rotation)
             {
                 Transform = transform;
                 Size = size;
                 Rotation = rotation;
-                Area = area;
             }
         }
 
@@ -174,12 +163,7 @@ namespace Blocks.Gameplay.Core
                     Quaternion rotation = mapRoot.rotation * Quaternion.Euler(0f, yaw, 0f);
 
                     int first = Mathf.Min(Mathf.Min(ofSize[a].Order, ofSize[b].Order), Mathf.Min(ofSize[c].Order, ofSize[d].Order));
-                    // The square's world-space extent: the four marker cel centers, plus half a cel outwards.
-                    var area = new Bounds(ofSize[a].Transform.position, Vector3.zero);
-                    foreach (int i in corners) area.Encapsulate(ofSize[i].Transform.position);
-                    area.Expand(new Vector3(TotalEditorCelSize, 0f, TotalEditorCelSize));
-
-                    squares.Add((first, new Socket(ofSize[origin].Transform, size, rotation, area)));
+                    squares.Add((first, new Socket(ofSize[origin].Transform, size, rotation)));
                 }
 
                 if (squares.Count == 0)

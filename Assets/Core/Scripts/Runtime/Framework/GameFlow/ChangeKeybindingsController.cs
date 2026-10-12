@@ -97,15 +97,6 @@ namespace Blocks.Gameplay.Core
     /// on by default). A toggles it; Up/Down reach it like any row and Right jumps to Save Changes. Like the
     /// bindings it's saved with Save Changes and reset by Restore Defaults.
     /// </summary>
-    ///
-    /// CONTROLS OVERHAUL (2026-10-12): the rows are now Move (gamepad) / Move Forward, Strafe Left, Strafe
-    /// Right, Move Back (keyboard), Camera (gamepad only - the mouse always aims), Jump, Parkour, Interact,
-    /// Use Item, Toggle Walk, Bet Yes, Bet No, Bet Multiplier, Dismiss Current Bet, Open Escape Menu and Open
-    /// Wagers Menu. Real actions: Move, Camera = Look, Jump, Parkour = Grab (the old grab button - hold it
-    /// to wall run / grind / climb), Toggle Walk = Sprint (Dan swapped the walk/run speeds, so the Sprint
-    /// action is what walks now), Open Escape Menu = Menu. The rest are stored in settings.json until the
-    /// game has actions for them. Camera, like Move, only listens for a stick.
-    /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class ChangeKeybindingsController : MonoBehaviour
     {
@@ -140,7 +131,6 @@ namespace Blocks.Gameplay.Core
         private Button m_SaveButton;
         private Button m_BackButton;
         private Toggle m_RumbleToggle;
-        private ScrollView m_ListScroll;
 
         private void Awake()
         {
@@ -187,29 +177,12 @@ namespace Blocks.Gameplay.Core
                 root.Add(title);
             }
 
-            // The rows sit in a scroll view filling the space below the logo, so at small resolutions the
-            // last rows can still be reached: mouse wheel or the scroll bar, and with a gamepad/keyboard the
-            // list scrolls to whichever row has focus (see SetupCrossColumnNavigation). The bar only shows
-            // when the rows don't fit.
-            m_ListScroll = new ScrollView(ScrollViewMode.Vertical)
-            {
-                horizontalScrollerVisibility = ScrollerVisibility.Hidden,
-                verticalScrollerVisibility = ScrollerVisibility.Auto,
-                touchScrollBehavior = ScrollView.TouchScrollBehavior.Clamped,
-            };
-            m_ListScroll.style.position = Position.Absolute;
-            m_ListScroll.style.left = 60;
-            m_ListScroll.style.top = 150;
-            m_ListScroll.style.bottom = 40;
-            // label + binding button (with its default margins) + the scroll bar, with room to spare: if a row
-            // is even a few pixels wider than the viewport, the list can slide sideways and clip the labels.
-            m_ListScroll.style.width = 300 + 180 + 60;
-            m_ListScroll.mouseWheelScrollSize = 34;
-            // The scroll bar is for the mouse only - gamepad/keyboard focus stays on the rows.
-            m_ListScroll.verticalScroller.Query<VisualElement>().ForEach(e => e.focusable = false);
-            m_ListScroll.horizontalScroller.Query<VisualElement>().ForEach(e => e.focusable = false);
-            root.Add(m_ListScroll);
-            VisualElement list = m_ListScroll;
+            var list = new VisualElement();
+            list.style.position = Position.Absolute;
+            list.style.left = 60;
+            list.style.top = 160;
+            list.style.flexDirection = FlexDirection.Column;
+            root.Add(list);
 
             m_RowButtons.Clear();
             m_FirstFocusable = null;
@@ -217,27 +190,29 @@ namespace Blocks.Gameplay.Core
             if (m_UseGamepad)
             {
                 AddRow(list, "MOVE", "Move");
-                AddRow(list, "CAMERA", "Camera");
+                AddRow(list, "JUMP", "Jump");
+                AddRow(list, "RUN", "Run");
+                AddRow(list, "GRAB", "Grab");
+                AddRow(list, "WAGER YES", "WagerYes");
+                AddRow(list, "WAGER NO", "WagerNo");
+                AddRow(list, "DISMISS WAGER", "DismissWager");
+                AddRow(list, "OPEN MENU", "OpenMenu");
+                AddRumbleRow(list);
             }
             else
             {
-                AddRow(list, "MOVE FORWARD", "MoveForward");
-                AddRow(list, "STRAFE LEFT", "StrafeLeft");
-                AddRow(list, "STRAFE RIGHT", "StrafeRight");
-                AddRow(list, "MOVE BACK", "MoveBack");
+                AddRow(list, "FORWARDS", "Forwards");
+                AddRow(list, "BACK", "Back");
+                AddRow(list, "LEFT", "Left");
+                AddRow(list, "RIGHT", "Right");
+                AddRow(list, "JUMP", "Jump");
+                AddRow(list, "RUN", "Run");
+                AddRow(list, "GRAB", "Grab");
+                AddRow(list, "WAGER YES", "WagerYes");
+                AddRow(list, "WAGER NO", "WagerNo");
+                AddRow(list, "DISMISS WAGER", "DismissWager");
+                AddRow(list, "OPEN MENU", "OpenMenu");
             }
-            AddRow(list, "JUMP", "Jump");
-            AddRow(list, "PARKOUR", "Parkour");
-            AddRow(list, "INTERACT", "Interact");
-            AddRow(list, "USE ITEM", "UseItem");
-            AddRow(list, "TOGGLE WALK", "ToggleWalk");
-            AddRow(list, "BET YES", "BetYes");
-            AddRow(list, "BET NO", "BetNo");
-            AddRow(list, "BET MULTIPLIER", "BetMultiplier");
-            AddRow(list, "DISMISS CURRENT BET", "DismissBet");
-            AddRow(list, "OPEN ESCAPE MENU", "OpenEscapeMenu");
-            AddRow(list, "OPEN WAGERS MENU", "OpenWagersMenu");
-            if (m_UseGamepad) AddRumbleRow(list);
 
             // Same absolutely-positioned bottom-right column as the other GameFlow screens, with Restore
             // Defaults and Save Changes added above Back (Restore Defaults on top, per spec).
@@ -270,37 +245,18 @@ namespace Blocks.Gameplay.Core
             SetFocusedVisual(toFocus, true);
         }
 
-        /// <summary>
-        /// Scrolls the row list up/down just enough to show <paramref name="element"/>. Vertical only, and it
-        /// pins the sideways offset at 0: ScrollView.ScrollTo also scrolls sideways to bring the (right-hand)
-        /// binding button fully into view, which cut the first letter or so off every label.
-        /// </summary>
-        private void ScrollRowIntoView(VisualElement element)
-        {
-            if (m_ListScroll == null || element == null) return;
-
-            Rect item = element.worldBound;
-            Rect view = m_ListScroll.contentViewport.worldBound;
-            Vector2 offset = m_ListScroll.scrollOffset;
-            if (item.yMin < view.yMin) offset.y -= view.yMin - item.yMin;
-            else if (item.yMax > view.yMax) offset.y += item.yMax - view.yMax;
-            offset.x = 0;
-            m_ListScroll.scrollOffset = offset;
-        }
-
         /// <summary>Builds one Command-label + binding-button row and registers it in m_RowButtons.</summary>
         private void AddRow(VisualElement parent, string label, string commandKey)
         {
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
-            row.style.marginBottom = 2;
+            row.style.marginBottom = 6;
 
             var commandLabel = new Label(label);
             commandLabel.style.color = Color.white;
-            commandLabel.style.fontSize = 15;
-            commandLabel.style.width = 300;
-            commandLabel.style.flexShrink = 0;
+            commandLabel.style.fontSize = 16;
+            commandLabel.style.width = 220;
             row.Add(commandLabel);
 
             var bindingButton = new Button(() => BeginRebind(commandKey))
@@ -308,12 +264,11 @@ namespace Blocks.Gameplay.Core
                 text = GetBindingDisplay(commandKey)
             };
             MenuUI.ApplyButtonFont(bindingButton);
-            bindingButton.style.width = 180;
-            bindingButton.style.flexShrink = 0;
-            bindingButton.style.height = 30;
-            bindingButton.style.marginTop = 2;
-            bindingButton.style.marginBottom = 2;
-            bindingButton.style.fontSize = 15;
+            bindingButton.style.width = 160;
+            bindingButton.style.height = 34;
+            bindingButton.style.marginTop = 4;
+            bindingButton.style.marginBottom = 4;
+            bindingButton.style.fontSize = 16;
 
             SetFocusedVisual(bindingButton, false);
             bindingButton.RegisterCallback<FocusInEvent>(_ => SetFocusedVisual(bindingButton, true));
@@ -338,19 +293,18 @@ namespace Blocks.Gameplay.Core
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
-            row.style.marginBottom = 2;
+            row.style.marginBottom = 6;
 
             var label = new Label("ENABLE RUMBLE");
             label.style.color = Color.white;
-            label.style.fontSize = 15;
-            label.style.width = 300;
-            label.style.flexShrink = 0;
+            label.style.fontSize = 16;
+            label.style.width = 220;
             row.Add(label);
 
             m_RumbleToggle = new Toggle();
             m_RumbleToggle.SetValueWithoutNotify(m_Bindings.Gamepad.RumbleEnabled);
-            m_RumbleToggle.style.marginTop = 4;
-            m_RumbleToggle.style.marginBottom = 4;
+            m_RumbleToggle.style.marginTop = 8;
+            m_RumbleToggle.style.marginBottom = 8;
             m_RumbleToggle.style.paddingLeft = 6;
             m_RumbleToggle.style.paddingRight = 6;
             m_RumbleToggle.RegisterValueChangedCallback(evt => m_Bindings.Gamepad.RumbleEnabled = evt.newValue);
@@ -388,7 +342,7 @@ namespace Blocks.Gameplay.Core
         /// between elements that roughly line up. Pressing right from ANY row always lands on Save
         /// Changes (the middle, most central action button); pressing left from ANY of Restore Defaults/
         /// Save Changes/Back always lands on the first row (whichever command that is for the active
-        /// scheme - Move for gamepad, Move Forward for keyboard+mouse). Every other direction (up/down within
+        /// scheme - Move for gamepad, Forwards for keyboard+mouse). Every other direction (up/down within
         /// either column) is left untouched, so normal automatic navigation still handles those. Must run
         /// after both the rows and the action buttons exist, since it references m_SaveButton/
         /// m_FirstFocusable - called once at the end of BuildUI.
@@ -398,11 +352,8 @@ namespace Blocks.Gameplay.Core
             foreach (Button rowButton in m_RowButtons.Values)
             {
                 rowButton.RegisterCallback<NavigationMoveEvent>(OnRowNavigationMove);
-                Button captured = rowButton;
-                captured.RegisterCallback<FocusInEvent>(_ => ScrollRowIntoView(captured)); // keep the focused row on screen
             }
             m_RumbleToggle?.RegisterCallback<NavigationMoveEvent>(OnRowNavigationMove);
-            m_RumbleToggle?.RegisterCallback<FocusInEvent>(_ => ScrollRowIntoView(m_RumbleToggle));
 
             m_RestoreDefaultsButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
             m_SaveButton.RegisterCallback<NavigationMoveEvent>(OnActionNavigationMove);
@@ -495,7 +446,7 @@ namespace Blocks.Gameplay.Core
             m_AwaitingRebindCommand = commandKey;
             m_RebindStartedFrame = Time.frameCount;
             Button button = m_RowButtons[commandKey];
-            button.text = Loc.T(m_UseGamepad && IsStickCommand(commandKey) ? "Move a stick..." : "Press...");
+            button.text = m_UseGamepad && commandKey == "Move" ? "Move a stick..." : "Press...";
             button.style.backgroundColor = AwaitingBackground;
             button.style.color = AwaitingText;
 
@@ -576,10 +527,10 @@ namespace Blocks.Gameplay.Core
             Gamepad pad = Gamepad.current;
             if (pad == null) return;
 
-            if (IsStickCommand(m_AwaitingRebindCommand))
+            if (m_AwaitingRebindCommand == "Move")
             {
-                // Move and Camera only ever bind to a stick - button presses are ignored entirely, per
-                // spec, so there's nothing else to check here.
+                // Move only ever binds to a stick - button presses are ignored entirely, per spec, so
+                // there's nothing else to check here.
                 const float deadzone = 0.5f;
                 if (pad.leftStick.ReadValue().sqrMagnitude > deadzone * deadzone)
                 {
@@ -600,18 +551,9 @@ namespace Blocks.Gameplay.Core
             if (pad.rightShoulder.wasPressedThisFrame) { CompleteRebind("rightShoulder"); return; }
             if (pad.leftTrigger.wasPressedThisFrame) { CompleteRebind("leftTrigger"); return; }
             if (pad.rightTrigger.wasPressedThisFrame) { CompleteRebind("rightTrigger"); return; }
-            if (pad.leftStickButton.wasPressedThisFrame) { CompleteRebind("leftStickPress"); return; }
-            if (pad.rightStickButton.wasPressedThisFrame) { CompleteRebind("rightStickPress"); return; }
             if (pad.startButton.wasPressedThisFrame) { CompleteRebind("start"); return; }
             if (pad.selectButton.wasPressedThisFrame) { CompleteRebind("select"); return; }
-            if (pad.dpad.up.wasPressedThisFrame) { CompleteRebind("dpad/up"); return; }
-            if (pad.dpad.down.wasPressedThisFrame) { CompleteRebind("dpad/down"); return; }
-            if (pad.dpad.left.wasPressedThisFrame) { CompleteRebind("dpad/left"); return; }
-            if (pad.dpad.right.wasPressedThisFrame) { CompleteRebind("dpad/right"); return; }
         }
-
-        /// <summary>Gamepad rows that take a whole stick rather than a button.</summary>
-        private static bool IsStickCommand(string commandKey) => commandKey == "Move" || commandKey == "Camera";
 
         #region Real commands (backed by GameplayInputSystem_Actions)
 
@@ -628,25 +570,24 @@ namespace Blocks.Gameplay.Core
                 return commandKey switch
                 {
                     "Move" => player.Move,
-                    "Camera" => player.Look,
                     "Jump" => player.Jump,
-                    "Parkour" => player.Grab,
-                    "ToggleWalk" => player.Sprint,
-                    "OpenEscapeMenu" => player.Menu,
+                    "Run" => player.Sprint,
+                    "Grab" => player.Grab,
+                    "OpenMenu" => player.Menu,
                     _ => null
                 };
             }
 
             return commandKey switch
             {
-                "MoveForward" => player.Move,
-                "MoveBack" => player.Move,
-                "StrafeLeft" => player.Move,
-                "StrafeRight" => player.Move,
+                "Forwards" => player.Move,
+                "Back" => player.Move,
+                "Left" => player.Move,
+                "Right" => player.Move,
                 "Jump" => player.Jump,
-                "Parkour" => player.Grab,
-                "ToggleWalk" => player.Sprint,
-                "OpenEscapeMenu" => player.Menu,
+                "Run" => player.Sprint,
+                "Grab" => player.Grab,
+                "OpenMenu" => player.Menu,
                 _ => null
             };
         }
@@ -656,10 +597,10 @@ namespace Blocks.Gameplay.Core
         {
             return commandKey switch
             {
-                "MoveForward" => "up",
-                "MoveBack" => "down",
-                "StrafeLeft" => "left",
-                "StrafeRight" => "right",
+                "Forwards" => "up",
+                "Back" => "down",
+                "Left" => "left",
+                "Right" => "right",
                 _ => null
             };
         }
@@ -740,30 +681,20 @@ namespace Blocks.Gameplay.Core
         {
             if (m_UseGamepad)
             {
-                GamepadBindings pad = m_Bindings.Gamepad;
                 return commandKey switch
                 {
-                    "Interact" => pad.Interact,
-                    "UseItem" => pad.UseItem,
-                    "BetYes" => pad.BetYes,
-                    "BetNo" => pad.BetNo,
-                    "BetMultiplier" => pad.BetMultiplier,
-                    "DismissBet" => pad.DismissBet,
-                    "OpenWagersMenu" => pad.OpenWagersMenu,
+                    "WagerYes" => m_Bindings.Gamepad.WagerYes,
+                    "WagerNo" => m_Bindings.Gamepad.WagerNo,
+                    "DismissWager" => m_Bindings.Gamepad.DismissWager,
                     _ => "?"
                 };
             }
 
-            KeyboardBindings keys = m_Bindings.Keyboard;
             return commandKey switch
             {
-                "Interact" => keys.Interact,
-                "UseItem" => keys.UseItem,
-                "BetYes" => keys.BetYes,
-                "BetNo" => keys.BetNo,
-                "BetMultiplier" => keys.BetMultiplier,
-                "DismissBet" => keys.DismissBet,
-                "OpenWagersMenu" => keys.OpenWagersMenu,
+                "WagerYes" => m_Bindings.Keyboard.WagerYes,
+                "WagerNo" => m_Bindings.Keyboard.WagerNo,
+                "DismissWager" => m_Bindings.Keyboard.DismissWager,
                 _ => "?"
             };
         }
@@ -772,30 +703,20 @@ namespace Blocks.Gameplay.Core
         {
             if (m_UseGamepad)
             {
-                GamepadBindings pad = m_Bindings.Gamepad;
                 switch (commandKey)
                 {
-                    case "Interact": pad.Interact = rawValue; break;
-                    case "UseItem": pad.UseItem = rawValue; break;
-                    case "BetYes": pad.BetYes = rawValue; break;
-                    case "BetNo": pad.BetNo = rawValue; break;
-                    case "BetMultiplier": pad.BetMultiplier = rawValue; break;
-                    case "DismissBet": pad.DismissBet = rawValue; break;
-                    case "OpenWagersMenu": pad.OpenWagersMenu = rawValue; break;
+                    case "WagerYes": m_Bindings.Gamepad.WagerYes = rawValue; break;
+                    case "WagerNo": m_Bindings.Gamepad.WagerNo = rawValue; break;
+                    case "DismissWager": m_Bindings.Gamepad.DismissWager = rawValue; break;
                 }
                 return;
             }
 
-            KeyboardBindings keys = m_Bindings.Keyboard;
             switch (commandKey)
             {
-                case "Interact": keys.Interact = rawValue; break;
-                case "UseItem": keys.UseItem = rawValue; break;
-                case "BetYes": keys.BetYes = rawValue; break;
-                case "BetNo": keys.BetNo = rawValue; break;
-                case "BetMultiplier": keys.BetMultiplier = rawValue; break;
-                case "DismissBet": keys.DismissBet = rawValue; break;
-                case "OpenWagersMenu": keys.OpenWagersMenu = rawValue; break;
+                case "WagerYes": m_Bindings.Keyboard.WagerYes = rawValue; break;
+                case "WagerNo": m_Bindings.Keyboard.WagerNo = rawValue; break;
+                case "DismissWager": m_Bindings.Keyboard.DismissWager = rawValue; break;
             }
         }
 
@@ -829,11 +750,55 @@ namespace Blocks.Gameplay.Core
             return slash >= 0 && slash + 1 < path.Length ? path.Substring(slash + 1) : path;
         }
 
-        /// <summary>Short on-screen label for a bare keyboard control name - see <see cref="ControlNames"/>.</summary>
-        private static string KeyboardControlDisplayName(string controlName) => ControlNames.Keyboard(controlName);
+        /// <summary>Turns a bare keyboard control name (as returned by KeyControl.name, e.g. "w", "leftShift", "escape", "1") into a short on-screen label.</summary>
+        private static string KeyboardControlDisplayName(string controlName)
+        {
+            if (string.IsNullOrEmpty(controlName)) return controlName;
 
-        /// <summary>Short on-screen label for a bare gamepad control name (Nintendo-style face buttons) - see <see cref="ControlNames"/>.</summary>
-        private static string GamepadControlDisplayName(string controlName) => ControlNames.Gamepad(controlName);
+            return controlName switch
+            {
+                "leftShift" => "L Shift",
+                "rightShift" => "R Shift",
+                "leftCtrl" => "L Ctrl",
+                "rightCtrl" => "R Ctrl",
+                "leftAlt" => "L Alt",
+                "rightAlt" => "R Alt",
+                "escape" => "Esc",
+                "space" => "Space",
+                "upArrow" => "Up",
+                "downArrow" => "Down",
+                "leftArrow" => "Left",
+                "rightArrow" => "Right",
+                _ when controlName.Length == 1 => controlName.ToUpperInvariant(),
+                _ => char.ToUpperInvariant(controlName[0]) + controlName.Substring(1)
+            };
+        }
+
+        /// <summary>
+        /// Turns a bare gamepad control name into a short on-screen label, using this project's own
+        /// controller-label convention: South="B", East="A", North="X", West="Y" (Nintendo-style, as
+        /// established for this project), and L1/L2/R1/R2 for the shoulders/triggers, matching the
+        /// mockup.
+        /// </summary>
+        private static string GamepadControlDisplayName(string controlName)
+        {
+            return controlName switch
+            {
+                "leftStick" => "Left Stick",
+                "rightStick" => "Right Stick",
+                "buttonSouth" => "B",
+                "buttonEast" => "A",
+                "buttonNorth" => "X",
+                "buttonWest" => "Y",
+                "leftShoulder" => "L1",
+                "rightShoulder" => "R1",
+                "leftTrigger" => "L2",
+                "rightTrigger" => "R2",
+                "start" => "Start",
+                "select" => "Select",
+                _ => controlName
+            };
+        }
 
         #endregion
 

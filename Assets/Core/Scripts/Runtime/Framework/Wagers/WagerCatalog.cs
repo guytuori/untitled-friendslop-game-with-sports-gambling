@@ -107,7 +107,7 @@ namespace Blocks.Gameplay.Core
         public static string Format(Template template, string playerName, int number)
         {
             if (template == null) return "";
-            string text = Loc.T(template.text).Replace("[PLAYER]", playerName ?? Loc.T("Someone"));
+            string text = template.text.Replace("[PLAYER]", playerName ?? "Someone");
             if (!string.IsNullOrEmpty(template.numberPlaceholder))
             {
                 text = text.Replace("[" + template.numberPlaceholder + "]", number.ToString());

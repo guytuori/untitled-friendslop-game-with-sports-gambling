@@ -277,9 +277,9 @@ namespace Blocks.Gameplay.Core
 
             if (!InGameMenu.IsOpen && m_Offers.Count > 0)
             {
-                if (Pressed(m_Bindings.Keyboard.BetYes, m_Bindings.Gamepad.BetYes)) Answer(0, AnswerKind.Yes);
-                else if (Pressed(m_Bindings.Keyboard.BetNo, m_Bindings.Gamepad.BetNo)) Answer(0, AnswerKind.No);
-                else if (Pressed(m_Bindings.Keyboard.DismissBet, m_Bindings.Gamepad.DismissBet)) Answer(0, AnswerKind.Dismiss);
+                if (Pressed(m_Bindings.Keyboard.WagerYes, m_Bindings.Gamepad.WagerYes)) Answer(0, AnswerKind.Yes);
+                else if (Pressed(m_Bindings.Keyboard.WagerNo, m_Bindings.Gamepad.WagerNo)) Answer(0, AnswerKind.No);
+                else if (Pressed(m_Bindings.Keyboard.DismissWager, m_Bindings.Gamepad.DismissWager)) Answer(0, AnswerKind.Dismiss);
             }
 
             ScrollPhone(Time.unscaledDeltaTime);
@@ -322,12 +322,12 @@ namespace Blocks.Gameplay.Core
                 row.WagerId = view.Id;
                 row.Text.text = view.Text;
 
-                string yesKey = i == 0 ? KeyHint(m_Bindings.Keyboard.BetYes, m_Bindings.Gamepad.BetYes, gamepadHints) : "";
-                string noKey = i == 0 ? KeyHint(m_Bindings.Keyboard.BetNo, m_Bindings.Gamepad.BetNo, gamepadHints) : "";
-                string dismissKey = i == 0 ? KeyHint(m_Bindings.Keyboard.DismissBet, m_Bindings.Gamepad.DismissBet, gamepadHints) : "";
-                row.Yes.text = Loc.F("YES {0}", view.YesCost) + yesKey;
-                row.No.text = Loc.F("NO {0}", view.NoCost) + noKey;
-                row.Dismiss.text = Loc.T("DISMISS") + dismissKey;
+                string yesKey = i == 0 ? KeyHint(m_Bindings.Keyboard.WagerYes, m_Bindings.Gamepad.WagerYes, gamepadHints) : "";
+                string noKey = i == 0 ? KeyHint(m_Bindings.Keyboard.WagerNo, m_Bindings.Gamepad.WagerNo, gamepadHints) : "";
+                string dismissKey = i == 0 ? KeyHint(m_Bindings.Keyboard.DismissWager, m_Bindings.Gamepad.DismissWager, gamepadHints) : "";
+                row.Yes.text = $"YES {view.YesCost}{yesKey}";
+                row.No.text = $"NO {view.NoCost}{noKey}";
+                row.Dismiss.text = $"DISMISS{dismissKey}";
             }
         }
 
@@ -371,16 +371,16 @@ namespace Blocks.Gameplay.Core
 
             if (refunded)
             {
-                m_Notify?.Invoke(Loc.F("Refunded {0}: {1}", entry.Cost, entry.Text));
+                m_Notify?.Invoke($"Refunded {entry.Cost}: {entry.Text}");
             }
             else if (entry.Yes == yesWon)
             {
                 float multiplier = m_Manager != null ? m_Manager.PayoutMultiplier : 3f;
-                m_Notify?.Invoke(Loc.F("WON +{0}: {1}", Mathf.RoundToInt(entry.Cost * multiplier), entry.Text));
+                m_Notify?.Invoke($"WON +{Mathf.RoundToInt(entry.Cost * multiplier)}: {entry.Text}");
             }
             else
             {
-                m_Notify?.Invoke(Loc.F("Lost {0}: {1}", entry.Cost, entry.Text));
+                m_Notify?.Invoke($"Lost {entry.Cost}: {entry.Text}");
             }
         }
 
@@ -424,7 +424,7 @@ namespace Blocks.Gameplay.Core
                 text.style.whiteSpace = WhiteSpace.Normal;
                 item.Add(text);
 
-                var chip = new Label(Loc.F(entry.Yes ? "YES {0}" : "NO {0}", entry.Cost));
+                var chip = new Label($"{(entry.Yes ? "YES" : "NO")} {entry.Cost}");
                 chip.style.alignSelf = Align.FlexStart;
                 chip.style.marginTop = 3;
                 chip.style.paddingLeft = 6;
@@ -505,9 +505,24 @@ namespace Blocks.Gameplay.Core
 
         private static string KeyHint(string keyboardControl, string gamepadControl, bool gamepad)
         {
-            // Same labels as the Change Keybindings screen (L1/R1/L2/R2, Nintendo-style face buttons).
-            string name = gamepad ? ControlNames.Gamepad(gamepadControl) : ControlNames.Keyboard(keyboardControl);
+            string name = gamepad ? GamepadHint(gamepadControl) : (keyboardControl ?? "").ToUpperInvariant();
             return string.IsNullOrEmpty(name) ? "" : $"  [{name}]";
+        }
+
+        private static string GamepadHint(string control)
+        {
+            switch (control)
+            {
+                case "rightShoulder": return "RB";
+                case "leftShoulder": return "LB";
+                case "rightTrigger": return "RT";
+                case "leftTrigger": return "LT";
+                case "buttonNorth": return "X"; // Nintendo-style labels, like the rest of the project
+                case "buttonSouth": return "B";
+                case "buttonEast": return "A";
+                case "buttonWest": return "Y";
+                default: return control;
+            }
         }
     }
 }

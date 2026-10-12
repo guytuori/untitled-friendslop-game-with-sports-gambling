@@ -6,13 +6,7 @@ using UnityEngine;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// Display-name cleanup and a basic bad-word filter.
-    ///
-    /// MATURE LANGUAGE FILTER (2026-10-12): names are no longer refused for bad words. Instead, a player
-    /// with Settings > Gameplay > Mature Language Filter on (the default) sees each bad word in a name
-    /// replaced with *** (<see cref="Mask"/>, applied by NetworkPlayers.GetDisplayName), keeping the rest
-    /// of the name - "Ihatefoos" shows as "Ihate***s" if "foo" is listed as an anywhere-word.
-    /// Unity has no built-in profanity filter, so this is a
+    /// Display-name cleanup and a basic bad-word filter. Unity has no built-in profanity filter, so this is a
     /// small one of our own, driven by a plain text word list - <c>Resources/BlockedWords.txt</c> - that can
     /// be extended without touching code:
     ///   - one entry per line; blank lines and lines starting with # are ignored;
@@ -108,123 +102,9 @@ namespace Blocks.Gameplay.Core
         {
             string cleaned = Clean(name);
             if (cleaned.Length == 0) return "Enter a display name.";
+            if (!IsAllowed(cleaned)) return "That display name isn't allowed.";
             return null;
         }
-
-        /// <summary>The text that replaces each bad word.</summary>
-        public const string MaskText = "***";
-
-        /// <summary>
-        /// The name with every bad word replaced by <see cref="MaskText"/> - the rest of the name is kept.
-        /// Uses the same matching as <see cref="IsAllowed"/> (whole words, anywhere-words, spaced-out
-        /// spellings, letter swaps and stretched letters), mapped back onto the original characters.
-        /// </summary>
-        public static string Mask(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return name ?? string.Empty;
-            EnsureLoaded();
-
-            // Normalize keeps one character per character, so indices line up with the original name.
-            string normalized = Normalize(name);
-            var masked = new bool[name.Length];
-            bool any = false;
-
-            // Whole words: each run of letters.
-            for (int i = 0; i < normalized.Length;)
-            {
-                if (normalized[i] == ' ') { i++; continue; }
-                int start = i;
-                while (i < normalized.Length && normalized[i] != ' ') i++;
-                if (IsBlockedWord(normalized.Substring(start, i - start)))
-                {
-                    MarkRange(masked, start, i);
-                    any = true;
-                }
-            }
-
-            // The letters only, with where each came from in the original.
-            var letters = new StringBuilder(name.Length);
-            var letterIndex = new List<int>(name.Length);
-            for (int i = 0; i < normalized.Length; i++)
-            {
-                if (normalized[i] == ' ') continue;
-                letters.Append(normalized[i]);
-                letterIndex.Add(i);
-            }
-            string joined = letters.ToString();
-            if (joined.Length == 0) return name;
-
-            // Spelled out with spaces or punctuation ("f u c k") - the whole name as one word.
-            if (IsBlockedWord(joined))
-            {
-                MarkRange(masked, letterIndex[0], letterIndex[letterIndex.Count - 1] + 1);
-                any = true;
-            }
-
-            // Anywhere-words, plain and (if the name has stretched letters) squashed.
-            var collapsed = new StringBuilder(joined.Length);
-            var collapsedStart = new List<int>(joined.Length); // first letter (in joined) of each squashed letter
-            var collapsedEnd = new List<int>(joined.Length);   // last letter (in joined) of each squashed letter
-            for (int i = 0; i < joined.Length; i++)
-            {
-                if (i > 0 && joined[i] == joined[i - 1])
-                {
-                    collapsedEnd[collapsedEnd.Count - 1] = i;
-                    continue;
-                }
-                collapsed.Append(joined[i]);
-                collapsedStart.Add(i);
-                collapsedEnd.Add(i);
-            }
-            string joinedCollapsed = collapsed.ToString();
-            bool stretched = joinedCollapsed.Length != joined.Length;
-
-            foreach (string word in s_Anywhere)
-            {
-                for (int at = joined.IndexOf(word, StringComparison.Ordinal); at >= 0; at = joined.IndexOf(word, at + 1, StringComparison.Ordinal))
-                {
-                    MarkRange(masked, letterIndex[at], letterIndex[at + word.Length - 1] + 1);
-                    any = true;
-                }
-
-                if (!stretched) continue;
-                string collapsedWord = Collapse(word);
-                if (collapsedWord.Length < 4) continue;
-                for (int at = joinedCollapsed.IndexOf(collapsedWord, StringComparison.Ordinal); at >= 0; at = joinedCollapsed.IndexOf(collapsedWord, at + 1, StringComparison.Ordinal))
-                {
-                    int first = collapsedStart[at];
-                    int last = collapsedEnd[at + collapsedWord.Length - 1];
-                    MarkRange(masked, letterIndex[first], letterIndex[last] + 1);
-                    any = true;
-                }
-            }
-
-            if (!any) return name;
-
-            // Each run of masked characters (spaces and punctuation inside it included) becomes one ***.
-            var result = new StringBuilder(name.Length);
-            for (int i = 0; i < name.Length;)
-            {
-                if (!masked[i])
-                {
-                    result.Append(name[i]);
-                    i++;
-                    continue;
-                }
-                while (i < name.Length && masked[i]) i++;
-                result.Append(MaskText);
-            }
-            return result.ToString();
-        }
-
-        private static void MarkRange(bool[] masked, int start, int end)
-        {
-            for (int i = Math.Max(0, start); i < end && i < masked.Length; i++) masked[i] = true;
-        }
-
-        /// <summary>The name as this player should see it: masked if their Mature Language Filter is on.</summary>
-        public static string ForDisplay(string name) =>
-            GameplaySettings.Current.MatureLanguageFilter ? Mask(name) : name;
 
         /// <summary>Lower case, common letter swaps undone, everything that isn't a-z turned into a space.</summary>
         private static string Normalize(string text)

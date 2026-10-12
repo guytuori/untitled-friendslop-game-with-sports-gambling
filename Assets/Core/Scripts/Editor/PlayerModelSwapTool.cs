@@ -169,7 +169,6 @@ namespace Blocks.Gameplay.Core
             importer.animationType = ModelImporterAnimationType.Human;
             importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
             importer.SaveAndReimport();
-            RemapToSiblingMaterial(importer, modelPath, log);
 
             // Scale so the model is as tall as the player's CharacterController.
             float height = MeasureHeight(modelPath);
@@ -281,31 +280,6 @@ namespace Blocks.Gameplay.Core
 
             log.AppendLine($"{modelPath}: Humanoid avatar OK (bones mapped automatically, facing +Z).");
             return true;
-        }
-
-        /// <summary>
-        /// If there's a material named after the model in the same folder (Assets/_models/Arachne/Arachne.mat
-        /// for Arachne.fbx), every material inside the model is remapped to it - for models whose look needs a
-        /// hand-made material (a texture with see-through parts, say) rather than the one the FBX carries.
-        /// </summary>
-        private static void RemapToSiblingMaterial(ModelImporter importer, string modelPath, StringBuilder log)
-        {
-            string folder = System.IO.Path.GetDirectoryName(modelPath)?.Replace('\\', '/');
-            string materialPath = $"{folder}/{System.IO.Path.GetFileNameWithoutExtension(modelPath)}.mat";
-            var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
-            if (material == null) return;
-
-            bool changed = false;
-            foreach (Material embedded in AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<Material>())
-            {
-                if (embedded == material) continue;
-                importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), embedded.name), material);
-                changed = true;
-            }
-            if (!changed) return;
-
-            importer.SaveAndReimport();
-            log.AppendLine($"Materials remapped to {materialPath}.");
         }
 
         private static float MeasureHeight(string modelPath)

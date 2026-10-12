@@ -314,7 +314,7 @@ namespace Blocks.Gameplay.Core
             float end = Time.unscaledTime + ConfirmDelaySeconds;
             while (Time.unscaledTime < end)
             {
-                m_YesButton.text = Loc.F("Yes ({0})", Mathf.CeilToInt(end - Time.unscaledTime));
+                m_YesButton.text = $"Yes ({Mathf.CeilToInt(end - Time.unscaledTime)})";
                 yield return null;
             }
             m_YesButton.text = "Yes";

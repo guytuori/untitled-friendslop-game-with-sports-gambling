@@ -272,9 +272,9 @@ namespace Blocks.Gameplay.Core
     public static class GameRulesFormat
     {
         public static string Time(int seconds) => $"{seconds / 60}:{seconds % 60:00}";
-        public static string Lives(int lives) => lives < 0 ? Loc.T("Unlimited") : lives.ToString(CultureInfo.InvariantCulture);
-        public static string DeathPenalty(int penalty) => penalty < 0 ? Loc.T("All") : penalty.ToString(CultureInfo.InvariantCulture);
+        public static string Lives(int lives) => lives < 0 ? "Unlimited" : lives.ToString(CultureInfo.InvariantCulture);
+        public static string DeathPenalty(int penalty) => penalty < 0 ? "All" : penalty.ToString(CultureInfo.InvariantCulture);
         public static string Payout(float payout) => payout.ToString("0.#", CultureInfo.InvariantCulture);
-        public static string OnOff(bool on) => Loc.T(on ? "On" : "Off");
+        public static string OnOff(bool on) => on ? "On" : "Off";
     }
 }

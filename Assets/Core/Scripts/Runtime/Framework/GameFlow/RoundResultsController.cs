@@ -85,8 +85,8 @@ namespace Blocks.Gameplay.Core
             root.Add(column);
 
             int round = MatchProgress.HasResults ? MatchProgress.LastRoundNumber : MatchProgress.RoundNumber - 1;
-            column.Add(MakeLabel(Loc.F("ROUND {0} COMPLETE!", Mathf.Max(1, round)), 40, new Color(0.55f, 0.9f, 0.43f), bold: true));
-            column.Add(MakeLabel(Loc.F("Team scored {0} of {1}", MatchProgress.LastTeamTotal, MatchProgress.LastTeamTarget), 20, Color.white, bold: false));
+            column.Add(MakeLabel($"ROUND {Mathf.Max(1, round)} COMPLETE!", 40, new Color(0.55f, 0.9f, 0.43f), bold: true));
+            column.Add(MakeLabel($"Team scored {MatchProgress.LastTeamTotal} of {MatchProgress.LastTeamTarget}", 20, Color.white, bold: false));
 
             var table = new VisualElement();
             table.style.marginTop = 24;
@@ -105,7 +105,7 @@ namespace Blocks.Gameplay.Core
             }
             table.Add(MakeRow("TOTAL", MatchProgress.LastTeamTotal.ToString(), Color.white, new Color(1f, 0.84f, 0.35f)));
 
-            column.Add(MakeLabel(Loc.F("Next round's target: {0}", MatchProgress.NextTeamTarget), 20, new Color(0.67f, 0.86f, 1f), bold: true));
+            column.Add(MakeLabel($"Next round's target: {MatchProgress.NextTeamTarget}", 20, new Color(0.67f, 0.86f, 1f), bold: true));
 
             m_Prompt = MakeLabel("Press any key to go to the next round", 18, Color.white, bold: false);
             m_Prompt.style.position = Position.Absolute;
@@ -222,7 +222,7 @@ namespace Blocks.Gameplay.Core
                 players++;
                 if (MatchProgress.IsReady(player.PlayerId)) ready++;
             }
-            m_ReadyLabel.text = Loc.F("{0} / {1} ready", ready, players);
+            m_ReadyLabel.text = $"{ready} / {players} ready";
         }
 
         private void HandleGameEnded(string message)

@@ -40,8 +40,8 @@ namespace Blocks.Gameplay.Core
 
         internal static void Set(int playerId, string displayName, string characterId)
         {
-            // Bad words are allowed in names; each viewer's Mature Language Filter masks them when shown.
             string name = NameFilter.Clean(displayName);
+            if (!NameFilter.IsAllowed(name)) name = string.Empty; // a modified client - show them as "Player N"
 
             var profile = new SessionProfile { DisplayName = name, CharacterId = characterId ?? string.Empty };
             if (s_Profiles.TryGetValue(playerId, out SessionProfile existing) &&
