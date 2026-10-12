@@ -9,9 +9,8 @@ namespace Blocks.Gameplay.Core
     /// Change Profile screen, reached from the Single Player menu. Edits this player's PlayerProfile:
     ///   - DISPLAY NAME: text box, up to NameFilter.MaxLength (24) characters, default "Parkour Player".
     ///     Shown to everyone in the lobby and in game ("Player 1: name"). Checked against the bad-word
-    ///     list (NameFilter) when saving.
-    ///   - SHOW DISPLAY NAMES: checkbox, on by default. Off shows other players only as "Player 1",
-    ///     "Player 2", ... on this machine.
+    ///     Any name is allowed; other players see bad words as *** if their Mature Language Filter is on
+    ///     (Settings > Gameplay, where SHOW DISPLAY NAMES also moved on 2026-10-12).
     ///   - CHARACTER: a scrolling box of T-pose thumbnails, 3 per row and 2.5 rows tall, one per character in
     ///     the hand-edited CharacterCatalog list (Resources/CharacterCatalog), in its order. The
     ///     selected (or hovered) character's name is shown to the right, with a double-size picture under
@@ -20,7 +19,7 @@ namespace Blocks.Gameplay.Core
     /// screens, or B/Esc) leaves without saving.
     ///
     /// Controls follow the Host Game screen's conventions: explicit row navigation (Up/Down between rows,
-    /// down through Save Changes to Back at the bottom), A toggles the checkbox, and the character grid uses edit
+    /// down through Save Changes to Back at the bottom), and the character grid uses edit
     /// mode - A to start choosing, the stick/d-pad to move, A to keep the choice or B to undo it. The mouse
     /// can click straight on a thumbnail. Typing a name needs a keyboard (same as room codes); Left/Right in
     /// the text box move the caret. Composite controls handle Submit/Cancel/Move in the capture phase
@@ -65,7 +64,6 @@ namespace Blocks.Gameplay.Core
 
         private VisualElement m_Column;
         private TextField m_NameField;
-        private Toggle m_ShowNamesToggle;
         private VisualElement m_Grid;
         private ScrollView m_GridScroll;
         private readonly List<Image> m_Cells = new List<Image>();
@@ -93,7 +91,8 @@ namespace Blocks.Gameplay.Core
             GamepadUIBindingFix.Apply();
 
             m_Catalog = CharacterCatalog.Load();
-            if (m_Catalog != null) m_Characters = m_Catalog.GetSelectable();
+            // Arachnophobia Mode hides the spiders from the list.
+            if (m_Catalog != null) m_Characters = m_Catalog.GetSelectable(GameplaySettings.ArachnophobiaMode);
 
             VisualElement root = GetComponent<UIDocument>().rootVisualElement;
             BuildUI(root);
@@ -126,7 +125,6 @@ namespace Blocks.Gameplay.Core
             root.Add(m_Column);
 
             BuildNameRow();
-            BuildShowNamesRow();
             BuildCharacterRow();
 
             // Save Changes with Back below it, in the bottom-right column like the other screens. Never scaled.
@@ -197,7 +195,7 @@ namespace Blocks.Gameplay.Core
             m_NameField.style.fontSize = 20;
             m_NameField.style.flexShrink = 0;
             row.Add(m_NameField);
-            row.Add(MakeHint($"Up to {NameFilter.MaxLength} characters"));
+            row.Add(MakeHint(Loc.F("Up to {0} characters", NameFilter.MaxLength)));
 
             m_NameField.RegisterValueChangedCallback(_ => ClearStatus());
 
@@ -224,42 +222,6 @@ namespace Blocks.Gameplay.Core
             }, TrickleDown.TrickleDown);
 
             AddNavRow(m_NameField);
-        }
-
-        private void BuildShowNamesRow()
-        {
-            VisualElement row = MakeRow("SHOW DISPLAY NAMES");
-
-            m_ShowNamesToggle = new Toggle { value = PlayerProfile.ShowDisplayNames };
-            m_ShowNamesToggle.style.flexShrink = 0;
-            m_ShowNamesToggle.style.paddingLeft = 4;
-            m_ShowNamesToggle.style.paddingRight = 4;
-            m_ShowNamesToggle.style.paddingTop = 2;
-            m_ShowNamesToggle.style.paddingBottom = 2;
-            row.Add(m_ShowNamesToggle);
-            row.Add(MakeHint("Off shows other players as Player 1, Player 2, ..."));
-
-            m_ShowNamesToggle.RegisterValueChangedCallback(_ => ClearStatus());
-
-            SetToggleHighlight(false);
-            m_ShowNamesToggle.RegisterCallback<FocusInEvent>(_ => SetToggleHighlight(true));
-            m_ShowNamesToggle.RegisterCallback<FocusOutEvent>(_ => SetToggleHighlight(false));
-
-            // A toggles it - handled here (and the Toggle's own default prevented) so it can't double-toggle.
-            m_ShowNamesToggle.RegisterCallback<NavigationSubmitEvent>(evt =>
-            {
-                evt.PreventDefault();
-                evt.StopPropagation();
-                m_ShowNamesToggle.value = !m_ShowNamesToggle.value;
-                MenuUI.PlaySound(selectSound);
-            }, TrickleDown.TrickleDown);
-            m_ShowNamesToggle.RegisterCallback<NavigationMoveEvent>(evt =>
-            {
-                Suppress(evt);
-                MoveFocus(m_ShowNamesToggle, evt.direction);
-            }, TrickleDown.TrickleDown);
-
-            AddNavRow(m_ShowNamesToggle);
         }
 
         private void BuildCharacterRow()
@@ -566,11 +528,6 @@ namespace Blocks.Gameplay.Core
             m_Grid.style.backgroundColor = focused ? FocusedBackground : UnfocusedBackground;
         }
 
-        private void SetToggleHighlight(bool focused)
-        {
-            m_ShowNamesToggle.style.backgroundColor = focused ? FocusedBackground : Color.clear;
-        }
-
         private Button MakeButton(string text, System.Action onClick, AudioClip clickSound)
         {
             Button button = MenuUI.MakeButton(text, () =>
@@ -619,7 +576,7 @@ namespace Blocks.Gameplay.Core
             string characterId = m_SelectedIndex >= 0 && m_SelectedIndex < CharacterCount
                 ? m_Characters[m_SelectedIndex].id
                 : PlayerProfile.CharacterId;
-            PlayerProfile.Save(name, m_ShowNamesToggle.value, characterId);
+            PlayerProfile.Save(name, characterId);
 
             m_NameField.SetValueWithoutNotify(name);
             MenuUI.PlaySound(selectSound);

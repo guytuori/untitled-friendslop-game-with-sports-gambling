@@ -746,7 +746,7 @@ namespace Blocks.Gameplay.Core
                 case ShutdownReason.OperationTimeout:
                 case ShutdownReason.ConnectionRefused:
                     return "Couldn't reach the game server.";
-                default: return $"Couldn't connect ({reason}).";
+                default: return Loc.F("Couldn't connect ({0}).", reason);
             }
         }
 
@@ -927,7 +927,7 @@ namespace Blocks.Gameplay.Core
             {
                 GameEnded?.Invoke(shutdownReason == ShutdownReason.Ok || shutdownReason == ShutdownReason.DisconnectedByPluginLogic
                     ? "The game was closed."
-                    : $"Disconnected from the game ({shutdownReason}).");
+                    : Loc.F("Disconnected from the game ({0}).", shutdownReason));
             }
         }
 

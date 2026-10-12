@@ -97,6 +97,21 @@ namespace Blocks.Gameplay.Core
 
         #endregion
 
+        #region Dinosaurs
+
+        /// <summary>
+        /// Someone pressed Interact next to scenery dinosaur <paramref name="dinosaur"/> (its index in
+        /// <see cref="Dinosaurs.All"/>, the same on every machine): play its sound everywhere. Lives here
+        /// because the dinosaurs themselves aren't networked and this is the map's networked object.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.All)]
+        public void RPC_PlayDinosaurSound(int dinosaur)
+        {
+            Dinosaurs.PlaySound(dinosaur);
+        }
+
+        #endregion
+
         #region Choosing (master client)
 
         private void ChooseLayout()

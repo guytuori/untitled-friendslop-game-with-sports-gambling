@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe6fa4423aba4517a9c01c54a86cdc6d, type: 3}
+  m_Name: DinosaurCatalog
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.DinosaurCatalog
+  dinosaurs:
+  - id: Apatosaurus
+    model: {fileID: 919132149155446097, guid: 115baffdd86c4de4496c34dc2c53da1a, type: 3}
+    mesh: {fileID: 2534964839176971238, guid: 115baffdd86c4de4496c34dc2c53da1a, type: 3}
+    idle: {fileID: -4752779493917210438, guid: 115baffdd86c4de4496c34dc2c53da1a, type: 3}
+    walk: {fileID: -6357750857876333677, guid: 115baffdd86c4de4496c34dc2c53da1a, type: 3}
+  - id: Parasaurolophus
+    model: {fileID: 919132149155446097, guid: 027a704fd5511ad4d96527835f14a169, type: 3}
+    mesh: {fileID: -1529236534557386741, guid: 027a704fd5511ad4d96527835f14a169, type: 3}
+    idle: {fileID: 2370080510497258867, guid: 027a704fd5511ad4d96527835f14a169, type: 3}
+    walk: {fileID: -4517929548200820678, guid: 027a704fd5511ad4d96527835f14a169, type: 3}
+  - id: Stegosaurus
+    model: {fileID: 919132149155446097, guid: 0c451cc49ab760e4aa7082a6676169cf, type: 3}
+    mesh: {fileID: -739210783278617820, guid: 0c451cc49ab760e4aa7082a6676169cf, type: 3}
+    idle: {fileID: 2365668113189278568, guid: 0c451cc49ab760e4aa7082a6676169cf, type: 3}
+    walk: {fileID: -6883705844951173334, guid: 0c451cc49ab760e4aa7082a6676169cf, type: 3}
+  - id: Trex
+    model: {fileID: 919132149155446097, guid: d4c680797f3768f43adb98d9ea647422, type: 3}
+    mesh: {fileID: -225422950938431916, guid: d4c680797f3768f43adb98d9ea647422, type: 3}
+    idle: {fileID: -9213415508901047716, guid: d4c680797f3768f43adb98d9ea647422, type: 3}
+    walk: {fileID: -1235954696588916024, guid: d4c680797f3768f43adb98d9ea647422, type: 3}
+  - id: Triceratops
+    model: {fileID: 919132149155446097, guid: e354ab442cfb27a40918c7822e4aec68, type: 3}
+    mesh: {fileID: -1486718953335282330, guid: e354ab442cfb27a40918c7822e4aec68, type: 3}
+    idle: {fileID: 5289134713090633407, guid: e354ab442cfb27a40918c7822e4aec68, type: 3}
+    walk: {fileID: 8014001432420945911, guid: e354ab442cfb27a40918c7822e4aec68, type: 3}
+  - id: Velociraptor
+    model: {fileID: 919132149155446097, guid: 9471b9ba47c956b4ba7d9799e4f93578, type: 3}
+    mesh: {fileID: -5077818786510239925, guid: 9471b9ba47c956b4ba7d9799e4f93578, type: 3}
+    idle: {fileID: -5871086038374619908, guid: 9471b9ba47c956b4ba7d9799e4f93578, type: 3}
+    walk: {fileID: 359388479972869541, guid: 9471b9ba47c956b4ba7d9799e4f93578, type: 3}
+  interactSound: {fileID: 8300000, guid: 0d27537cf84b2614a9dc92827e394b0d, type: 3}

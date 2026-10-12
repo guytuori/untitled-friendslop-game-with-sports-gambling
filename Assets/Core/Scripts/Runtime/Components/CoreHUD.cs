@@ -762,8 +762,8 @@ namespace Blocks.Gameplay.Core
                 string targetPlayerName = GetPlayerName(payload.targetPlayerId);
 
                 string eliminationMessage = (sourcePlayerName == targetPlayerName && payload.sourcePlayerId == payload.targetPlayerId)
-                    ? $"{targetPlayerName} eliminated themselves"
-                    : $"{sourcePlayerName} eliminated {targetPlayerName}";
+                    ? Loc.F("{0} eliminated themselves", targetPlayerName)
+                    : Loc.F("{0} eliminated {1}", sourcePlayerName, targetPlayerName);
 
                 AddNotification(eliminationMessage);
             }
@@ -868,7 +868,7 @@ namespace Blocks.Gameplay.Core
                 row.AddToClassList("scoreboard-row");
 
                 bool finished = RoundTimer.Instance != null && RoundTimer.Instance.IsPlayerFinished(clientId);
-                var nameLabel = new Label(NetworkPlayers.GetPlayerLabel(clientId) + (finished ? " (finished)" : ""));
+                var nameLabel = new Label(NetworkPlayers.GetPlayerLabel(clientId) + (finished ? " " + Loc.T("(finished)") : ""));
                 nameLabel.AddToClassList("scoreboard-name");
                 if (finished) nameLabel.AddToClassList("scoreboard-name--finished");
                 row.Add(nameLabel);
@@ -1008,7 +1008,7 @@ namespace Blocks.Gameplay.Core
             if (PracticeMode.IsActive) { UpdateTeamRows(); return; }
             if (m_RoundTimerCaption != null && m_SubscribedRoundTimer != null)
             {
-                m_RoundTimerCaption.text = $"ROUND {m_SubscribedRoundTimer.RoundNumber}";
+                m_RoundTimerCaption.text = Loc.F("ROUND {0}", m_SubscribedRoundTimer.RoundNumber);
             }
             UpdateTeamRows();
         }
@@ -1024,13 +1024,13 @@ namespace Blocks.Gameplay.Core
         {
             if (playerId == OwnerClientId)
             {
-                ShowBanner("FINISHED!", bonusPoints > 0 ? $"+{bonusPoints} bonus points" : "No time left on the bonus timer", null, 3f);
+                ShowBanner("FINISHED!", bonusPoints > 0 ? Loc.F("+{0} bonus points", bonusPoints) : "No time left on the bonus timer", null, 3f);
             }
             else
             {
                 AddNotification(bonusPoints > 0
-                    ? $"{GetPlayerName(playerId)} reached the end! +{bonusPoints}"
-                    : $"{GetPlayerName(playerId)} reached the end!");
+                    ? Loc.F("{0} reached the end! +{1}", GetPlayerName(playerId), bonusPoints)
+                    : Loc.F("{0} reached the end!", GetPlayerName(playerId)));
             }
         }
 
@@ -1047,7 +1047,7 @@ namespace Blocks.Gameplay.Core
 
                 case RoundTimer.RoundPhase.Ended:
                     bool reached = m_SubscribedRoundTimer.TargetReached;
-                    string score = $"Team scored {m_SubscribedRoundTimer.FinalTeamTotal} of {m_SubscribedRoundTimer.TeamTarget}";
+                    string score = Loc.F("Team scored {0} of {1}", m_SubscribedRoundTimer.FinalTeamTotal, m_SubscribedRoundTimer.TeamTarget);
                     ShowBanner(reached ? "TARGET REACHED!" : "TARGET MISSED", score, reached, 0f);
                     UpdateTeamRows();
                     break;
@@ -1118,7 +1118,7 @@ namespace Blocks.Gameplay.Core
                 m_ChallengeBetStatusLabel.style.display = DisplayStyle.Flex;
                 m_ChallengeBetStatusLabel.text = choice == ChallengeBetChoice.Decline
                     ? "You declined to bet."
-                    : $"You bet: {DescribeBetChoice(choice)}";
+                    : Loc.F("You bet: {0}", Loc.T(DescribeBetChoice(choice)));
             }
         }
 
@@ -1191,7 +1191,7 @@ namespace Blocks.Gameplay.Core
             ulong challengerId = ChallengeManager.Instance.ActiveChallengerClientId;
 
             if (m_ChallengeTitleLabel != null) m_ChallengeTitleLabel.text = challengeName;
-            if (m_ChallengeSubtitleLabel != null) m_ChallengeSubtitleLabel.text = $"{GetPlayerName(challengerId)} is attempting this challenge";
+            if (m_ChallengeSubtitleLabel != null) m_ChallengeSubtitleLabel.text = Loc.F("{0} is attempting this challenge", GetPlayerName(challengerId));
             if (m_ChallengeTimerBar != null)
             {
                 m_ChallengeTimerBar.highValue = ChallengeManager.Instance.BettingWindowSeconds;
@@ -1236,7 +1236,7 @@ namespace Blocks.Gameplay.Core
 
             foreach (ulong bettorId in ChallengeManager.Instance.ActiveBettorClientIds)
             {
-                var label = new Label($"{GetPlayerName(bettorId)} has bet on the outcome of {challengeName}");
+                var label = new Label(Loc.F("{0} has bet on the outcome of {1}", GetPlayerName(bettorId), challengeName));
                 label.AddToClassList("challenge-bet-announcement");
                 m_ChallengeBetAnnouncements.Add(label);
             }
