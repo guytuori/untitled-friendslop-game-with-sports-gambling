@@ -65,7 +65,8 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float jumpPushForce = 7f;
         [Tooltip("How long after jumping off before the same pole can be re-grabbed - stops immediately re-sticking to the pole you just launched off of.")]
         [SerializeField] private float regrabCooldown = 0.25f;
-
+        [SerializeField] private float poleAngleLowerBound = 50;
+        [SerializeField] private float poleAngleUpperBound = 125;
         [Header("Input Event")]
         [Tooltip("Same GameEvent CoreInputHandler raises on jump press (drag the same asset assigned there). Wired directly here because a pole leaves the player ungrounded, so CoreMovement.JumpRequested never becomes true while attached - same reason GrindRailAbility/WallClimbAbility react to the raw event instead of the grounded jump path.")]
         [SerializeField] private GameEvent onJumpPressed;
@@ -155,9 +156,10 @@ namespace Blocks.Gameplay.Core
 
         public void OnPlayerSpawn()
         {
+            TryRegisterListener();
             if (IsOwner)
             {
-                TryRegisterListener();
+               
             }
         }
 
@@ -184,11 +186,16 @@ namespace Blocks.Gameplay.Core
         #endregion
 
         #region Pole Movement
-
+    
         public bool IsPoleHorizontal(Pole _pole)
         {
-
-            return Mathf.Abs(_pole.transform.eulerAngles.x) < 125 && Mathf.Abs(_pole.transform.eulerAngles.x) > 50;
+            bool isHorizontal = Mathf.Abs(_pole.transform.eulerAngles.x) < poleAngleUpperBound && Mathf.Abs(_pole.transform.eulerAngles.x) > poleAngleLowerBound;
+            //check both directions, any orientation that isnt up and down should count as horizontal
+            if (isHorizontal == false)
+            {
+                isHorizontal = Mathf.Abs(_pole.transform.eulerAngles.z) < poleAngleUpperBound && Mathf.Abs(_pole.transform.eulerAngles.z) > poleAngleLowerBound;
+            }
+            return isHorizontal;
         }
 
         private void ProcessPoleMovement(Vector2 rawInput, ref MovementModifier modifier)
@@ -241,9 +248,9 @@ namespace Blocks.Gameplay.Core
             m_AngleDegrees += rawInput.y * degreesPerSecond * Time.deltaTime;
 
             Vector3 axis = m_CurrentPole.Axis;
-            Vector3 refDir = Vector3.Cross(axis, Vector3.up).sqrMagnitude > 0.0001f
-                ? Vector3.Cross(axis, Vector3.up).normalized
-                : Vector3.forward;
+            Vector3 refDir = Vector3.Cross(axis, m_CurrentPole.transform.forward).sqrMagnitude > 0.0001f
+                ? Vector3.Cross(axis, m_CurrentPole.transform.forward).normalized
+                : m_CurrentPole.transform.up;
             Vector3 outward = Quaternion.AngleAxis(m_AngleDegrees, axis) * refDir;
             m_LastOutwardDir = outward;
 
@@ -331,8 +338,9 @@ namespace Blocks.Gameplay.Core
         {
             if (!m_IsActive || !IsOwner || m_Motor == null) return;
             if (!IsOnPole) return;
-            ExitPole(applyRegrabCooldown: true);
+            
             PerformJumpOff();
+            ExitPole(applyRegrabCooldown: true);
         }
 
         private void PerformJumpOff()
@@ -341,7 +349,7 @@ namespace Blocks.Gameplay.Core
 
             float jumpVelocity = Mathf.Sqrt(Mathf.Max(0.01f, jumpHeight * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
             m_Motor.SetVerticalVelocity(5);
-            m_Motor.ApplyExternalForce(Vector3.right * jumpPushForce * 10, ForceMode.Impulse);
+            m_Motor.ApplyExternalForce(transform.forward * jumpPushForce * 10, ForceMode.Impulse);
 
             
         }

@@ -374,26 +374,7 @@ namespace Blocks.Gameplay.Core
             onGrabReleased.UnregisterListener(HandleGrabReleased);
         }
 
-        private void HandleJumpPressed()
-        {
-            if (!m_IsActive || !IsOwner || m_Motor == null) return;
-            if (!IsClimbing) return;
-
-            PerformWallJump();
-        }
-        private void HandleGrabPressed()
-        {
-            if (!m_IsActive || !IsOwner || m_Motor == null) return;
-            if (!IsClimbing) return;
-
-        }
-        private void HandleGrabReleased()
-        {
-            if (!m_IsActive || !IsOwner || m_Motor == null) return;
-            if (!IsClimbing) return;
-            
-            //ExitClimb();
-        }
+       
         [SerializeField] private float angleToconsiderJumpControlled=100.0f;
         private void PerformWallJump()
         {
@@ -439,6 +420,30 @@ namespace Blocks.Gameplay.Core
 
 
         #endregion
+
+        #region input
+        private void HandleJumpPressed()
+        {
+            if (!m_IsActive || !IsOwner || m_Motor == null) return;
+            if (!IsClimbing) return;
+
+            PerformWallJump();
+        }
+        private void HandleGrabPressed()
+        {
+            if (!m_IsActive || !IsOwner || m_Motor == null) return;
+            if (!IsClimbing) return;
+
+        }
+        private void HandleGrabReleased()
+        {
+            if (!m_IsActive || !IsOwner || m_Motor == null) return;
+            if (!IsClimbing) return;
+
+            //ExitClimb();
+        }
+        #endregion
+
 
         #region Detection
 
