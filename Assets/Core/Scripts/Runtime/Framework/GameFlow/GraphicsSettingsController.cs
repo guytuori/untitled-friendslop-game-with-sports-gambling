@@ -228,6 +228,15 @@ namespace Blocks.Gameplay.Core
             root.style.flexGrow = 1;
             root.style.backgroundColor = Color.black;
 
+            // B / Esc = Back (a slider/dropdown being edited takes it first, to undo the edit).
+            root.RegisterCallback<NavigationCancelEvent>(evt =>
+            {
+                evt.StopPropagation();
+                if (m_EditingDropdown != null) return;
+                MenuUI.PlaySound(cancelSound);
+                OnBackClicked();
+            });
+
             if (titleImage != null)
             {
                 var title = new Image { image = titleImage, scaleMode = ScaleMode.ScaleToFit };

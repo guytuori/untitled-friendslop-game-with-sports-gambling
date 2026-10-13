@@ -134,6 +134,7 @@ namespace Blocks.Gameplay.Core
         private bool m_UseGamepad;
         private string m_AwaitingRebindCommand;
         private int m_RebindStartedFrame = -1;
+        private int m_RebindCompletedFrame = -100;
         private readonly Dictionary<string, Button> m_RowButtons = new Dictionary<string, Button>();
         private Button m_FirstFocusable;
         private Button m_RestoreDefaultsButton;
@@ -173,6 +174,16 @@ namespace Blocks.Gameplay.Core
         {
             root.style.flexGrow = 1;
             root.style.backgroundColor = Color.black;
+
+            // B / Esc = Back - except while waiting for a new binding, or just after one was captured (that
+            // B / Esc may have BEEN the new binding, and its UI Cancel can arrive a frame or two later).
+            root.RegisterCallback<NavigationCancelEvent>(evt =>
+            {
+                evt.StopPropagation();
+                if (m_AwaitingRebindCommand != null || Time.frameCount - m_RebindCompletedFrame < 10) return;
+                MenuUI.PlaySound(cancelSound);
+                OnBackClicked();
+            });
 
             if (titleImage != null)
             {
@@ -513,6 +524,7 @@ namespace Blocks.Gameplay.Core
         {
             string commandKey = m_AwaitingRebindCommand;
             m_AwaitingRebindCommand = null;
+            m_RebindCompletedFrame = Time.frameCount;
 
             if (EventSystem.current != null)
             {
