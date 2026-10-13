@@ -126,6 +126,9 @@ namespace Blocks.Gameplay.Core
         public bool ArachnophobiaMode = false;
         public bool ArachnophiliaMode = false;
 
+        /// <summary>0 Off, 1 Protanopia, 2 Deuteranopia, 3 Tritanopia (see ColorblindFilter).</summary>
+        public int ColorblindMode = 0;
+
         public GameplaySettingsData Clone() => (GameplaySettingsData)MemberwiseClone();
     }
 
@@ -162,6 +165,19 @@ namespace Blocks.Gameplay.Core
     {
         private const string FileName = "settings.json";
 
+        /// <summary>
+        /// Raised after settings.json or the input binding overrides are saved - e.g. from Change Keybindings
+        /// opened mid-game (Esc > Settings), so anything holding bindings (the player's input, the bet keys,
+        /// Interact) picks the new ones up straight away.
+        /// </summary>
+        public static event Action Saved;
+
+        internal static void RaiseSaved()
+        {
+            GamepadRumble.Refresh();
+            Saved?.Invoke();
+        }
+
         private static string FilePath => Path.Combine(Application.persistentDataPath, FileName);
 
         public static InputBindingsData Load()
@@ -196,6 +212,7 @@ namespace Blocks.Gameplay.Core
             {
                 Debug.LogError($"[InputBindingsStore] Couldn't write {FilePath}: {e.Message}");
             }
+            RaiseSaved();
         }
     }
 
@@ -287,6 +304,7 @@ namespace Blocks.Gameplay.Core
             {
                 Debug.LogError($"[InputBindingOverridesStore] Couldn't write {FilePath}: {e.Message}");
             }
+            InputBindingsStore.RaiseSaved();
         }
     }
 }

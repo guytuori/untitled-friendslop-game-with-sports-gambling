@@ -16,7 +16,7 @@ namespace Blocks.Gameplay.Core
     ///   1. Sets up Pirate.fbx's import settings: Humanoid rig with an explicit bone mapping for the Blender
     ///      rigs made by BlenderProjects/make_*_rigged.py, axis conversion baked in, no animations or cameras,
     ///      and an import scale chosen so the model is as tall as the player's CharacterController.
-    ///   2. Replaces the current model in [BB] CorePlayer.prefab with it:
+    ///   2. Replaces the current model in CorePlayer.prefab with it:
     ///      - the new model's Animator gets the old one's controller and settings (root motion stays off);
     ///      - CoreAnimator moves onto it (the footstep/landing sounds are animation events that call it);
     ///      - everything that pointed at the old model (Fusion's NetworkMecanimAnimator, VisualsAddon,
@@ -31,7 +31,7 @@ namespace Blocks.Gameplay.Core
     {
         #region Configuration
 
-        private const string PlayerPrefabPath = "Assets/Core/Prefabs/[BB] CorePlayer.prefab";
+        private const string PlayerPrefabPath = "Assets/Core/Prefabs/CorePlayer.prefab";
         private const string PiratePath = "Assets/Core/Art/Models/Characters/Pirate.fbx";
         private const string PlaceholderPath = "Assets/Core/Art/Models/Armature_Core.prefab";
 

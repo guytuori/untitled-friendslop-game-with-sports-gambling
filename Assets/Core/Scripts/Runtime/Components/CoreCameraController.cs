@@ -215,6 +215,13 @@ namespace Blocks.Gameplay.Core
         /// Sets the look sensitivity at runtime.
         /// </summary>
         /// <param name="sensitivity">The new sensitivity value.</param>
+        /// <summary>Points the camera straight ahead along <paramref name="yaw"/> (used when the player is teleported, e.g. Practice Challenges' Retry).</summary>
+        public void ResetLook(float yaw)
+        {
+            m_CurrentHorizontalLookAngle = yaw;
+            m_CurrentVerticalLookAngle = 0f;
+        }
+
         public void SetLookSensitivity(float sensitivity)
         {
             m_LookSensitivity = sensitivity;

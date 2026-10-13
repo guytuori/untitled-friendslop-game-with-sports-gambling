@@ -10,7 +10,15 @@ namespace Blocks.Gameplay.Core
         private void Awake()
         {
             m_Bindings = InputBindingsStore.Load();
+            InputBindingsStore.Saved += ReloadBindings; // rebound mid-game
         }
+
+        private void OnDestroy()
+        {
+            InputBindingsStore.Saved -= ReloadBindings;
+        }
+
+        private void ReloadBindings() => m_Bindings = InputBindingsStore.Load();
 
         private void Update()
         {

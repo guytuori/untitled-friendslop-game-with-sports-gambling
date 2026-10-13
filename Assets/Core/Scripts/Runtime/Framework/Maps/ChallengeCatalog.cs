@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Blocks.Gameplay.Core
@@ -25,6 +26,9 @@ namespace Blocks.Gameplay.Core
             public int size;
 
             public GameObject prefab;
+
+            [Tooltip("A view of the challenge for the Practice Challenges list - rendered by MatchCatalogBuilder.")]
+            public Texture2D thumbnail;
         }
 
         public const string ResourcePath = "ChallengeCatalog";
@@ -53,6 +57,42 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>The plain piece Practice Map puts in a hole of this size (null if there isn't one).</summary>
         public GameObject GetPracticePiece(int size) => size == 16 ? practice16 : size == 32 ? practice32 : null;
+
+        /// <summary>The index of the challenge with this id (its prefab file name), or -1.</summary>
+        public int IndexOf(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return -1;
+            for (int i = 0; i < challenges.Count; i++)
+            {
+                if (challenges[i] != null && string.Equals(challenges[i].id, id, StringComparison.OrdinalIgnoreCase)) return i;
+            }
+            return -1;
+        }
+
+        private static readonly Regex NumberedId = new Regex(@"_(\d+)$", RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// The challenge's number among those of its size: the number at the end of its id
+        /// ("Challenge_16_03" is 3), or failing that its position in the list (1-based).
+        /// </summary>
+        public int NumberOf(Entry entry)
+        {
+            if (entry == null) return 0;
+            Match match = NumberedId.Match(entry.id ?? "");
+            if (match.Success && int.TryParse(match.Groups[1].Value, out int number) && number > 0) return number;
+
+            int position = 0;
+            foreach (Entry e in challenges)
+            {
+                if (e == null || e.size != entry.size) continue;
+                position++;
+                if (e == entry) return position;
+            }
+            return position;
+        }
+
+        /// <summary>"Challenge 16.3": size.number (see <see cref="NumberOf"/>).</summary>
+        public string DisplayName(Entry entry) => entry == null ? "" : Loc.F("Challenge {0}.{1}", entry.size, NumberOf(entry));
 
         /// <summary>Indices of every challenge that fits a hole of this size.</summary>
         public List<int> IndicesForSize(int size)

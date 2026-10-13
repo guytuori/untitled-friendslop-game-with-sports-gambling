@@ -16,7 +16,10 @@ namespace Blocks.Gameplay.Core
     /// button, or double-click a map) to play it alone with no time limit (see <see cref="PracticeMode"/>).
     /// B/Esc or Back closes the popup. Random picks one of the other maps.
     ///
-    /// How To Play and Practice Challenges are placeholders for now (they just log).
+    /// PRACTICE CHALLENGES opens the <see cref="ChallengePicker"/> list over this screen: pick a challenge and
+    /// Start to play just that challenge, in the Practice16 / Practice32 map (see <see cref="PracticeMode"/>).
+    ///
+    /// How To Play is a placeholder for now (it just logs).
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class SinglePlayerController : MonoBehaviour
@@ -47,8 +50,19 @@ namespace Blocks.Gameplay.Core
         /// <summary>The map last picked for practice, so the popup reopens on it.</summary>
         private static int s_LastPracticeMap;
 
+        /// <summary>A challenge to start as soon as this screen opens (Retry / Change Challenge in a practice run).</summary>
+        private static string s_QueuedChallengeId;
+
+        /// <summary>
+        /// Practice Challenges' Retry / Change Challenge: the next time the Single Player screen opens, it starts
+        /// a practice run of <paramref name="challengeId"/> straight away (the list shows "Starting practice...").
+        /// </summary>
+        public static void QueuePracticeChallenge(string challengeId) => s_QueuedChallengeId = challengeId;
+
         private VisualElement m_Column;
         private Button m_PracticeButton;
+        private Button m_ChallengesButton;
+        private ChallengePicker m_ChallengePicker;
 
         private VisualElement m_Popup;
         private VisualElement m_Grid;
@@ -78,13 +92,33 @@ namespace Blocks.Gameplay.Core
             m_Column.Add(MenuUI.MakeButton("How To Play", () => NotImplemented("How To Play"), selectSound));
             m_PracticeButton = MenuUI.MakeButton("Practice Map", OpenPracticePopup, selectSound);
             m_Column.Add(m_PracticeButton);
-            m_Column.Add(MenuUI.MakeButton("Practice Challenges", () => NotImplemented("Practice Challenges"), selectSound));
+            m_ChallengesButton = MenuUI.MakeButton("Practice Challenges", OpenChallengePicker, selectSound);
+            m_Column.Add(m_ChallengesButton);
             m_Column.Add(MenuUI.MakeButton("Back", OnBack, cancelSound));
 
             BuildPracticePopup(root);
+            m_ChallengePicker = new ChallengePicker(root, selectSound, cancelSound, StartChallengePractice, CloseChallengePicker);
 
             MenuUI.RegisterCancelAsBack(root, cancelSound, OnBack);
             MenuUI.FocusFirst(changeProfileButton);
+
+            StartQueuedChallenge();
+        }
+
+        /// <summary>Back from a practice run's Retry / Change Challenge: start the queued challenge now.</summary>
+        private void StartQueuedChallenge()
+        {
+            string id = s_QueuedChallengeId;
+            s_QueuedChallengeId = null;
+            if (string.IsNullOrEmpty(id)) return;
+
+            ChallengeCatalog catalog = ChallengeCatalog.Load();
+            ChallengeCatalog.Entry entry = catalog != null ? catalog.Get(catalog.IndexOf(id)) : null;
+            if (entry == null) return;
+
+            OpenChallengePicker();
+            m_ChallengePicker.Open(id);
+            StartChallengePractice(entry);
         }
 
         private static void NotImplemented(string option)
@@ -92,15 +126,60 @@ namespace Blocks.Gameplay.Core
             Debug.Log($"[SinglePlayer] {option} selected (not implemented yet).");
         }
 
-        /// <summary>B/Esc or Back: closes the practice popup if it's open, otherwise back to the main menu.</summary>
+        /// <summary>B/Esc or Back: closes the practice popup or challenge list if one is open, otherwise back to the main menu.</summary>
         private void OnBack()
         {
+            if (m_ChallengePicker != null && m_ChallengePicker.IsOpen)
+            {
+                CloseChallengePicker();
+                return;
+            }
             if (PopupOpen)
             {
                 ClosePracticePopup();
                 return;
             }
             SceneManager.LoadScene(backSceneName);
+        }
+
+        // =====================================================================================
+        // Practice Challenges list
+        // =====================================================================================
+
+        private bool m_StartingChallenge;
+
+        private void OpenChallengePicker()
+        {
+            m_StartingChallenge = false;
+            m_Column.SetEnabled(false); // the menu behind the list can't be reached
+            m_ChallengePicker.Open();
+        }
+
+        private void CloseChallengePicker()
+        {
+            if (m_StartingChallenge) return; // can't back out while the session is starting
+            m_ChallengePicker.Close();
+            m_Column.SetEnabled(true);
+            MenuUI.FocusFirst(m_ChallengesButton);
+        }
+
+        private async void StartChallengePractice(ChallengeCatalog.Entry entry)
+        {
+            if (m_StartingChallenge || entry == null) return;
+            m_StartingChallenge = true;
+            m_ChallengePicker.SetBusy(true, "Starting practice...");
+
+            ChallengeCatalog catalog = ChallengeCatalog.Load();
+            string name = catalog != null ? catalog.DisplayName(entry) : entry.id;
+            string error = await FusionSessionService.Instance.StartPracticeAsync(PracticeMode.MapForSize(entry.size), name, entry.id);
+            if (this == null) return; // the gameplay scene has already replaced this one
+
+            if (error != null)
+            {
+                m_StartingChallenge = false;
+                m_ChallengePicker.ShowError(error);
+            }
+            // On success Fusion loads the gameplay scene.
         }
 
         // =====================================================================================

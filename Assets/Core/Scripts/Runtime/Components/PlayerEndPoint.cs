@@ -29,6 +29,30 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float triggerDepth = 0.5f;
 
         private bool m_Built;
+        private Vector3 m_Center;
+
+        private static readonly System.Collections.Generic.List<PlayerEndPoint> s_All = new System.Collections.Generic.List<PlayerEndPoint>();
+
+        /// <summary>The middle of the end point's tile (world space).</summary>
+        public Vector3 Center => m_Built ? m_Center : transform.position;
+
+        /// <summary>
+        /// The end point nearest to <paramref name="from"/> (its tile's middle) - what players are turned to face
+        /// when they spawn at a spawn point. False if the scene has none.
+        /// </summary>
+        public static bool TryGetNearest(Vector3 from, out Vector3 point)
+        {
+            point = default;
+            float best = float.MaxValue;
+            foreach (PlayerEndPoint endPoint in s_All)
+            {
+                if (endPoint == null) continue;
+                Vector3 c = endPoint.Center;
+                float d = (c - from).sqrMagnitude;
+                if (d < best) { best = d; point = c; }
+            }
+            return best < float.MaxValue;
+        }
 
         /// <summary>Adds a PlayerEndPoint to every "player_end_point..." object under <paramref name="root"/> that doesn't have one.</summary>
         public static int SetUpAll(Transform root)
@@ -59,7 +83,13 @@ namespace Blocks.Gameplay.Core
 
         private void Awake()
         {
+            s_All.Add(this);
             Build();
+        }
+
+        private void OnDestroy()
+        {
+            s_All.Remove(this);
         }
 
         private void Build()
@@ -97,6 +127,7 @@ namespace Blocks.Gameplay.Core
                                    size.z / Mathf.Max(0.0001f, Mathf.Abs(lossy.z)));
 
             triggerObject.AddComponent<PlayerEndPointTrigger>();
+            m_Center = bounds.center;
         }
 
         private bool TryGetRendererBounds(out Bounds bounds)

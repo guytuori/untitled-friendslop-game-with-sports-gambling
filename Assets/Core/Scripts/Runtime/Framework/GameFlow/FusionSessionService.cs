@@ -167,8 +167,11 @@ namespace Blocks.Gameplay.Core
         /// <summary>True while in a session started by <see cref="StartDevSessionAsync"/> (a gameplay scene played directly).</summary>
         public bool IsDevSession { get; private set; }
 
-        /// <summary>True while in a Practice Map session (see <see cref="StartPracticeAsync"/> and <see cref="PracticeMode"/>).</summary>
+        /// <summary>True while in a practice session - Practice Map or Practice Challenges (see <see cref="StartPracticeAsync"/> and <see cref="PracticeMode"/>).</summary>
         public bool IsPracticeSession { get; private set; }
+
+        /// <summary>Practice Challenges: the ChallengeCatalog id being practised. Null in Practice Map (and outside practice).</summary>
+        public string PracticeChallengeId { get; private set; }
 
         /// <summary>The rules the host published for the current session (Normal defaults if none).</summary>
         public HostGameRulesData SessionRules
@@ -478,12 +481,14 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Practice Map (Single Player menu): starts a private, closed one-player session that plays
-        /// <paramref name="mapPrefab"/> and loads the gameplay scene straight away - no lobby. The session
-        /// is marked as practice (<see cref="PracticeMode"/>): no time limit, no wagers, score starts at 0.
+        /// Practice Map / Practice Challenges (Single Player menu): starts a private, closed one-player session
+        /// that plays <paramref name="mapPrefab"/> and loads the gameplay scene straight away - no lobby. The
+        /// session is marked as practice (<see cref="PracticeMode"/>): no time limit, no wagers, score starts
+        /// at 0. With a <paramref name="challengeId"/> it's Practice Challenges: that challenge goes in the
+        /// map's hole (the map should be <see cref="PracticeMode.MapForSize"/>).
         /// Returns null on success, or a player-facing error message.
         /// </summary>
-        public async Task<string> StartPracticeAsync(string mapPrefab, string mapName)
+        public async Task<string> StartPracticeAsync(string mapPrefab, string mapName, string challengeId = null)
         {
             if (m_GameRunner != null) return m_Starting ? "Already starting." : "Already in a game.";
             if (string.IsNullOrWhiteSpace(mapPrefab)) return "That map isn't set up yet.";
@@ -518,6 +523,7 @@ namespace Blocks.Gameplay.Core
             if (!result.Ok) return DescribeFailure(result.Reason);
 
             IsPracticeSession = true;
+            PracticeChallengeId = string.IsNullOrEmpty(challengeId) ? null : challengeId;
             RoomCode = sessionName;
             IsPublic = false;
             MaxPlayers = 1;
@@ -535,6 +541,12 @@ namespace Blocks.Gameplay.Core
             MatchProgress.Reset();
             _ = m_GameRunner.LoadScene(scene, LoadSceneMode.Single, LocalPhysicsMode.None, true);
             return null;
+        }
+
+        /// <summary>Practice Challenges: switches the challenge being practised (MatchLayout.RebuildForPractice then swaps it in).</summary>
+        public void SetPracticeChallenge(string challengeId)
+        {
+            if (IsPracticeSession && !string.IsNullOrEmpty(challengeId)) PracticeChallengeId = challengeId;
         }
 
         /// <summary>Leaves the current game. If this player was the host, another player becomes the host.</summary>
@@ -664,6 +676,7 @@ namespace Blocks.Gameplay.Core
             MaxPlayers = 0;
             IsDevSession = false;
             IsPracticeSession = false;
+            PracticeChallengeId = null;
             m_RosterMasterId = -1;
             m_Players.Clear();
             SessionProfiles.Clear();

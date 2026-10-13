@@ -174,7 +174,7 @@ namespace Blocks.Gameplay.Core
 
             int index = GetRandomSpawnIndex();
             Vector3 position = GetSpawnPositionForIndex(index);
-            Quaternion rotation = TryGetSpawnTransform(index, out Transform spawnTransform) ? spawnTransform.rotation : Quaternion.identity;
+            Quaternion rotation = TryGetSpawnTransform(index, out Transform spawnTransform) ? SpawnRotation(spawnTransform) : Quaternion.identity;
 
             NetworkObject avatar = runner.Spawn(playerPrefab, position, rotation, runner.LocalPlayer,
                 flags: NetworkSpawnFlags.SharedModeStateAuthLocalPlayer);
@@ -346,8 +346,11 @@ namespace Blocks.Gameplay.Core
                 int spawnIndex = GetRandomSpawnIndex();
                 if (TryGetSpawnTransform(spawnIndex, out Transform spawnTransform))
                 {
-                    coreMovement.transform.rotation = spawnTransform.rotation;
+                    Quaternion facing = SpawnRotation(spawnTransform);
+                    coreMovement.transform.rotation = facing;
                     coreMovement.SetPosition(spawnTransform.position);
+                    var camera = playerState.GetComponent<CoreCameraController>();
+                    if (camera != null) camera.ResetLook(facing.eulerAngles.y);
                 }
                 else
                 {
@@ -430,6 +433,32 @@ namespace Blocks.Gameplay.Core
         /// RefreshSpawnPointsFromMarkers) so this always reflects whatever map is currently loaded.
         /// </summary>
         /// <returns>A random spawn point index, or -1 if no spawn points are configured.</returns>
+        /// <summary>A spawn point (one of the map's PlayerSpawnPoint markers, picked at random) - false if there are none.</summary>
+        public bool TryGetSpawnPoint(out Vector3 position, out Quaternion rotation)
+        {
+            position = Vector3.zero;
+            rotation = Quaternion.identity;
+            if (!TryGetSpawnTransform(GetRandomSpawnIndex(), out Transform spawn)) return false;
+            position = spawn.position;
+            rotation = SpawnRotation(spawn);
+            return true;
+        }
+
+        /// <summary>
+        /// Which way a player spawning at <paramref name="spawn"/> faces: towards the nearest player end point
+        /// (so the course is in front of them), or the spawn point's own rotation if the map has no end point.
+        /// </summary>
+        private static Quaternion SpawnRotation(Transform spawn)
+        {
+            if (PlayerEndPoint.TryGetNearest(spawn.position, out Vector3 end))
+            {
+                Vector3 toEnd = end - spawn.position;
+                toEnd.y = 0f;
+                if (toEnd.sqrMagnitude > 0.01f) return Quaternion.LookRotation(toEnd.normalized, Vector3.up);
+            }
+            return spawn.rotation;
+        }
+
         private int GetRandomSpawnIndex()
         {
             RefreshSpawnPointsFromMarkers();

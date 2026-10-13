@@ -92,7 +92,8 @@ namespace Blocks.Gameplay.Core
             float dt = Time.deltaTime;
 
             bool grounded = m_Movement != null && m_Movement.IsGrounded;
-            bool running = grounded && m_Movement.IsSprinting && m_Movement.CurrentSpeed > RunMinSpeed;
+            // IsSprinting is the walk toggle now (the walk/run speeds were swapped), so running = moving without it.
+            bool running = grounded && !m_Movement.IsSprinting && m_Movement.CurrentSpeed > RunMinSpeed;
             bool onRail = m_Rail != null && m_Rail.IsOnRail;
             bool onWall = m_Wall != null && m_Wall.IsClimbing;
             bool onPole = m_Pole != null && m_Pole.IsOnPole;

@@ -61,6 +61,7 @@ namespace Blocks.Gameplay.Core
 
             if (settings.ArachnophobiaMode && settings.ArachnophiliaMode) settings.ArachnophiliaMode = false;
             if (!Loc.IsSupported(settings.Language)) settings.Language = Loc.DefaultLanguageCode;
+            settings.ColorblindMode = Mathf.Clamp(settings.ColorblindMode, 0, ColorblindFilter.ModeNames.Length - 1);
             return settings;
         }
 

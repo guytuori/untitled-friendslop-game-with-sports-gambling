@@ -152,6 +152,24 @@ namespace Blocks.Gameplay.Core
             stats.ModifyStat(StatKeys.Health, -Mathf.Max(1f, health + 1f), m_Player.OwnerClientId, ModificationSource.Environmental);
         }
 
+        /// <summary>
+        /// Practice Challenges' quick Retry: forget every safe spot and challenge entrance, so a death after the
+        /// retry respawns near where the new run has been, not where the old one ended.
+        /// </summary>
+        public void ResetHistory()
+        {
+            m_History.Clear();
+            m_HistoryNext = 0;
+            m_LastSafe = null;
+            m_PendingChallengeEntry = null;
+            m_ChallengeEntry = null;
+            m_InChallenge = false;
+            m_HasDeathPosition = false;
+            m_NextSampleTime = 0f;
+            m_KillY = float.NaN; // re-measured (the map may have changed - Change Challenge)
+            m_NextMeasureTime = 0f;
+        }
+
         private void HandleLifeStateChanged(PlayerLifeState state)
         {
             if (state == PlayerLifeState.Eliminated)

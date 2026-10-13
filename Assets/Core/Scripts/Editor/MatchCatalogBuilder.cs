@@ -55,8 +55,9 @@ namespace Blocks.Gameplay.Core
         {
             EditorApplication.delayCall += () =>
             {
-                if (AssetDatabase.LoadAssetAtPath<MapCatalog>(MapCatalogPath) == null ||
-                    AssetDatabase.LoadAssetAtPath<ChallengeCatalog>(ChallengeCatalogPath) == null)
+                var challenges = AssetDatabase.LoadAssetAtPath<ChallengeCatalog>(ChallengeCatalogPath);
+                if (AssetDatabase.LoadAssetAtPath<MapCatalog>(MapCatalogPath) == null || challenges == null ||
+                    challenges.Challenges.Any(c => c != null && c.thumbnail == null)) // e.g. thumbnails are new
                 {
                     Rebuild();
                 }
@@ -209,7 +210,13 @@ namespace Blocks.Gameplay.Core
                     continue;
                 }
 
-                entries.Add(new ChallengeCatalog.Entry { id = prefab.name, size = size, prefab = prefab });
+                entries.Add(new ChallengeCatalog.Entry
+                {
+                    id = prefab.name,
+                    size = size,
+                    prefab = prefab,
+                    thumbnail = ChallengeThumbnails.Ensure(prefab.name, prefab), // for the Practice Challenges list
+                });
             }
             return entries;
         }

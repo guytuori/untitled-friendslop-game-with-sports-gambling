@@ -237,7 +237,12 @@ namespace Blocks.Gameplay.Core
         /// <summary>Called by PlayerEndPoint on the touching player's own machine.</summary>
         public void ReportLocalPlayerFinished()
         {
-            if (PracticeMode.IsActive) return; // the end point does nothing in practice
+            if (PracticeMode.IsActive)
+            {
+                // Practice Map: the end point does nothing. Practice Challenges: stop the clock, ask "Retry?".
+                PracticeMode.ReportChallengeFinished();
+                return;
+            }
             if (!IsPlaying || LocalPlayerFinished) return;
             ReportFinishedRpc();
         }

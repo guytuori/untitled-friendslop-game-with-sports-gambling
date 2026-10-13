@@ -76,13 +76,17 @@ namespace Blocks.Gameplay.Core
         {
             m_Notify = notify;
             m_Bindings = InputBindingsStore.Load();
+            InputBindingsStore.Saved += ReloadBindings; // rebound mid-game (Esc > Settings > Change Keybindings)
             BuildTicker(root);
             BuildPhone(root);
             RefreshPhone();
         }
 
+        private void ReloadBindings() => m_Bindings = InputBindingsStore.Load();
+
         private void OnDestroy()
         {
+            InputBindingsStore.Saved -= ReloadBindings;
             Unsubscribe();
             m_Ticker?.RemoveFromHierarchy();
             m_PhoneViewport?.parent?.RemoveFromHierarchy();

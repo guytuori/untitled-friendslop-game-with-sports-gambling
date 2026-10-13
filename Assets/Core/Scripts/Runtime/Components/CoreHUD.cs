@@ -992,15 +992,18 @@ namespace Blocks.Gameplay.Core
         {
             if (m_BonusTimerContainer != null) m_BonusTimerContainer.style.display = DisplayStyle.None;
             if (m_RoundTimerCaption != null) m_RoundTimerCaption.text = "PRACTICE";
+            PracticeMode.StartRun();
             if (m_RoundTimerLabel == null) return;
 
-            float start = Time.time;
-            m_RoundTimerLabel.text = "0:00";
+            // Practice Challenges times runs to the tenth (and stops at the end point); Practice Map to the second.
+            bool tenths = PracticeMode.IsChallenge;
+            m_RoundTimerLabel.text = tenths ? "0:00.0" : "0:00";
             m_RoundTimerLabel.schedule.Execute(() =>
             {
-                int seconds = Mathf.FloorToInt(Time.time - start);
-                m_RoundTimerLabel.text = $"{seconds / 60}:{seconds % 60:00}";
-            }).Every(250);
+                float elapsed = PracticeMode.RunSeconds;
+                int seconds = Mathf.FloorToInt(elapsed);
+                m_RoundTimerLabel.text = tenths ? PracticeMode.FormatRunTime(elapsed) : $"{seconds / 60}:{seconds % 60:00}";
+            }).Every(tenths ? 100 : 250);
         }
 
         private void HandleRoundInfoChanged()

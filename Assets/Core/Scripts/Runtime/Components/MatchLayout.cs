@@ -126,7 +126,11 @@ namespace Blocks.Gameplay.Core
             }
 
             int[] picks;
-            if (PracticeMode.IsActive)
+            if (PracticeMode.IsChallenge)
+            {
+                picks = PickPracticeChallenge(sockets, ChallengeCatalog.Load(), PracticeMode.ChallengeId);
+            }
+            else if (PracticeMode.IsActive)
             {
                 // Practice Map is about the map itself: every hole gets the plain piece, no challenges.
                 picks = new int[sockets.Count];
@@ -148,12 +152,47 @@ namespace Blocks.Gameplay.Core
 
         private string ResolveMapId()
         {
+            if (PracticeMode.IsChallenge)
+            {
+                // Practice Challenges: the practice map for the chosen challenge's size.
+                ChallengeCatalog catalog = ChallengeCatalog.Load();
+                ChallengeCatalog.Entry entry = catalog != null ? catalog.Get(catalog.IndexOf(PracticeMode.ChallengeId)) : null;
+                return PracticeMode.MapForSize(entry != null ? entry.size : 16);
+            }
+
             if (FusionSessionService.HasInstance && FusionSessionService.Instance.InGame && !FusionSessionService.Instance.IsDevSession)
             {
                 string fromRules = FusionSessionService.Instance.SessionRules.MapPrefab;
                 if (!string.IsNullOrWhiteSpace(fromRules)) return fromRules.Trim();
             }
             return devMapPrefab;
+        }
+
+        /// <summary>
+        /// Practice Challenges: the chosen challenge goes in the first hole of its size; any other holes stay empty.
+        /// </summary>
+        private int[] PickPracticeChallenge(List<ChallengeSockets.Socket> sockets, ChallengeCatalog catalog, string challengeId)
+        {
+            var picks = new int[sockets.Count];
+            for (int i = 0; i < picks.Length; i++) picks[i] = -1;
+
+            int index = catalog != null ? catalog.IndexOf(challengeId) : -1;
+            ChallengeCatalog.Entry entry = catalog != null ? catalog.Get(index) : null;
+            if (entry == null)
+            {
+                Debug.LogError($"[MatchLayout] Practice challenge '{challengeId}' isn't in the ChallengeCatalog.", this);
+                return picks;
+            }
+
+            int hole = sockets.FindIndex(s => s.Size == entry.size);
+            if (hole < 0)
+            {
+                Debug.LogError($"[MatchLayout] The practice map has no {entry.size}x{entry.size} hole for '{entry.id}'.", this);
+                return picks;
+            }
+
+            picks[hole] = index;
+            return picks;
         }
 
         /// <summary>
@@ -202,6 +241,43 @@ namespace Blocks.Gameplay.Core
         {
             if (m_Built || !IsSpawned || !NetLayoutReady) return;
             Build();
+        }
+
+        /// <summary>
+        /// Practice Challenges' Change Challenge (master client - the only player): swaps in the newly chosen
+        /// challenge (<see cref="PracticeMode.ChallengeId"/>) without reloading the scene - and the practice map
+        /// too, if the new challenge is the other size. The old challenge (and map) are destroyed immediately,
+        /// so their spawn/end points and challenge zones are gone before anything looks for the new ones.
+        /// Raises <see cref="Built"/> again. False if this isn't a practice challenge session.
+        /// </summary>
+        public bool RebuildForPractice()
+        {
+            if (!PracticeMode.IsChallenge || !IsSpawned || !IsOwner) return false;
+
+            string mapId = ResolveMapId();
+
+            Transform oldChallenges = transform.Find("Challenges");
+            if (oldChallenges != null) DestroyImmediate(oldChallenges.gameObject);
+            if (m_MapInstance != null && !string.Equals(m_MapInstanceId, mapId, StringComparison.OrdinalIgnoreCase))
+            {
+                DestroyImmediate(m_MapInstance);
+                m_MapInstance = null;
+                m_MapInstanceId = null;
+            }
+
+            GameObject map = EnsureMapInstance(mapId);
+            if (map == null) return false;
+
+            List<ChallengeSockets.Socket> sockets = ChallengeSockets.FindSockets(map.transform);
+            int[] picks = PickPracticeChallenge(sockets, ChallengeCatalog.Load(), PracticeMode.ChallengeId);
+            int count = Mathf.Min(picks.Length, MaxSockets);
+            for (int i = 0; i < count; i++) NetPicks.Set(i, picks[i]);
+            NetSocketCount = count;
+            NetMapPrefab = mapId;
+
+            m_Built = false;
+            Build();
+            return true;
         }
 
         private void Build()

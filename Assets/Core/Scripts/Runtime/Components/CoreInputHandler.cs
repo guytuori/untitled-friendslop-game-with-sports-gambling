@@ -87,6 +87,19 @@ namespace Blocks.Gameplay.Core
             // the class summary's "Rebindable controls" note) - a no-op, falling back to this asset's
             // own defaults, if nothing's been saved yet.
             InputBindingOverridesStore.ApplySavedOverrides(m_InputActions.asset);
+            InputBindingsStore.Saved += ReloadBindingOverrides;
+        }
+
+        /// <summary>Keybindings were changed mid-game (Esc > Settings > Change Keybindings): use the new ones now.</summary>
+        private void ReloadBindingOverrides()
+        {
+            if (m_InputActions == null) return;
+            InputBindingOverridesStore.ApplySavedOverrides(m_InputActions.asset);
+        }
+
+        private void OnDestroy()
+        {
+            InputBindingsStore.Saved -= ReloadBindingOverrides;
         }
 
         public override void OnNetworkSpawn()

@@ -181,7 +181,6 @@ namespace Blocks.Gameplay.Core
             if (!IsOwner) return;
             
             UpdateCameraTargetRotation();
-            HandleSprintingStamina();
         }
 
         #endregion
@@ -201,7 +200,7 @@ namespace Blocks.Gameplay.Core
             if (!isEnabled && coreMovement != null)
             {
                 coreMovement.SetMoveInput(Vector2.zero);
-                coreMovement.SetSprintState(false);
+                // The walk toggle is kept: with no move input it does nothing, and it's still on afterwards.
             }
         }
 
@@ -221,8 +220,7 @@ namespace Blocks.Gameplay.Core
                 if (coreMovement != null)
                 {
                     coreMovement.SetMoveInput(Vector2.zero);
-                    coreMovement.SetSprintState(false);
-                    coreMovement.SetGrabState(false);
+                    coreMovement.SetGrabState(false); // the walk toggle is kept (see SetMovementInputEnabled)
                 }
             }
             else
@@ -248,22 +246,22 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        private void HandleSprint(bool isSprinting)
+        /// <summary>
+        /// Toggle Walk (the input asset's "Sprint" action - the walk/run speeds were swapped, so
+        /// CoreMovement.IsSprinting now means walking at sprintSpeed). Each press switches walking on or off;
+        /// letting go does nothing, and walking costs no stamina (and doesn't need any).
+        /// </summary>
+        private void HandleSprint(bool isPressed)
         {
-            if (!CanMove) return;
+            if (!isPressed || !CanMove) return;
 
-            if (coreStats == null || coreMovement == null)
+            if (coreMovement == null)
             {
-                Debug.LogWarning("[CorePlayerManager] coreStats or coreMovement is null in HandleSprint");
+                Debug.LogWarning("[CorePlayerManager] coreMovement is null in HandleSprint");
                 return;
             }
 
-            if (isSprinting && coreStats.GetCurrentValue(StatKeys.Stamina) < 1f)
-            {
-                coreMovement.SetSprintState(false);
-                return;
-            }
-            coreMovement.SetSprintState(isSprinting);
+            coreMovement.SetSprintState(!coreMovement.IsSprinting);
         }
 
         private void HandleGrab(bool isHeld)
@@ -458,29 +456,6 @@ namespace Blocks.Gameplay.Core
             if (coreMovement != null && coreCamera != null)
             {
                 coreMovement.SetTargetRotation(coreCamera.CurrentHorizontalLookAngle);
-            }
-        }
-
-        private void HandleSprintingStamina()
-        {
-            if (coreMovement == null)
-            {
-                Debug.LogWarning("[CorePlayerManager] coreMovement is null in HandleSprintingStamina");
-                return;
-            }
-
-            if (coreStats == null)
-            {
-                Debug.LogWarning("[CorePlayerManager] coreStats is null in HandleSprintingStamina");
-                return;
-            }
-
-            if (!coreMovement.IsSprinting || coreMovement.CurrentSpeed <= 0.1f || !coreMovement.IsGrounded) return;
-
-            float staminaToConsume = CoreMovement.GetAbilityStaminaCost<WalkAbility>() * Time.deltaTime;
-            if (!coreStats.TryConsumeStat(StatKeys.Stamina, staminaToConsume, OwnerClientId))
-            {
-                coreMovement.SetSprintState(false);
             }
         }
 

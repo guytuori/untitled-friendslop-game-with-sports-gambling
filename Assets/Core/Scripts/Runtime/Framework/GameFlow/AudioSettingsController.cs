@@ -140,6 +140,7 @@ namespace Blocks.Gameplay.Core
 
             VisualElement root = GetComponent<UIDocument>().rootVisualElement;
             BuildUI(root);
+            SettingsOverlay.PrepareIfOverlay(this, GetComponent<UIDocument>()); // opened mid-game from Esc > Settings
         }
 
         private static AudioSettingsData CloneSettings(AudioSettingsData source)
@@ -670,6 +671,7 @@ namespace Blocks.Gameplay.Core
         private void OnBackClicked()
         {
             if (m_EditingSlider != null) return; // don't leave mid-edit, see class summary
+            if (SettingsOverlay.TryClose(this)) return; // in a match: back to the Escape menu
             SceneManager.LoadScene(settingsSceneName);
         }
     }

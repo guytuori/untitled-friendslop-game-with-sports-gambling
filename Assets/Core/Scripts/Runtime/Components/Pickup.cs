@@ -103,6 +103,17 @@ namespace Blocks.Gameplay.Core
             if (m_Visual != null) m_Visual.rotation = rotation;
         }
 
+        /// <summary>Brings a collected pickup back (Practice Challenges' quick Retry).</summary>
+        internal void Show()
+        {
+            Collected = false;
+            m_PopStart = -1f;
+            if (m_Visual == null) return;
+            m_Visual.localScale = Vector3.one * m_BaseScale;
+            m_Visual.position = Center;
+            m_Visual.gameObject.SetActive(true);
+        }
+
         /// <summary>Hides the pickup with a quick pop (or straight away if <paramref name="animate"/> is false).</summary>
         internal void Hide(bool animate)
         {

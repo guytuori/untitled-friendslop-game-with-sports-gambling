@@ -22,11 +22,21 @@ namespace Blocks.Gameplay.Core
     ///
     /// Quit to Main Menu and Quit Game ask "Are you sure?" first. No is focused by default and Yes stays
     /// disabled for <see cref="ConfirmDelaySeconds"/> seconds, so a mashed button can't quit by accident.
+    ///
+    /// PRACTICE CHALLENGES (<see cref="PracticeMode.IsChallenge"/>) has its own menu: Retry, Change Challenge,
+    /// Settings and Return to Menu (back to the Single Player menu), none of which ask first. Reaching the
+    /// end point opens the "Retry Challenge?" box (with the run's time): Retry, Return to Menu or Change
+    /// Challenge - B / Esc / Start don't close it. Change Challenge shows the <see cref="ChallengePicker"/>
+    /// list; B / Esc / Back there returns to whichever box opened it. Retry is instant - the player goes
+    /// back to the spawn point and the course resets in place (<see cref="PracticeRetry"/>). Picking a
+    /// challenge swaps it in place too (and the practice map, for the other size) - only if that can't be
+    /// done does it start a fresh run through the Single Player menu (see <see cref="Restart"/>).
     /// </summary>
     public class InGameMenu : MonoBehaviour
     {
         public const float ConfirmDelaySeconds = 2f;
         private const string MainMenuSceneName = "MainMenu";
+        private const string SinglePlayerSceneName = "SinglePlayer";
 
         /// <summary>True while any player's Escape menu is open on this machine (there's only ever one).</summary>
         public static bool IsOpen { get; private set; }
@@ -45,6 +55,23 @@ namespace Blocks.Gameplay.Core
         private bool m_Leaving;
         private float m_LastBackTime = float.NegativeInfinity;
 
+        // Settings (Esc > Settings): a list of the settings screens, each opened over the game (SettingsOverlay).
+        private VisualElement m_HudRoot;
+        private VisualElement m_SettingsPanel;
+        private Button m_SettingsFirstButton;
+        private Button m_LastSettingsButton;
+        private bool m_FinishPending; // reached the end point while a settings screen was up
+
+        // Practice Challenges only.
+        private bool m_ChallengeMode;
+        private VisualElement m_FinishPanel;
+        private Label m_FinishTimeLabel;
+        private Label m_FinishStatusLabel;
+        private Button m_FinishFirstButton;
+        private ChallengePicker m_Picker;
+        private bool m_PickerFromFinish;
+        private bool m_Finished;
+
         /// <summary>Ignore back presses this soon after opening (the press that opened the menu).</summary>
         private const float OpenGraceSeconds = 0.2f;
 
@@ -54,13 +81,19 @@ namespace Blocks.Gameplay.Core
             // Same Nintendo-style A = confirm / B = back swap every menu screen applies (see GamepadUIBindingFix).
             GamepadUIBindingFix.Apply();
 
+            m_ChallengeMode = PracticeMode.IsChallenge;
+            m_HudRoot = root;
             BuildUI(root);
             CoreInputHandler.MenuPressed += HandleMenuPressed;
+            SettingsOverlay.Closed += HandleSettingsClosed;
+            if (m_ChallengeMode) PracticeMode.ChallengeFinished += ShowFinished;
         }
 
         private void OnDestroy()
         {
             CoreInputHandler.MenuPressed -= HandleMenuPressed;
+            PracticeMode.ChallengeFinished -= ShowFinished;
+            SettingsOverlay.Closed -= HandleSettingsClosed;
             if (IsOpen)
             {
                 IsOpen = false;
@@ -98,10 +131,20 @@ namespace Blocks.Gameplay.Core
 
             // Main menu panel
             m_MenuPanel = MakePanel("MENU");
-            m_FirstButton = AddButton(m_MenuPanel, "Settings", OnSettings);
-            AddButton(m_MenuPanel, "Quit to Main Menu", () => Confirm("Quit to the main menu?", QuitToMainMenu));
-            AddButton(m_MenuPanel, "Quit Game", () => Confirm("Quit the game?", QuitGame));
-            AddButton(m_MenuPanel, "Return to Game", Close);
+            if (m_ChallengeMode)
+            {
+                m_FirstButton = AddButton(m_MenuPanel, "Retry", Retry);
+                AddButton(m_MenuPanel, "Change Challenge", () => OpenPicker(fromFinish: false));
+                AddButton(m_MenuPanel, "Settings", OnSettings);
+                AddButton(m_MenuPanel, "Return to Menu", () => LeaveTo(SinglePlayerSceneName, m_StatusLabel));
+            }
+            else
+            {
+                m_FirstButton = AddButton(m_MenuPanel, "Settings", OnSettings);
+                AddButton(m_MenuPanel, "Quit to Main Menu", () => Confirm("Quit to the main menu?", QuitToMainMenu));
+                AddButton(m_MenuPanel, "Quit Game", () => Confirm("Quit the game?", QuitGame));
+                AddButton(m_MenuPanel, "Return to Game", Close);
+            }
 
             m_StatusLabel = new Label("");
             m_StatusLabel.style.color = new Color(0.85f, 0.85f, 0.85f);
@@ -132,6 +175,51 @@ namespace Blocks.Gameplay.Core
             m_ConfirmPanel.Add(buttonRow);
             m_ConfirmPanel.style.display = DisplayStyle.None;
             m_Overlay.Add(m_ConfirmPanel);
+
+            // Settings list
+            m_SettingsPanel = MakePanel("SETTINGS");
+            Button graphics = null, audio = null, keys = null;
+            graphics = AddButton(m_SettingsPanel, "Graphics", () => OpenSettingsScreen("GraphicsSettings", graphics));
+            audio = AddButton(m_SettingsPanel, "Audio", () => OpenSettingsScreen("AudioSettings", audio));
+            keys = AddButton(m_SettingsPanel, "Change Keybindings", () =>
+            {
+                ChangeKeybindingsController.EnteredViaGamepad = GamepadButtonPressedThisFrame(); // gamepad rows if chosen with a gamepad
+                OpenSettingsScreen("ChangeKeybindings", keys);
+            });
+            AddButton(m_SettingsPanel, "Back", CloseSettingsList);
+            m_SettingsFirstButton = graphics;
+            m_SettingsPanel.style.display = DisplayStyle.None;
+            m_Overlay.Add(m_SettingsPanel);
+
+            if (m_ChallengeMode) BuildChallengeUI();
+        }
+
+        /// <summary>Practice Challenges: the "Retry Challenge?" box and the challenge list.</summary>
+        private void BuildChallengeUI()
+        {
+            m_FinishPanel = MakePanel("Retry Challenge?");
+            m_FinishTimeLabel = new Label("");
+            m_FinishTimeLabel.style.color = new Color(1f, 0.85f, 0.35f);
+            m_FinishTimeLabel.style.fontSize = 20;
+            m_FinishTimeLabel.style.marginBottom = 12;
+            m_FinishTimeLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            m_FinishPanel.Add(m_FinishTimeLabel);
+
+            m_FinishFirstButton = AddButton(m_FinishPanel, "Retry", Retry);
+            AddButton(m_FinishPanel, "Return to Menu", () => LeaveTo(SinglePlayerSceneName, m_FinishStatusLabel));
+            AddButton(m_FinishPanel, "Change Challenge", () => OpenPicker(fromFinish: true));
+
+            m_FinishStatusLabel = new Label("");
+            m_FinishStatusLabel.style.color = new Color(0.85f, 0.85f, 0.85f);
+            m_FinishStatusLabel.style.fontSize = 14;
+            m_FinishStatusLabel.style.marginTop = 8;
+            m_FinishStatusLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            m_FinishPanel.Add(m_FinishStatusLabel);
+            m_FinishPanel.style.display = DisplayStyle.None;
+            m_Overlay.Add(m_FinishPanel);
+
+            m_Picker = new ChallengePicker(m_Overlay, null, null, PickChallenge, ClosePicker);
+            m_Picker.Overlay.style.backgroundColor = Color.clear; // the menu's own dimming is already behind it
         }
 
         private static VisualElement MakePanel(string title)
@@ -170,6 +258,8 @@ namespace Blocks.Gameplay.Core
         private void HandleMenuPressed(InputControl control)
         {
             if (m_Leaving) return;
+            if (m_Finished || (m_Picker != null && m_Picker.IsOpen)) return; // pick something (or B / Esc out of the list)
+            if (SettingsOverlay.IsOpen) return; // a settings screen is up - its own Back closes it
 
             if (!IsOpen)
             {
@@ -194,6 +284,7 @@ namespace Blocks.Gameplay.Core
 
             m_StatusLabel.text = "";
             m_ConfirmPanel.style.display = DisplayStyle.None;
+            m_SettingsPanel.style.display = DisplayStyle.None;
             m_MenuPanel.style.display = DisplayStyle.Flex;
             m_Overlay.style.display = DisplayStyle.Flex;
             MenuUI.FocusFirst(m_FirstButton);
@@ -223,6 +314,7 @@ namespace Blocks.Gameplay.Core
             if (Time.unscaledTime - m_OpenedTime < OpenGraceSeconds) return;
 
             bool back = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+            bool settingsScreenOpen = SettingsOverlay.IsOpen;
             if (!back && Application.isFocused)
             {
                 foreach (Gamepad pad in Gamepad.all)
@@ -233,6 +325,13 @@ namespace Blocks.Gameplay.Core
                         break;
                     }
                 }
+            }
+
+            if (settingsScreenOpen)
+            {
+                // The settings screen handles its own B / Esc; make sure it gets one if the UI's Cancel doesn't arrive.
+                if (back) StartCoroutine(ForwardBackToSettingsScreen(Time.frameCount));
+                return;
             }
 
             if (back)
@@ -271,19 +370,188 @@ namespace Blocks.Gameplay.Core
 
         private void Back()
         {
-            if (m_ConfirmPanel.style.display == DisplayStyle.Flex) CloseConfirm();
+            if (m_Leaving) return;
+            if (m_Picker != null && m_Picker.IsOpen) ClosePicker();
+            else if (m_Finished) return; // the "Retry Challenge?" box stays until something's picked
+            else if (m_ConfirmPanel.style.display == DisplayStyle.Flex) CloseConfirm();
+            else if (m_SettingsPanel.style.display == DisplayStyle.Flex) CloseSettingsList();
             else Close();
+        }
+
+        // =====================================================================================
+        // Settings (Graphics / Audio / Change Keybindings, over the game)
+        // =====================================================================================
+
+        private void OnSettings()
+        {
+            m_StatusLabel.text = "";
+            m_MenuPanel.style.display = DisplayStyle.None;
+            m_SettingsPanel.style.display = DisplayStyle.Flex;
+            MenuUI.FocusFirst(m_SettingsFirstButton);
+        }
+
+        private void CloseSettingsList()
+        {
+            m_SettingsPanel.style.display = DisplayStyle.None;
+            m_MenuPanel.style.display = DisplayStyle.Flex;
+            MenuUI.FocusFirst(m_FirstButton);
+        }
+
+        /// <summary>
+        /// Shows the menu's own settings screen (<paramref name="sceneName"/>) over the game - the same scene as
+        /// from the main menu (<see cref="SettingsOverlay"/>). The HUD hides meanwhile; its Back comes back here.
+        /// The game keeps running and gameplay input stays blocked, as with the rest of this menu.
+        /// </summary>
+        private void OpenSettingsScreen(string sceneName, Button from)
+        {
+            if (SettingsOverlay.IsOpen || m_Leaving) return;
+            m_LastSettingsButton = from;
+            m_Overlay.panel?.focusController?.focusedElement?.Blur();
+            m_HudRoot.style.display = DisplayStyle.None;
+            SettingsOverlay.Open(sceneName);
+        }
+
+        private void HandleSettingsClosed()
+        {
+            if (m_HudRoot == null) return;
+            m_HudRoot.style.display = DisplayStyle.Flex;
+            if (!IsOpen) return;
+            m_MenuPanel.style.display = DisplayStyle.None;
+            m_SettingsPanel.style.display = DisplayStyle.Flex;
+            m_Overlay.style.display = DisplayStyle.Flex;
+            MenuUI.FocusFirst(m_LastSettingsButton != null ? m_LastSettingsButton : m_SettingsFirstButton);
+
+            if (m_FinishPending)
+            {
+                m_FinishPending = false;
+                m_SettingsPanel.style.display = DisplayStyle.None;
+                ShowFinished();
+            }
+        }
+
+        /// <summary>Two frames on: if the settings screen didn't get that B / Esc as a UI Cancel itself, send it one.</summary>
+        private IEnumerator ForwardBackToSettingsScreen(int pressFrame)
+        {
+            yield return null;
+            yield return null;
+            if (SettingsOverlay.IsOpen && SettingsOverlay.LastCancelFrame < pressFrame) SettingsOverlay.SendCancel();
+        }
+
+        private static bool GamepadButtonPressedThisFrame()
+        {
+            Gamepad pad = Gamepad.current;
+            return pad != null && (pad.buttonSouth.wasPressedThisFrame || pad.buttonEast.wasPressedThisFrame ||
+                                   pad.buttonNorth.wasPressedThisFrame || pad.buttonWest.wasPressedThisFrame);
+        }
+
+        // =====================================================================================
+        // Practice Challenges
+        // =====================================================================================
+
+        /// <summary>The end point was reached: freeze the player and ask "Retry Challenge?".</summary>
+        private void ShowFinished()
+        {
+            if (m_Leaving || m_FinishPanel == null) return;
+            if (SettingsOverlay.IsOpen) { m_FinishPending = true; return; } // shown once the settings screen closes
+            m_Finished = true;
+
+            IsOpen = true;
+            m_OpenedTime = Time.unscaledTime;
+            CoreInputHandler.SetGameplayInputBlocked(true);
+            UnityEngine.Cursor.lockState = CursorLockMode.None;
+            UnityEngine.Cursor.visible = true;
+
+            StopYesDelay();
+            m_ConfirmAction = null;
+            m_Picker.Close();
+            m_MenuPanel.style.display = DisplayStyle.None;
+            m_ConfirmPanel.style.display = DisplayStyle.None;
+            m_FinishTimeLabel.text = Loc.F("Time: {0}", PracticeMode.FormatRunTime(PracticeMode.RunSeconds));
+            m_FinishStatusLabel.text = "";
+            m_FinishPanel.style.display = DisplayStyle.Flex;
+            m_Overlay.style.display = DisplayStyle.Flex;
+            MenuUI.FocusFirst(m_FinishFirstButton);
+        }
+
+        private void OpenPicker(bool fromFinish)
+        {
+            if (m_Leaving) return;
+            m_PickerFromFinish = fromFinish;
+            m_MenuPanel.style.display = DisplayStyle.None;
+            m_FinishPanel.style.display = DisplayStyle.None;
+            m_Picker.Open(PracticeMode.ChallengeId);
+        }
+
+        private void ClosePicker()
+        {
+            if (m_Leaving) return;
+            m_Picker.Close();
+            if (m_PickerFromFinish)
+            {
+                m_FinishPanel.style.display = DisplayStyle.Flex;
+                MenuUI.FocusFirst(m_FinishFirstButton);
+            }
+            else
+            {
+                m_MenuPanel.style.display = DisplayStyle.Flex;
+                MenuUI.FocusFirst(m_FirstButton);
+            }
+        }
+
+        /// <summary>Quick retry: straight back to the start of the same run (<see cref="PracticeRetry"/>), no loading.</summary>
+        private void Retry()
+        {
+            if (m_Leaving) return;
+            if (!PracticeRetry.Run())
+            {
+                // Nothing to reset in place (e.g. the player hasn't spawned yet): start a fresh run instead.
+                Restart(null, m_Finished ? m_FinishStatusLabel : m_StatusLabel);
+                return;
+            }
+
+            m_Finished = false;
+            m_Picker.Close();
+            m_FinishPanel.style.display = DisplayStyle.None;
+            Close(); // back to the game: input unblocked, cursor locked
+        }
+
+        private void PickChallenge(ChallengeCatalog.Entry entry)
+        {
+            if (entry == null) return;
+            if (m_Leaving) return;
+            if (PracticeRetry.ChangeChallenge(entry.id))
+            {
+                // Swapped in place - straight into the new challenge.
+                m_Finished = false;
+                m_Picker.Close();
+                m_FinishPanel.style.display = DisplayStyle.None;
+                Close();
+                return;
+            }
+
+            // Couldn't swap in place: start a fresh run instead.
+            m_Picker.SetBusy(true, "Loading...");
+            Restart(entry.id, null);
+        }
+
+        /// <summary>
+        /// Starts a fresh practice run of <paramref name="challengeId"/> (or the same challenge again): leaves this
+        /// session and goes back through the Single Player menu, which starts the new one straight away
+        /// (<see cref="SinglePlayerController.QueuePracticeChallenge"/>) - exactly the path a run from the menu
+        /// takes. (Reloading the gameplay scene inside the running session left a stale player behind.)
+        /// </summary>
+        private void Restart(string challengeId, Label statusLabel)
+        {
+            if (m_Leaving) return;
+            string id = !string.IsNullOrEmpty(challengeId) ? challengeId : PracticeMode.ChallengeId;
+            SinglePlayerController.QueuePracticeChallenge(id);
+            LeaveTo(SinglePlayerSceneName, statusLabel);
+            if (statusLabel != null) statusLabel.text = Loc.T("Loading...");
         }
 
         // =====================================================================================
         // Buttons
         // =====================================================================================
-
-        private void OnSettings()
-        {
-            // Placeholder - the in-game settings screen comes later.
-            m_StatusLabel.text = "Settings aren't available in a match yet.";
-        }
 
         private void Confirm(string question, System.Action onYes)
         {
@@ -341,14 +609,21 @@ namespace Blocks.Gameplay.Core
             MenuUI.FocusFirst(m_FirstButton);
         }
 
-        private async void QuitToMainMenu()
+        private void QuitToMainMenu()
+        {
+            if (m_Leaving) return;
+            StopYesDelay();
+            m_YesButton.SetEnabled(false);
+            m_NoButton.SetEnabled(false);
+            LeaveTo(MainMenuSceneName, m_ConfirmLabel);
+        }
+
+        /// <summary>Leaves the session and loads <paramref name="sceneName"/> (the main menu, or the Single Player menu from practice).</summary>
+        private async void LeaveTo(string sceneName, Label statusLabel)
         {
             if (m_Leaving) return;
             m_Leaving = true;
-            StopYesDelay();
-            m_ConfirmLabel.text = "Leaving...";
-            m_YesButton.SetEnabled(false);
-            m_NoButton.SetEnabled(false);
+            if (statusLabel != null) statusLabel.text = Loc.T("Leaving...");
 
             IsOpen = false;
             CoreInputHandler.SetGameplayInputBlocked(false);
@@ -359,7 +634,7 @@ namespace Blocks.Gameplay.Core
             {
                 await FusionSessionService.Instance.LeaveGameAsync();
             }
-            SceneManager.LoadScene(MainMenuSceneName);
+            SceneManager.LoadScene(sceneName);
         }
 
         private void QuitGame()

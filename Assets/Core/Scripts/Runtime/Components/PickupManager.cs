@@ -189,6 +189,45 @@ namespace Blocks.Gameplay.Core
 
         #endregion
 
+        #region Practice
+
+        /// <summary>
+        /// Practice Challenges' quick Retry (master client): every pickup comes back and nobody has collected
+        /// any. (The player's score is reset separately.)
+        /// </summary>
+        public void ResetForPracticeRetry()
+        {
+            if (!IsSpawned || !IsOwner) return;
+
+            for (int word = 0; word < BitWords; word++) NetCollected.Set(word, 0);
+            NetCollectedCount = 0;
+            m_AppliedCount = 0;
+            s_CollectedByPlayer.Clear();
+            foreach (Pickup pickup in m_Pickups)
+            {
+                if (pickup != null) pickup.Show();
+            }
+        }
+
+        /// <summary>
+        /// Practice Challenges' Change Challenge: the map and challenge were swapped in place (see
+        /// MatchLayout.RebuildForPractice) - forget the old pickups and find the new ones.
+        /// </summary>
+        public void RescanForPractice()
+        {
+            if (!IsSpawned || !IsOwner) return;
+
+            for (int word = 0; word < BitWords; word++) NetCollected.Set(word, 0);
+            NetCollectedCount = 0;
+            s_CollectedByPlayer.Clear();
+            m_Pickups.Clear();
+            m_Registered = false;
+            m_AppliedCount = -1;
+            TryRegister();
+        }
+
+        #endregion
+
         #region Collecting
 
         private void CheckLocalPlayerTouch()

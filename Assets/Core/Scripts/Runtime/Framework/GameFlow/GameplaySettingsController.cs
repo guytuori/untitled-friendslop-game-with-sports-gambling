@@ -10,6 +10,8 @@ namespace Blocks.Gameplay.Core
     /// Restore Defaults / Save Changes / Back column as the other settings screens.
     ///   - LANGUAGE: dropdown of <see cref="Loc.Languages"/> (each in its own language). Picking one shows the
     ///     screen in it straight away; Back without saving puts the saved language back.
+    ///   - COLORBLIND MODE: Off / Protanopia / Deuteranopia / Tritanopia - a whole-screen color correction for
+    ///     the 3D world (<see cref="ColorblindFilter"/>), applied on Save Changes.
     ///   - SHOW DISPLAY NAMES: moved here from Change Profile. Off shows other players as "Player 1", ...
     ///   - MATURE LANGUAGE FILTER: on by default; bad words in player names show as *** (NameFilter.Mask).
     ///   - ARACHNOPHOBIA MODE / ARACHNOPHILIA MODE: off by default, and never both on - ticking one unticks
@@ -18,8 +20,8 @@ namespace Blocks.Gameplay.Core
     /// <see cref="GameplaySettings"/>.
     ///
     /// Controls follow the Graphics screen: Up/Down move between rows, Right jumps to Save Changes and Left
-    /// from the buttons comes back to Language. A on the dropdown enters edit mode (Up/Down change the
-    /// language, A keeps it, B undoes it); A on a checkbox ticks it. B/Esc = Back.
+    /// from the buttons comes back to Language. A on a dropdown enters edit mode (Up/Down change the
+    /// choice, A keeps it, B undoes it); A on a checkbox ticks it. B/Esc = Back.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class GameplaySettingsController : MonoBehaviour
@@ -46,14 +48,17 @@ namespace Blocks.Gameplay.Core
         private string m_SavedLanguage;
 
         private DropdownField m_LanguageDropdown;
+        private DropdownField m_ColorblindDropdown;
+        private readonly Dictionary<DropdownField, System.Action<int>> m_DropdownChanged = new Dictionary<DropdownField, System.Action<int>>();
         private Toggle m_ShowNamesToggle;
         private Toggle m_FilterToggle;
         private Toggle m_PhobiaToggle;
         private Toggle m_PhiliaToggle;
         private readonly List<VisualElement> m_Rows = new List<VisualElement>();
 
-        private bool m_EditingLanguage;
+        private DropdownField m_EditingDropdown; // the dropdown in edit mode (A pressed on it), if any
         private int m_IndexBeforeEdit;
+        private bool Editing => m_EditingDropdown != null;
 
         private Button m_RestoreDefaultsButton;
         private Button m_SaveButton;
@@ -78,7 +83,7 @@ namespace Blocks.Gameplay.Core
 
             root.RegisterCallback<NavigationCancelEvent>(evt =>
             {
-                if (m_EditingLanguage) return; // the dropdown undoes its edit first
+                if (Editing) return; // the dropdown undoes its edit first
                 evt.StopPropagation();
                 MenuUI.PlaySound(cancelSound);
                 OnBackClicked();
@@ -95,23 +100,13 @@ namespace Blocks.Gameplay.Core
             // LANGUAGE
             var languageNames = new List<string>();
             foreach (Loc.Language language in Loc.Languages) languageNames.Add(language.NativeName);
-            VisualElement languageRow = MakeRow(column, "LANGUAGE");
-            m_LanguageDropdown = new DropdownField(languageNames, Mathf.Max(0, Loc.IndexOf(m_Settings.Language)));
-            m_LanguageDropdown.style.width = 240;
-            m_LanguageDropdown.style.flexShrink = 0;
-            SetHighlight(m_LanguageDropdown, false);
-            m_LanguageDropdown.RegisterCallback<FocusInEvent>(_ => SetHighlight(m_LanguageDropdown, true));
-            m_LanguageDropdown.RegisterCallback<FocusOutEvent>(_ => SetHighlight(m_LanguageDropdown, false));
-            m_LanguageDropdown.RegisterCallback<NavigationSubmitEvent>(OnLanguageSubmit, TrickleDown.TrickleDown);
-            m_LanguageDropdown.RegisterCallback<NavigationCancelEvent>(OnLanguageCancel, TrickleDown.TrickleDown);
-            m_LanguageDropdown.RegisterCallback<NavigationMoveEvent>(OnLanguageNavigationMove, TrickleDown.TrickleDown);
-            m_LanguageDropdown.RegisterValueChangedCallback(evt =>
-            {
-                if (evt.newValue == evt.previousValue) return;
-                SetLanguage(m_LanguageDropdown.index);
-            });
-            languageRow.Add(m_LanguageDropdown);
-            m_Rows.Add(m_LanguageDropdown);
+            m_LanguageDropdown = AddDropdownRow(column, "LANGUAGE", null, languageNames,
+                Mathf.Max(0, Loc.IndexOf(m_Settings.Language)), SetLanguage);
+
+            // COLORBLIND MODE
+            m_ColorblindDropdown = AddDropdownRow(column, "COLORBLIND MODE", "Adjusts the game's colors",
+                new List<string>(ColorblindFilter.ModeNames), m_Settings.ColorblindMode,
+                index => m_Settings.ColorblindMode = index);
 
             // Checkboxes
             m_ShowNamesToggle = AddToggleRow(column, "SHOW DISPLAY NAMES", "Off shows other players as Player 1, Player 2, ...",
@@ -154,6 +149,41 @@ namespace Blocks.Gameplay.Core
 
             m_LanguageDropdown.Focus();
             SetHighlight(m_LanguageDropdown, true);
+        }
+
+        /// <summary>A labelled dropdown row with A-to-edit behaviour; <paramref name="onChanged"/> gets the new index.</summary>
+        private DropdownField AddDropdownRow(VisualElement column, string label, string hint, List<string> choices, int index, System.Action<int> onChanged)
+        {
+            VisualElement row = MakeRow(column, label);
+            var dropdown = new DropdownField(choices, Mathf.Clamp(index, 0, choices.Count - 1));
+            dropdown.style.width = 240;
+            dropdown.style.flexShrink = 0;
+            SetHighlight(dropdown, false);
+            dropdown.RegisterCallback<FocusInEvent>(_ => SetHighlight(dropdown, true));
+            dropdown.RegisterCallback<FocusOutEvent>(_ => SetHighlight(dropdown, false));
+            dropdown.RegisterCallback<NavigationSubmitEvent>(evt => OnDropdownSubmit(dropdown, evt), TrickleDown.TrickleDown);
+            dropdown.RegisterCallback<NavigationCancelEvent>(evt => OnDropdownCancel(dropdown, evt), TrickleDown.TrickleDown);
+            dropdown.RegisterCallback<NavigationMoveEvent>(evt => OnDropdownNavigationMove(dropdown, evt), TrickleDown.TrickleDown);
+            dropdown.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.newValue == evt.previousValue) return;
+                onChanged(dropdown.index);
+                ClearStatus();
+            });
+            m_DropdownChanged[dropdown] = onChanged;
+            row.Add(dropdown);
+
+            if (!string.IsNullOrEmpty(hint))
+            {
+                var hintLabel = new Label(hint);
+                hintLabel.style.color = HintText;
+                hintLabel.style.fontSize = 14;
+                hintLabel.style.marginLeft = 16;
+                row.Add(hintLabel);
+            }
+
+            m_Rows.Add(dropdown);
+            return dropdown;
         }
 
         private static VisualElement MakeRow(VisualElement column, string label)
@@ -218,7 +248,7 @@ namespace Blocks.Gameplay.Core
         }
 
         // =====================================================================================
-        // Language dropdown (edit mode, like the Graphics screen's dropdowns)
+        // Dropdowns (edit mode, like the Graphics screen's dropdowns)
         // =====================================================================================
 
         private void SetLanguage(int index)
@@ -226,58 +256,56 @@ namespace Blocks.Gameplay.Core
             if (index < 0 || index >= Loc.Languages.Length) return;
             m_Settings.Language = Loc.Languages[index].Code;
             Loc.SetLanguage(m_Settings.Language); // preview straight away; Back undoes it unless saved
-            ClearStatus();
         }
 
-        private void OnLanguageSubmit(NavigationSubmitEvent evt)
+        private void OnDropdownSubmit(DropdownField dropdown, NavigationSubmitEvent evt)
         {
-            if (m_EditingLanguage)
+            if (m_EditingDropdown == dropdown)
             {
-                m_EditingLanguage = false;
-                SetHighlight(m_LanguageDropdown, true);
-                MenuUI.PlaySound(selectSound);
+                m_EditingDropdown = null;
+                SetHighlight(dropdown, true);
             }
             else
             {
-                m_EditingLanguage = true;
-                m_IndexBeforeEdit = m_LanguageDropdown.index;
-                m_LanguageDropdown.style.backgroundColor = EditingBackground;
-                MenuUI.PlaySound(selectSound);
+                m_EditingDropdown = dropdown;
+                m_IndexBeforeEdit = dropdown.index;
+                dropdown.style.backgroundColor = EditingBackground;
             }
+            MenuUI.PlaySound(selectSound);
             evt.PreventDefault();
             evt.StopPropagation();
         }
 
-        private void OnLanguageCancel(NavigationCancelEvent evt)
+        private void OnDropdownCancel(DropdownField dropdown, NavigationCancelEvent evt)
         {
-            if (!m_EditingLanguage) return;
+            if (m_EditingDropdown != dropdown) return;
 
-            m_EditingLanguage = false;
-            if (m_LanguageDropdown.index != m_IndexBeforeEdit)
+            m_EditingDropdown = null;
+            if (dropdown.index != m_IndexBeforeEdit)
             {
-                m_LanguageDropdown.SetValueWithoutNotify(m_LanguageDropdown.choices[m_IndexBeforeEdit]);
-                SetLanguage(m_IndexBeforeEdit);
+                dropdown.SetValueWithoutNotify(dropdown.choices[m_IndexBeforeEdit]);
+                m_DropdownChanged[dropdown](m_IndexBeforeEdit);
             }
-            SetHighlight(m_LanguageDropdown, true);
+            SetHighlight(dropdown, true);
             MenuUI.PlaySound(cancelSound);
             evt.PreventDefault();
             evt.StopPropagation();
         }
 
-        private void OnLanguageNavigationMove(NavigationMoveEvent evt)
+        private void OnDropdownNavigationMove(DropdownField dropdown, NavigationMoveEvent evt)
         {
-            if (m_EditingLanguage)
+            if (m_EditingDropdown == dropdown)
             {
                 if (evt.direction == NavigationMoveEvent.Direction.Up || evt.direction == NavigationMoveEvent.Direction.Down)
                 {
-                    int count = m_LanguageDropdown.choices.Count;
+                    int count = dropdown.choices.Count;
                     int step = evt.direction == NavigationMoveEvent.Direction.Down ? 1 : -1;
-                    m_LanguageDropdown.index = ((m_LanguageDropdown.index + step) % count + count) % count;
+                    dropdown.index = ((dropdown.index + step) % count + count) % count;
                 }
                 Suppress(evt);
                 return;
             }
-            OnRowNavigationMove(m_LanguageDropdown, evt);
+            OnRowNavigationMove(dropdown, evt);
         }
 
         // =====================================================================================
@@ -338,11 +366,12 @@ namespace Blocks.Gameplay.Core
 
         private void OnRestoreDefaultsClicked()
         {
-            if (m_EditingLanguage) return;
+            if (Editing) return;
 
             m_Settings = new GameplaySettingsData();
             m_LanguageDropdown.SetValueWithoutNotify(m_LanguageDropdown.choices[Mathf.Max(0, Loc.IndexOf(m_Settings.Language))]);
             Loc.SetLanguage(m_Settings.Language);
+            m_ColorblindDropdown.SetValueWithoutNotify(m_ColorblindDropdown.choices[m_Settings.ColorblindMode]);
             m_ShowNamesToggle.SetValueWithoutNotify(m_Settings.ShowDisplayNames);
             m_FilterToggle.SetValueWithoutNotify(m_Settings.MatureLanguageFilter);
             m_PhobiaToggle.SetValueWithoutNotify(m_Settings.ArachnophobiaMode);
@@ -352,7 +381,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnSaveChangesClicked()
         {
-            if (m_EditingLanguage) return;
+            if (Editing) return;
 
             // Load what's on disk so the other screens' settings in settings.json are kept.
             InputBindingsData data = InputBindingsStore.Load();
@@ -366,7 +395,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnBackClicked()
         {
-            if (m_EditingLanguage) return;
+            if (Editing) return;
 
             // An unsaved language preview goes back to the saved language.
             if (Loc.CurrentCode != m_SavedLanguage) Loc.SetLanguage(m_SavedLanguage);

@@ -28,3 +28,13 @@ MonoBehaviour:
     sockets16: 6
     sockets32: 2
     skybox: {fileID: 0}
+  - id: Practice16
+    prefab: {fileID: 8908256594952916965, guid: b173e0ba5d70ad3438bd8e1de36e48b6, type: 3}
+    sockets16: 1
+    sockets32: 0
+    skybox: {fileID: 0}
+  - id: Practice32
+    prefab: {fileID: 1380240548861405174, guid: 3db314609adf4f44f85d8db1152ed42b, type: 3}
+    sockets16: 0
+    sockets32: 1
+    skybox: {fileID: 0}

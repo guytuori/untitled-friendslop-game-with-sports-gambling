@@ -377,6 +377,32 @@ namespace Blocks.Gameplay.Core
 
         #endregion
 
+        #region Practice
+
+        /// <summary>
+        /// Practice Challenges' quick Retry (master client - the only player in a practice session): every
+        /// challenge becomes claimable again and any attempt in progress is dropped, as if the run had never
+        /// started. Players mid-attempt are told they've left their challenge.
+        /// </summary>
+        public void ResetForPracticeRetry()
+        {
+            if (!IsOwner) return;
+
+            foreach (ulong playerId in new List<ulong>(m_RunningAttemptsByOwner.Keys))
+            {
+                PlayerChallengeStateRpc((int)playerId, false);
+            }
+            m_RunningAttemptsByOwner.Clear();
+
+            EnsureZones();
+            foreach (ChallengeZone zone in m_Zones)
+            {
+                if (zone != null) zone.ResetForNewRound();
+            }
+        }
+
+        #endregion
+
         #region Zones
 
         /// <summary>
