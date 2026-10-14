@@ -23,6 +23,16 @@ namespace Blocks.Gameplay.Core
     /// Animation: the model's idle and walk clips (from the <see cref="DinosaurCatalog"/>), blended with a
     /// PlayableGraph on its own Animator - no controller asset needed. The walk speed is measured from the
     /// walk clip itself (how far a planted foot travels per cycle) so the feet don't slide.
+    ///
+    /// Habits - every 30-45 s (<see cref="HabitMinSeconds"/>-<see cref="HabitMaxSeconds"/>) it stops for a moment:
+    ///   - plant eaters graze: the neck and head bend down until the snout is near the ground (worked out
+    ///     from the bones each time, so it suits each species and slope), it tugs at the grass with a few
+    ///     shakes of the head, chews, and looks up again. There's no eating clip in the pack, so this is
+    ///     done on top of the idle animation, in LateUpdate;
+    ///   - the T-rex plays its Jump clip and roars (dinosaur.mp3) if this machine's player is within
+    ///     <see cref="RoarRange"/> - first turning on the spot to face that player (shuffling its feet);
+    ///   - the raptors play their Attack clip (sometimes twice).
+    /// Which one is decided by the model's name (<see cref="HabitFor"/>).
     /// </summary>
     public class DinosaurWander : MonoBehaviour
     {
@@ -37,7 +47,27 @@ namespace Blocks.Gameplay.Core
         private static readonly RaycastHit[] s_Hits = new RaycastHit[16];
         private static readonly Vector2[] s_Candidates = new Vector2[16]; // (yaw, preference) for TryStartWalk
 
-        private enum State { Idle, Walk }
+        /// <summary>Seconds between habits (grazing, the T-rex's roar, the raptors' lunge).</summary>
+        public const float HabitMinSeconds = 30f, HabitMaxSeconds = 45f;
+
+        /// <summary>The T-rex only roars when this machine's player is within this many meters of it.</summary>
+        public const float RoarRange = 40f;
+
+        private const float GrazeSeconds = 8f;       // head down, tug at the grass, chew, head up
+        private const float GrazeLower = 1.6f;       // seconds to lower (and to raise) the head
+        private const float MaxGrazePitch = 100f;    // degrees, shared by shoulders / neck / head
+        private const float MaxHeadDown = 80f;       // the head never points further down than this (no curling under)
+        private const float UprightLean = 45f;       // two-legged plant eaters lean the upper body forward this much
+        private const float ShouldersShare = 0.12f, NeckShare = 0.5f, HeadShare = 0.38f;
+        private const float ShakeDegrees = 14f;
+        private const float RoarDelay = 0.15f;       // into the jump
+        private const float FaceTurnRate = 60f;      // degrees per second, turning to face the player before a roar
+        private const float FaceTimeout = 4f;        // give up turning (and roar anyway) after this long
+
+        private enum State { Idle, Walk, Act }
+
+        /// <summary>What a dinosaur does now and then: plant eaters graze, the T-rex stomps and roars, raptors lunge.</summary>
+        public enum Habit { Graze, Stomp, Lunge }
 
         private int m_Index;
         private System.Random m_Random;
@@ -76,10 +106,33 @@ namespace Blocks.Gameplay.Core
         private double m_IdleTime, m_WalkTime;
         private float m_WalkWeight;
 
+        // Habits.
+        private Habit m_Habit;
+        private float m_NextHabitAt;
+        private float m_ActTime, m_ActLength;
+        private AnimationClip m_ActClip;                 // the T-rex's jump / the raptor's attack
+        private AnimationClipPlayable m_ActPlayable;
+        private bool m_Roared;
+        private bool m_Facing;                           // the T-rex is turning to face the player first
+        private float m_FaceTimeLeft;
+        private int m_Tugs;
+        private float m_RestoreCullingAt = -1f;
+
+        // Grazing: the bones that bend (upper body, shoulders, neck, head - any may be missing), the snout tip.
+        private Transform[] m_BendBones;
+        private readonly Quaternion[] m_BendBase = new Quaternion[4];
+        private readonly Quaternion[] m_BendWritten = new Quaternion[4];
+        private bool m_BendApplied;
+        private Transform m_Snout;
+        private Vector3 m_SnoutLocal;                    // in the head's space, if there's no Head_end bone
+        private float m_GrazePitch, m_GrazeTorso;
+        private bool m_Upright;                          // stands on two legs (shoulders above the torso), e.g. Parasaurolophus
+
         private Renderer[] m_Renderers;
         private AudioSource m_Voice;
 
         public int Index => m_Index;
+        public Habit Kind => m_Habit;
 
         /// <summary>True while its Interact sound is playing.</summary>
         public bool IsMakingSound => m_Voice != null && m_Voice.isPlaying;
@@ -93,6 +146,8 @@ namespace Blocks.Gameplay.Core
             m_Index = index;
             m_IdleClip = entry.idle;
             m_WalkClip = entry.walk;
+            m_Habit = HabitFor(entry.id);
+            m_ActClip = m_Habit == Habit.Stomp ? entry.jump : m_Habit == Habit.Lunge ? entry.attack : null;
             m_Random = new System.Random(index * 7919 + 17);
             m_Renderers = GetComponentsInChildren<Renderer>(true);
 
@@ -115,6 +170,7 @@ namespace Blocks.Gameplay.Core
             m_HomePosition = transform.position;
 
             MeasureBody(heading);
+            if (m_Habit == Habit.Graze) FindBendBones();
             float length = m_Front + m_Back;
             m_WanderRadius = Mathf.Max(20f, length * 4f);
             m_TurnRate = Mathf.Clamp(900f / Mathf.Max(1f, length), 20f, 120f);
@@ -157,6 +213,49 @@ namespace Blocks.Gameplay.Core
             m_IdleTime = m_Random.NextDouble() * 10.0;
             StartIdle(Range(0.5f, 4f));
             m_NextProbe = Time.time + (float)m_Random.NextDouble() * ProbeInterval;
+
+            // The first habit comes a little sooner, so there's something to see early in the round.
+            m_NextHabitAt = Time.time + Range(8f, HabitMaxSeconds);
+        }
+
+        /// <summary>Plant eaters graze; the T-rex stomps and roars; raptors lunge. Decided by the model's name.</summary>
+        public static Habit HabitFor(string id)
+        {
+            string name = id ?? string.Empty;
+            if (name.IndexOf("rex", System.StringComparison.OrdinalIgnoreCase) >= 0) return Habit.Stomp;
+            if (name.IndexOf("raptor", System.StringComparison.OrdinalIgnoreCase) >= 0) return Habit.Lunge;
+            return Habit.Graze;
+        }
+
+        /// <summary>The spine bones that bend to graze, and the snout tip (Quaternius rigs: Torso > Shoulders > Neck > Head > Head_end).</summary>
+        private void FindBendBones()
+        {
+            Transform torso = null, shoulders = null, neck = null, head = null, headEnd = null;
+            foreach (Transform t in GetComponentsInChildren<Transform>(true))
+            {
+                if (Is(t, "Torso")) torso = t;
+                else if (Is(t, "Shoulders")) shoulders = t;
+                else if (Is(t, "Neck")) neck = t;
+                else if (Is(t, "Head")) head = t;
+                else if (Is(t, "Head_end")) headEnd = t;
+            }
+            if (head == null && neck == null) return;
+
+            m_BendBones = new[] { torso, shoulders, neck, head };
+            m_Upright = torso != null && shoulders != null && shoulders.position.y > torso.position.y;
+            if (headEnd != null && head != null && headEnd.IsChildOf(head))
+            {
+                m_Snout = headEnd;
+            }
+            else if (head != null)
+            {
+                // No end bone: guess the snout as far beyond the head as the head is from the neck.
+                m_Snout = head;
+                Vector3 along = neck != null ? head.position - neck.position : transform.rotation * m_ModelForward;
+                m_SnoutLocal = head.InverseTransformVector(along);
+            }
+
+            static bool Is(Transform t, string name) => string.Equals(t.name, name, System.StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Body extent from the meshes at rest, measured along the facing and across it.</summary>
@@ -236,7 +335,7 @@ namespace Blocks.Gameplay.Core
             m_Graph = PlayableGraph.Create($"Dinosaur {name}");
             m_Graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
             var output = AnimationPlayableOutput.Create(m_Graph, "Dinosaur", m_Animator);
-            m_Mixer = AnimationMixerPlayable.Create(m_Graph, 2);
+            m_Mixer = AnimationMixerPlayable.Create(m_Graph, 3);
             output.SetSourcePlayable(m_Mixer);
 
             if (m_IdleClip != null)
@@ -252,6 +351,13 @@ namespace Blocks.Gameplay.Core
                 m_WalkPlayable.SetApplyFootIK(false);
                 m_WalkPlayable.SetSpeed(0);
                 m_Graph.Connect(m_WalkPlayable, 0, m_Mixer, 1);
+            }
+            if (m_ActClip != null)
+            {
+                m_ActPlayable = AnimationClipPlayable.Create(m_Graph, m_ActClip);
+                m_ActPlayable.SetApplyFootIK(false);
+                m_ActPlayable.SetSpeed(0);
+                m_Graph.Connect(m_ActPlayable, 0, m_Mixer, 2);
             }
 
             UpdateAnimation(0f);
@@ -281,7 +387,38 @@ namespace Blocks.Gameplay.Core
             m_CurrentSpeed = 0f;
             m_StateTimer -= dt;
 
-            if (m_State == State.Idle)
+            if (m_RestoreCullingAt > 0f && Time.time >= m_RestoreCullingAt && m_State != State.Act)
+            {
+                m_RestoreCullingAt = -1f;
+                if (m_Animator != null) m_Animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            }
+
+            if (m_State != State.Act && Time.time >= m_NextHabitAt)
+            {
+                StartHabit(); // stops a walk where it is
+            }
+
+            if (m_State == State.Act && m_Facing)
+            {
+                // Turn on the spot towards this machine's player (following them if they move), then stomp.
+                if (TryYawToLocalPlayer(out float yaw)) m_TargetYaw = yaw;
+                float delta = Mathf.DeltaAngle(m_Yaw, m_TargetYaw);
+                float rate = Mathf.Max(m_TurnRate * 2f, FaceTurnRate);
+                m_Yaw += Mathf.Clamp(delta, -rate * dt, rate * dt);
+                m_FaceTimeLeft -= dt;
+                if (Mathf.Abs(delta) < 4f || m_FaceTimeLeft <= 0f) m_Facing = false;
+            }
+            else if (m_State == State.Act)
+            {
+                m_ActTime += dt;
+                if (m_Habit == Habit.Stomp && !m_Roared && m_ActTime >= RoarDelay)
+                {
+                    m_Roared = true;
+                    if (IsLocalPlayerWithin(RoarRange)) MakeSound(Dinosaurs.Sound);
+                }
+                if (m_ActTime >= m_ActLength) EndHabit();
+            }
+            else if (m_State == State.Idle)
             {
                 if (m_StateTimer <= 0f)
                 {
@@ -400,12 +537,220 @@ namespace Blocks.Gameplay.Core
 
         private void Respawn()
         {
+            if (m_State == State.Act) EndHabit();
             transform.position = m_HomePosition;
             m_Yaw = m_TargetYaw = m_HomeYaw;
             m_GroundY = m_HomePosition.y - m_HeightOffset;
             m_NoGroundTime = 0f;
             transform.rotation = Quaternion.LookRotation(Direction(m_Yaw)) * m_Tilt;
             StartIdle(Range(2f, 4f));
+        }
+
+        // =====================================================================================
+        // Habits
+        // =====================================================================================
+
+        private void StartHabit()
+        {
+            m_NextHabitAt = Time.time + Range(HabitMinSeconds, HabitMaxSeconds);
+            m_ActTime = 0f;
+            m_Roared = false;
+            m_Facing = false;
+
+            if (m_Habit == Habit.Graze)
+            {
+                if (m_BendBones == null) return;
+                m_ActLength = GrazeSeconds;
+                m_Tugs = Range(0f, 1f) < 0.5f ? 2 : 3;
+                SolveGrazePose();
+                m_BendApplied = false;
+                // Bones are bent on top of the animation every frame, so they must be animated every frame too.
+                if (m_Animator != null) m_Animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            }
+            else
+            {
+                if (m_ActClip == null || m_ActClip.length <= 0.01f) return;
+                int repeats = m_Habit == Habit.Lunge && Range(0f, 1f) < 0.4f ? 2 : 1;
+                m_ActLength = m_ActClip.length * repeats;
+
+                // The T-rex faces whoever it's about to roar at.
+                if (m_Habit == Habit.Stomp && IsLocalPlayerWithin(RoarRange) && TryYawToLocalPlayer(out float yaw))
+                {
+                    m_Facing = true;
+                    m_FaceTimeLeft = FaceTimeout;
+                    m_TargetYaw = yaw;
+                }
+            }
+
+            m_State = State.Act;
+            m_Blocked = false;
+        }
+
+        private void EndHabit()
+        {
+            m_Facing = false;
+            if (m_Habit == Habit.Graze)
+            {
+                // Straighten up (the animation re-poses the bones it drives anyway; this covers any it doesn't).
+                if (m_BendApplied)
+                {
+                    for (int i = 0; i < m_BendBones.Length; i++) if (m_BendBones[i] != null) m_BendBones[i].localRotation = m_BendBase[i];
+                    m_BendApplied = false;
+                }
+                m_RestoreCullingAt = Time.time + 0.5f;
+            }
+            StartIdle(Range(1.5f, 4f));
+        }
+
+        /// <summary>The flat direction (yaw) from the dinosaur to this machine's player, if there is one.</summary>
+        private bool TryYawToLocalPlayer(out float yaw)
+        {
+            yaw = m_Yaw;
+            CorePlayerManager local = NetworkPlayers.Local;
+            if (local == null) return false;
+            Vector3 to = Flat(local.transform.position - transform.position);
+            if (to.sqrMagnitude < 0.01f) return false;
+            yaw = YawOf(to);
+            return true;
+        }
+
+        private bool IsLocalPlayerWithin(float range)
+        {
+            CorePlayerManager local = NetworkPlayers.Local;
+            return local != null && DistanceTo(local.transform.position + Vector3.up * 0.9f) <= range;
+        }
+
+        /// <summary>
+        /// How far to bend so the snout gets down to the grass: two-legged ones lean the upper body forward
+        /// first, then the neck and head bend further in 5° steps until the snout is just above the ground -
+        /// or the head points <see cref="MaxHeadDown"/> down, so tall ones (Triceratops) look down at the
+        /// grass rather than curling their heads under. Checked offline on all four plant eaters' rigs.
+        /// The bones are put back afterwards; LateUpdate does the real bending.
+        /// </summary>
+        private void SolveGrazePose()
+        {
+            m_GrazePitch = m_GrazeTorso = 0f;
+            if (m_BendBones == null || m_Snout == null) return;
+
+            var saved = new Quaternion[m_BendBones.Length];
+            for (int i = 0; i < m_BendBones.Length; i++) if (m_BendBones[i] != null) saved[i] = m_BendBones[i].localRotation;
+
+            float target = m_GroundY + Mathf.Max(0.3f, m_Height * 0.03f);
+            float SnoutHeightAt(float pitch, float torso)
+            {
+                for (int i = 0; i < m_BendBones.Length; i++) if (m_BendBones[i] != null) m_BendBones[i].localRotation = saved[i];
+                m_GrazePitch = pitch;
+                m_GrazeTorso = torso;
+                ApplyBend(1f, 0f, 0f);
+                return SnoutPosition().y;
+            }
+
+            float lean = m_Upright ? UprightLean : 0f;
+            float bestPitch = 0f, bestHeight = float.MaxValue;
+            for (float pitch = 5f; pitch <= MaxGrazePitch + 0.01f; pitch += 5f)
+            {
+                float h = SnoutHeightAt(pitch, lean);
+                if (HeadDownAngle() > MaxHeadDown) break;
+                if (h < bestHeight) { bestHeight = h; bestPitch = pitch; }
+                if (h <= target) break;
+            }
+            float bestTorso = lean;
+
+            for (int i = 0; i < m_BendBones.Length; i++) if (m_BendBones[i] != null) m_BendBones[i].localRotation = saved[i];
+            m_GrazePitch = bestPitch;
+            m_GrazeTorso = bestTorso;
+        }
+
+        /// <summary>How far below level the head points (head bone to snout), in degrees.</summary>
+        private float HeadDownAngle()
+        {
+            Transform head = m_BendBones[3] != null ? m_BendBones[3] : m_BendBones[2];
+            if (head == null) return 0f;
+            Vector3 along = SnoutPosition() - head.position;
+            return along.sqrMagnitude < 0.000001f ? 0f : Mathf.Asin(Mathf.Clamp(-along.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
+        }
+
+        private Vector3 SnoutPosition() =>
+            m_SnoutLocal == Vector3.zero ? m_Snout.position : m_Snout.TransformPoint(m_SnoutLocal);
+
+        /// <summary>
+        /// Bends the bones (on top of whatever pose they're in): <paramref name="amount"/> 0-1 of the graze pose,
+        /// plus a side-to-side <paramref name="shake"/> and an up/down <paramref name="nod"/> of the head, in degrees.
+        /// Rotations are about the body's own right axis (positive = down), parent first.
+        /// </summary>
+        private void ApplyBend(float amount, float shake, float nod)
+        {
+            Vector3 heading = Flat(transform.rotation * m_ModelForward);
+            if (heading.sqrMagnitude < 0.0001f) return;
+            Vector3 right = Vector3.Cross(Vector3.up, heading.normalized);
+
+            Bend(m_BendBones[0], m_GrazeTorso * amount);
+            Bend(m_BendBones[1], m_GrazePitch * ShouldersShare * amount);
+            Bend(m_BendBones[2], m_GrazePitch * NeckShare * amount);
+            Transform head = m_BendBones[3];
+            if (head != null)
+            {
+                head.rotation = Quaternion.AngleAxis(shake, Vector3.up) * Quaternion.AngleAxis(m_GrazePitch * HeadShare * amount + nod, right) * head.rotation;
+            }
+
+            void Bend(Transform bone, float degrees)
+            {
+                if (bone != null && degrees != 0f) bone.rotation = Quaternion.AngleAxis(degrees, right) * bone.rotation;
+            }
+        }
+
+        /// <summary>
+        /// The graze, <paramref name="t"/> seconds in: head down (eased), then a few tugs at the grass (a quick
+        /// shake while pulling up a little), chewing in between, then head back up.
+        /// </summary>
+        private void GrazeMotion(float t, out float amount, out float shake, out float nod)
+        {
+            float hold = GrazeSeconds - 2f * GrazeLower;
+            if (t < GrazeLower) amount = Mathf.SmoothStep(0f, 1f, t / GrazeLower);
+            else if (t > GrazeSeconds - GrazeLower) amount = Mathf.SmoothStep(0f, 1f, (GrazeSeconds - t) / GrazeLower);
+            else amount = 1f;
+
+            shake = 0f;
+            float tug = 0f;
+            float since = t - GrazeLower - 0.3f;
+            float spacing = (hold - 0.3f) / Mathf.Max(1, m_Tugs);
+            if (since >= 0f && since < hold - 0.3f)
+            {
+                float u = (since % spacing) / 0.8f;            // each tug lasts 0.8 s
+                if (u < 1f)
+                {
+                    float envelope = Mathf.Sin(u * Mathf.PI);
+                    shake = ShakeDegrees * envelope * Mathf.Sin(u * Mathf.PI * 2f * 2.5f);
+                    tug = envelope;
+                }
+            }
+            float chew = (1f - tug) * Mathf.Sin(t * Mathf.PI * 2f * 1.6f) * 2.5f;
+            nod = (-6f * tug + chew) * amount;                 // pull up a little while tugging
+            shake *= amount;
+        }
+
+        /// <summary>Grazing is drawn here, after the animation has posed the bones for this frame.</summary>
+        private void LateUpdate()
+        {
+            if (m_State != State.Act || m_Habit != Habit.Graze || m_BendBones == null) return;
+
+            for (int i = 0; i < m_BendBones.Length; i++)
+            {
+                Transform bone = m_BendBones[i];
+                if (bone == null) continue;
+                // If the animation didn't write this bone this frame, take our bend back off before re-applying it.
+                if (m_BendApplied && bone.localRotation == m_BendWritten[i]) bone.localRotation = m_BendBase[i];
+                m_BendBase[i] = bone.localRotation;
+            }
+
+            GrazeMotion(m_ActTime, out float amount, out float shake, out float nod);
+            ApplyBend(amount, shake, nod);
+
+            for (int i = 0; i < m_BendBones.Length; i++)
+            {
+                if (m_BendBones[i] != null) m_BendWritten[i] = m_BendBones[i].localRotation;
+            }
+            m_BendApplied = true;
         }
 
         // =====================================================================================
@@ -558,7 +903,8 @@ namespace Blocks.Gameplay.Core
         {
             if (!m_Graph.IsValid()) return;
 
-            bool walking = m_State == State.Walk && m_CurrentSpeed > 0.01f;
+            // Turning on the spot to face the player uses the walk (slowed) so the feet shuffle round.
+            bool walking = (m_State == State.Walk && m_CurrentSpeed > 0.01f) || (m_State == State.Act && m_Facing);
             float target = walking && m_WalkClip != null ? 1f : 0f;
             if (m_IdleClip == null) target = 1f;
             m_WalkWeight = Mathf.MoveTowards(m_WalkWeight, target, dt / 0.35f);
@@ -567,10 +913,19 @@ namespace Blocks.Gameplay.Core
             float rate = m_Speed > 0f ? Mathf.Clamp(m_CurrentSpeed / m_Speed, 0.5f, 1.2f) : 1f;
             m_WalkTime += dt * (walking ? rate : 1f);
 
+            // The T-rex's jump / the raptor's attack, faded in and out over the idle.
+            float act = 0f;
+            if (m_State == State.Act && m_ActClip != null && m_Habit != Habit.Graze && m_ActClip.length > 0.01f)
+            {
+                act = Mathf.Clamp01(Mathf.Min(m_ActTime / 0.15f, (m_ActLength - m_ActTime) / 0.25f));
+                m_ActPlayable.SetTime(Mathf.Min(m_ActTime, m_ActLength - 0.001f) % m_ActClip.length);
+            }
+
             if (m_IdleClip != null) m_IdlePlayable.SetTime(m_IdleTime % m_IdleClip.length);
             if (m_WalkClip != null) m_WalkPlayable.SetTime(m_WalkTime % m_WalkClip.length);
-            m_Mixer.SetInputWeight(0, m_IdleClip != null ? 1f - m_WalkWeight : 0f);
-            m_Mixer.SetInputWeight(1, m_WalkClip != null ? m_WalkWeight : 0f);
+            m_Mixer.SetInputWeight(0, m_IdleClip != null ? (1f - m_WalkWeight) * (1f - act) : 0f);
+            m_Mixer.SetInputWeight(1, m_WalkClip != null ? m_WalkWeight * (1f - act) : 0f);
+            m_Mixer.SetInputWeight(2, m_ActClip != null ? act : 0f);
         }
 
         /// <summary>Plays <paramref name="clip"/> from the dinosaur, at the Sound Effects volume (unless it already is).</summary>

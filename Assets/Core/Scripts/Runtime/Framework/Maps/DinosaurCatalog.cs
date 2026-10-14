@@ -6,8 +6,8 @@ namespace Blocks.Gameplay.Core
 {
     /// <summary>
     /// The dinosaur models that wander around maps (see <see cref="Dinosaurs"/>): for each model, its mesh
-    /// (how a placed dinosaur is recognized in a map), its idle and walk animations, plus the sound a
-    /// dinosaur makes when a player presses Interact next to it.
+    /// (how a placed dinosaur is recognized in a map), its idle, walk, attack and jump animations, plus the
+    /// sound a dinosaur makes when a player presses Interact next to it (the T-rex also roars it).
     ///
     /// Built automatically in the editor by DinosaurCatalogBuilder from the FBX models in
     /// Assets/_models/Dinosaur Animated Pack and stored at Resources/DinosaurCatalog so the game can load
@@ -28,9 +28,20 @@ namespace Blocks.Gameplay.Core
 
             public AnimationClip idle;
             public AnimationClip walk;
+
+            [Tooltip("The raptors' occasional lunge.")]
+            public AnimationClip attack;
+
+            [Tooltip("The T-rex's occasional stomp-and-roar.")]
+            public AnimationClip jump;
         }
 
         public const string ResourcePath = "DinosaurCatalog";
+
+        /// <summary>Bumped when the entries gain fields, so the editor rebuilds an older catalog by itself.</summary>
+        public const int CurrentVersion = 2;
+
+        [SerializeField, HideInInspector] private int version;
 
         [SerializeField] private List<Entry> dinosaurs = new List<Entry>();
 
@@ -41,6 +52,7 @@ namespace Blocks.Gameplay.Core
 
         public IReadOnlyList<Entry> Dinosaurs => dinosaurs;
         public AudioClip InteractSound => interactSound;
+        public int Version => version;
 
         /// <summary>The catalog, or null if it hasn't been built yet.</summary>
         public static DinosaurCatalog Load() => Resources.Load<DinosaurCatalog>(ResourcePath);
@@ -66,6 +78,7 @@ namespace Blocks.Gameplay.Core
         {
             dinosaurs = entries;
             interactSound = sound;
+            version = CurrentVersion;
             m_ByMesh = null;
         }
 #endif

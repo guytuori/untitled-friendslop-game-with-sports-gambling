@@ -34,6 +34,9 @@ namespace Blocks.Gameplay.Core
 
         public static IReadOnlyList<DinosaurWander> All => s_All;
 
+        /// <summary>dinosaur.mp3 - the Interact sound, also the T-rex's roar.</summary>
+        public static AudioClip Sound => s_Sound;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Init()
         {

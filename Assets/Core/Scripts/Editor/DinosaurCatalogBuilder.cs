@@ -9,10 +9,11 @@ namespace Blocks.Gameplay.Core
 {
     /// <summary>
     /// Keeps <see cref="DinosaurCatalog"/> (Resources/DinosaurCatalog) in step with the dinosaur models: every
-    /// model under <see cref="DinosaurFolder"/>, with its mesh and its idle / walk animation (the clips whose
-    /// names contain "idle" and "walk", e.g. "TRex_Idle" / "TRex_Walk"), plus <see cref="SoundPath"/> as the
-    /// Interact sound. Rebuilt automatically when anything in that folder or the sound changes, once when the
-    /// editor loads if the catalog doesn't exist yet, and via Friendslop > Maps > Rebuild Dinosaur List.
+    /// model under <see cref="DinosaurFolder"/>, with its mesh and its idle / walk / attack / jump animations
+    /// (the clips whose names end in "_Idle", "_Walk", "_Attack", "_Jump", e.g. "TRex_Idle"), plus
+    /// <see cref="SoundPath"/> as the Interact sound. Rebuilt automatically when anything in that folder or the
+    /// sound changes, once when the editor loads if the catalog doesn't exist yet or is from an older version
+    /// of this builder, and via Friendslop > Maps > Rebuild Dinosaur List.
     ///
     /// To add a dinosaur: put its model (with idle and walk animations) in the folder, and place it in a map
     /// prefab. Nothing needs adding to the dinosaur itself.
@@ -32,7 +33,8 @@ namespace Blocks.Gameplay.Core
         {
             EditorApplication.delayCall += () =>
             {
-                if (AssetDatabase.LoadAssetAtPath<DinosaurCatalog>(CatalogPath) == null) Rebuild();
+                var existing = AssetDatabase.LoadAssetAtPath<DinosaurCatalog>(CatalogPath);
+                if (existing == null || existing.Version < DinosaurCatalog.CurrentVersion) Rebuild();
             };
         }
 
@@ -89,13 +91,15 @@ namespace Blocks.Gameplay.Core
                             .ToArray();
                         AnimationClip idle = FindClip(clips, "idle");
                         AnimationClip walk = FindClip(clips, "walk");
+                        AnimationClip attack = FindClip(clips, "attack");
+                        AnimationClip jump = FindClip(clips, "jump");
 
                         string id = Path.GetFileNameWithoutExtension(path);
                         if (mesh == null) { problems.Add($"{id}: no skinned mesh - skipped."); continue; }
                         if (walk == null) problems.Add($"{id}: no walk animation - it'll stand still.");
                         if (idle == null) problems.Add($"{id}: no idle animation.");
 
-                        entries.Add(new DinosaurCatalog.Entry { id = id, model = model, mesh = mesh, idle = idle, walk = walk });
+                        entries.Add(new DinosaurCatalog.Entry { id = id, model = model, mesh = mesh, idle = idle, walk = walk, attack = attack, jump = jump });
                     }
                 }
 
