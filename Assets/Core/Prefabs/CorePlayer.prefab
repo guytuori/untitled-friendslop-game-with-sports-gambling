@@ -306,7 +306,7 @@ MonoBehaviour:
   sprintSpeed: 3
   rotationSmoothTime: 0.1
   speedChangeRate: 5
-  forceDecayRate: 2
+  forceDecayRate: 10
   gravity: -30
   jumpHeight: 5
   groundedOffset: -0.14
@@ -582,6 +582,8 @@ MonoBehaviour:
   jumpHeight: 2.2
   jumpPushForce: 7
   regrabCooldown: 0.25
+  poleAngleLowerBound: 50
+  poleAngleUpperBound: 125
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!114 &7587005557142702197
 MonoBehaviour:

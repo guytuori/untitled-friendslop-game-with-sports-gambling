@@ -399,7 +399,7 @@ namespace Blocks.Gameplay.Core
 
             // An unsaved language preview goes back to the saved language.
             if (Loc.CurrentCode != m_SavedLanguage) Loc.SetLanguage(m_SavedLanguage);
-            SceneManager.LoadScene(settingsSceneName);
+            MenuTransition.LoadScene(settingsSceneName);
         }
 
         private void ClearStatus()

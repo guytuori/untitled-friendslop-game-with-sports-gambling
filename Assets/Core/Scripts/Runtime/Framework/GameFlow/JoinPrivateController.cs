@@ -147,7 +147,7 @@ namespace Blocks.Gameplay.Core
 
             if (error == null)
             {
-                SceneManager.LoadScene(gameLobbySceneName);
+                MenuTransition.LoadScene(gameLobbySceneName);
                 return;
             }
 
@@ -158,7 +158,7 @@ namespace Blocks.Gameplay.Core
         private void OnBack()
         {
             if (m_Joining) return;
-            SceneManager.LoadScene(backSceneName);
+            MenuTransition.LoadScene(backSceneName);
         }
     }
 }

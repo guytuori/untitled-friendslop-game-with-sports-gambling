@@ -34,15 +34,15 @@ namespace Blocks.Gameplay.Core
             MenuUI.AddFullLogo(root, titleImage);
 
             VisualElement column = MenuUI.AddBottomRightColumn(root);
-            Button publicButton = MenuUI.MakeButton("Public", () => SceneManager.LoadScene(publicSceneName), selectSound);
+            Button publicButton = MenuUI.MakeButton("Public", () => MenuTransition.LoadScene(publicSceneName), selectSound);
             column.Add(publicButton);
-            column.Add(MenuUI.MakeButton("Private", () => SceneManager.LoadScene(privateSceneName), selectSound));
+            column.Add(MenuUI.MakeButton("Private", () => MenuTransition.LoadScene(privateSceneName), selectSound));
             column.Add(MenuUI.MakeButton("Back", OnBack, cancelSound));
 
             MenuUI.RegisterCancelAsBack(root, cancelSound, OnBack);
             MenuUI.FocusFirst(publicButton);
         }
 
-        private void OnBack() => SceneManager.LoadScene(backSceneName);
+        private void OnBack() => MenuTransition.LoadScene(backSceneName);
     }
 }

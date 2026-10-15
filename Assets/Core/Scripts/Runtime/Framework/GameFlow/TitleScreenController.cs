@@ -40,6 +40,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private int copyrightStartYear = 2026;
 
         private VisualElement m_Root;
+        private VisualElement m_Title;
         private Label m_Prompt;
         private bool m_PromptVisible = true;
         private bool m_Advancing;
@@ -88,6 +89,7 @@ namespace Blocks.Gameplay.Core
                 title.style.width = Length.Percent(99);
                 title.style.height = Length.Percent(99);
                 root.Add(title);
+                m_Title = title;
             }
 
             m_Prompt = new Label(promptText);
@@ -163,7 +165,13 @@ namespace Blocks.Gameplay.Core
             while (t < fadeDuration)
             {
                 t += Time.deltaTime;
-                m_Root.style.opacity = 1f - Mathf.Clamp01(t / fadeDuration);
+                // Everything but the logo fades: Main Menu shows the same logo in the same place, so it just
+                // stays up across the change (MenuTransition picks it up there without a fade).
+                float opacity = 1f - Mathf.Clamp01(t / fadeDuration);
+                foreach (VisualElement child in m_Root.Children())
+                {
+                    if (child != m_Title) child.style.opacity = opacity;
+                }
                 yield return null;
             }
 

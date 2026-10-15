@@ -166,22 +166,22 @@ namespace Blocks.Gameplay.Core
 
         private void OnHostClicked()
         {
-            SceneManager.LoadScene(hostGameSceneName);
+            MenuTransition.LoadScene(hostGameSceneName);
         }
 
         private void OnJoinClicked()
         {
-            SceneManager.LoadScene(joinGameSceneName);
+            MenuTransition.LoadScene(joinGameSceneName);
         }
 
         private void OnSinglePlayerClicked()
         {
-            SceneManager.LoadScene(singlePlayerSceneName);
+            MenuTransition.LoadScene(singlePlayerSceneName);
         }
 
         private void OnSettingsClicked()
         {
-            SceneManager.LoadScene(settingsSceneName);
+            MenuTransition.LoadScene(settingsSceneName);
         }
 
         private void OnQuitClicked()

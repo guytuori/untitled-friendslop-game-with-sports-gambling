@@ -197,7 +197,7 @@ namespace Blocks.Gameplay.Core
                 if (this == null) return;
             }
 
-            SceneManager.LoadScene(leaveSceneName);
+            MenuTransition.LoadScene(leaveSceneName);
         }
 
         private void OnGameEnded(string message)

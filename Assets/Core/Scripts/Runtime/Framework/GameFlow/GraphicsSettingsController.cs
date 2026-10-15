@@ -673,7 +673,7 @@ namespace Blocks.Gameplay.Core
         {
             if (m_EditingDropdown != null) return; // don't leave mid-edit, see class summary
             if (SettingsOverlay.TryClose(this)) return; // in a match: back to the Escape menu
-            SceneManager.LoadScene(settingsSceneName);
+            MenuTransition.LoadScene(settingsSceneName);
         }
     }
 }

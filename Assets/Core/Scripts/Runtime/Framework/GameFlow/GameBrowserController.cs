@@ -341,7 +341,7 @@ namespace Blocks.Gameplay.Core
 
             if (error == null)
             {
-                SceneManager.LoadScene(gameLobbySceneName);
+                MenuTransition.LoadScene(gameLobbySceneName);
                 return;
             }
 
@@ -354,7 +354,7 @@ namespace Blocks.Gameplay.Core
         {
             if (m_Joining) return;
             string target = string.IsNullOrEmpty(GameSearch.BrowserBackScene) ? defaultBackSceneName : GameSearch.BrowserBackScene;
-            SceneManager.LoadScene(target);
+            MenuTransition.LoadScene(target);
         }
     }
 }

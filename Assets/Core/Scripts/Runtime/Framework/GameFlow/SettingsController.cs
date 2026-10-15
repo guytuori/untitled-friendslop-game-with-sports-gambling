@@ -177,17 +177,17 @@ namespace Blocks.Gameplay.Core
 
         private void OnGameplayClicked()
         {
-            SceneManager.LoadScene(gameplaySettingsSceneName);
+            MenuTransition.LoadScene(gameplaySettingsSceneName);
         }
 
         private void OnGraphicsClicked()
         {
-            SceneManager.LoadScene(graphicsSettingsSceneName);
+            MenuTransition.LoadScene(graphicsSettingsSceneName);
         }
 
         private void OnAudioClicked()
         {
-            SceneManager.LoadScene(audioSettingsSceneName);
+            MenuTransition.LoadScene(audioSettingsSceneName);
         }
 
         private void OnChangeKeybindingsClicked()
@@ -198,7 +198,7 @@ namespace Blocks.Gameplay.Core
             // pressed this frame. Set before the scene loads, since it's a static field ChangeKeybindings
             // reads in its own Awake().
             ChangeKeybindingsController.EnteredViaGamepad = WasTriggeredByGamepad();
-            SceneManager.LoadScene(keybindingsSceneName);
+            MenuTransition.LoadScene(keybindingsSceneName);
         }
 
         private static bool WasTriggeredByGamepad()
@@ -213,7 +213,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnBackClicked()
         {
-            SceneManager.LoadScene(mainMenuSceneName);
+            MenuTransition.LoadScene(mainMenuSceneName);
         }
     }
 }

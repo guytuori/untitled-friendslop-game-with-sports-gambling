@@ -895,6 +895,8 @@ GameObject:
   - component: {fileID: 1508710200}
   - component: {fileID: 1508710202}
   - component: {fileID: 1508710201}
+  - component: {fileID: 1508710204}
+  - component: {fileID: 1508710203}
   m_Layer: 0
   m_Name: grind_rail_medium_ring
   m_TagString: Untagged
@@ -974,6 +976,36 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1508710199}
   m_Mesh: {fileID: 576818903993012370, guid: 55146326a82ea5f4389cabceedf130be, type: 3}
+--- !u!114 &1508710203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1508710199}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d4cd9da9833d094e8cd2388568626f9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GrindRail
+  waypoints: []
+  radius: 1
+  exitMargin: 0.35
+  isTube: 0
+--- !u!114 &1508710204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1508710199}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9441cee1083afaf44b9d7973fc639036, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.MapObjectProperty
+  propertyType: 5
+  savedMaterialsBeforeHidden: []
 --- !u!1 &1551413985
 GameObject:
   m_ObjectHideFlags: 0
@@ -1037,6 +1069,8 @@ GameObject:
   - component: {fileID: 1644555381}
   - component: {fileID: 1644555383}
   - component: {fileID: 1644555382}
+  - component: {fileID: 1644555385}
+  - component: {fileID: 1644555384}
   m_Layer: 0
   m_Name: grind_rail_4x1
   m_TagString: Untagged
@@ -1116,6 +1150,36 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1644555380}
   m_Mesh: {fileID: 576818903993012370, guid: 9941e8c52827fe747a61303ea4d81b3e, type: 3}
+--- !u!114 &1644555384
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1644555380}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d4cd9da9833d094e8cd2388568626f9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GrindRail
+  waypoints: []
+  radius: 0.14142114
+  exitMargin: 0.35
+  isTube: 0
+--- !u!114 &1644555385
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1644555380}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9441cee1083afaf44b9d7973fc639036, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.MapObjectProperty
+  propertyType: 5
+  savedMaterialsBeforeHidden: []
 --- !u!1 &1727228308
 GameObject:
   m_ObjectHideFlags: 0
@@ -1437,6 +1501,8 @@ GameObject:
   - component: {fileID: 2147318853}
   - component: {fileID: 2147318855}
   - component: {fileID: 2147318854}
+  - component: {fileID: 2147318857}
+  - component: {fileID: 2147318856}
   m_Layer: 0
   m_Name: grind_rail_medium_ring (1)
   m_TagString: Untagged
@@ -1516,6 +1582,36 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2147318852}
   m_Mesh: {fileID: 576818903993012370, guid: 55146326a82ea5f4389cabceedf130be, type: 3}
+--- !u!114 &2147318856
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2147318852}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d4cd9da9833d094e8cd2388568626f9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GrindRail
+  waypoints: []
+  radius: 6.4584155
+  exitMargin: 0.35
+  isTube: 0
+--- !u!114 &2147318857
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2147318852}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9441cee1083afaf44b9d7973fc639036, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.MapObjectProperty
+  propertyType: 5
+  savedMaterialsBeforeHidden: []
 --- !u!4 &403987849875474284
 Transform:
   m_ObjectHideFlags: 0

@@ -902,7 +902,7 @@ namespace Blocks.Gameplay.Core
         {
             if (m_AwaitingRebindCommand != null) return; // don't leave mid-capture, see class summary
             if (SettingsOverlay.TryClose(this)) return; // in a match: back to the Escape menu
-            SceneManager.LoadScene(settingsSceneName);
+            MenuTransition.LoadScene(settingsSceneName);
         }
     }
 }

@@ -462,15 +462,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d4cd9da9833d094e8cd2388568626f9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GrindRail
-  waypoints:
-  - {x: -8.333336, y: 2, z: 3.333334}
-  - {x: -8, y: 2, z: 5}
-  - {x: -9.85714, y: 2, z: 6.8571434}
-  - {x: -10.887291, y: 2, z: 8.631578}
-  - {x: -9.197212, y: 2, z: 11.238096}
-  - {x: -10.14286, y: 2, z: 13.142858}
-  - {x: -12, y: 2, z: 15}
-  - {x: -11.666664, y: 2, z: 16.666668}
+  waypoints: []
   radius: 6.4584155
   exitMargin: 0.35
   isTube: 0
@@ -578,15 +570,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d4cd9da9833d094e8cd2388568626f9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GrindRail
-  waypoints:
-  - {x: -22.333336, y: 2, z: 8.333334}
-  - {x: -22, y: 2, z: 10}
-  - {x: -23.85714, y: 2, z: 11.857143}
-  - {x: -24.887291, y: 2, z: 13.631578}
-  - {x: -23.197212, y: 2, z: 16.238094}
-  - {x: -24.14286, y: 2, z: 18.142857}
-  - {x: -26, y: 2, z: 20}
-  - {x: -25.666664, y: 2, z: 21.666668}
+  waypoints: []
   radius: 6.4584155
   exitMargin: 0.35
   isTube: 0

@@ -73,7 +73,7 @@ namespace Blocks.Gameplay.Core
 
             if (error == null)
             {
-                SceneManager.LoadScene(gameLobbySceneName);
+                MenuTransition.LoadScene(gameLobbySceneName);
                 return;
             }
 
@@ -84,13 +84,13 @@ namespace Blocks.Gameplay.Core
         private void OnCustom()
         {
             if (m_Busy) return;
-            SceneManager.LoadScene(customSceneName);
+            MenuTransition.LoadScene(customSceneName);
         }
 
         private void OnBack()
         {
             if (m_Busy) return;
-            SceneManager.LoadScene(backSceneName);
+            MenuTransition.LoadScene(backSceneName);
         }
     }
 }

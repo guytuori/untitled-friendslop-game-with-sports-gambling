@@ -87,7 +87,7 @@ namespace Blocks.Gameplay.Core
             MenuUI.AddFullLogo(root, titleImage);
 
             m_Column = MenuUI.AddBottomRightColumn(root);
-            Button changeProfileButton = MenuUI.MakeButton("Change Profile", () => SceneManager.LoadScene(changeProfileSceneName), selectSound);
+            Button changeProfileButton = MenuUI.MakeButton("Change Profile", () => MenuTransition.LoadScene(changeProfileSceneName), selectSound);
             m_Column.Add(changeProfileButton);
             m_Column.Add(MenuUI.MakeButton("How To Play", () => NotImplemented("How To Play"), selectSound));
             m_PracticeButton = MenuUI.MakeButton("Practice Map", OpenPracticePopup, selectSound);
@@ -139,7 +139,7 @@ namespace Blocks.Gameplay.Core
                 ClosePracticePopup();
                 return;
             }
-            SceneManager.LoadScene(backSceneName);
+            MenuTransition.LoadScene(backSceneName);
         }
 
         // =====================================================================================

@@ -1130,7 +1130,7 @@ namespace Blocks.Gameplay.Core
 
             if (error == null)
             {
-                SceneManager.LoadScene(gameLobbySceneName);
+                MenuTransition.LoadScene(gameLobbySceneName);
                 return;
             }
 
@@ -1142,12 +1142,12 @@ namespace Blocks.Gameplay.Core
         {
             GameSearch.CurrentFilter = m_Filter.Clone();
             GameSearch.BrowserBackScene = SceneManager.GetActiveScene().name;
-            SceneManager.LoadScene(gameBrowserSceneName);
+            MenuTransition.LoadScene(gameBrowserSceneName);
         }
 
         private void OnBackClicked()
         {
-            SceneManager.LoadScene(backSceneName);
+            MenuTransition.LoadScene(backSceneName);
         }
     }
 }

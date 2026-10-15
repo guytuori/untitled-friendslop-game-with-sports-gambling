@@ -592,6 +592,6 @@ namespace Blocks.Gameplay.Core
             return -1;
         }
 
-        private void OnBack() => SceneManager.LoadScene(backSceneName);
+        private void OnBack() => MenuTransition.LoadScene(backSceneName);
     }
 }
