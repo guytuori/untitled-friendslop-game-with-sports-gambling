@@ -46,11 +46,11 @@ namespace Blocks.Gameplay.Core
     ///
     /// - MAPS: any MeshFilter+MeshRenderer anywhere in the scene whose shared mesh has more than one submesh
     ///   (this project's own signature for "an imported map piece" - every map is exported one submesh per
-    ///   material/texture) gets <see cref="MapColliderSetup.RunOnMapObject"/> and
-    ///   <see cref="MapObstacleSetup.RunOnMapObject"/> re-run on it automatically - the same per-material
-    ///   collider splitting (ice, climbable walls, challenge start/finish triggers) and balance-beam/grind-
-    ///   rail/pole extraction those tools already do, just applied to every map piece in the scene instead of
-    ///   one at a time by hand.
+    ///   material/texture) gets <see cref="MapColliderSetup.RunOnMapObject"/> re-run on it automatically - the
+    ///   same per-material collider splitting (ice, climbable walls, challenge start/finish triggers) that tool
+    ///   already does, just applied to every map piece in the scene instead of one at a time by hand. (The old
+    ///   per-material balance beam / grind rail / pole extraction, MapObstacleSetup, was removed 2026-10-16 -
+    ///   use Friendslop > Set Object Property on each piece instead.)
     ///
     /// Safe to re-run any time, as often as you like: every step only creates or wires what's missing or
     /// still unset, and never duplicates a component or overwrites a reference someone already deliberately
@@ -226,39 +226,9 @@ namespace Blocks.Gameplay.Core
                     if (meshFilter.GetComponent<MeshRenderer>() == null) continue;
 
                     MapColliderSetup.RunOnMapObject(meshFilter.gameObject);
-
-                    // MapObstacleSetup.RunOnMapObject logs an error if none of its three obstacle
-                    // keywords are present - fine when a person deliberately selects one known obstacle
-                    // map piece by hand, but this runs on every qualifying mesh in the scene, and most map
-                    // pieces (plain floors/walls/ice) legitimately have none of them. Skip the call
-                    // entirely for those instead of letting it log a false "error" every single refresh.
-                    if (HasObstacleMaterial(meshFilter.GetComponent<MeshRenderer>()))
-                    {
-                        MapObstacleSetup.RunOnMapObject(meshFilter.gameObject);
-                    }
-
                     summary.MapPiecesRefreshed++;
                 }
             }
-        }
-
-        // Keep in sync with MapObstacleSetup's own BalanceBeamKeyword/GrindRailKeyword/PoleKeyword constants.
-        private static readonly string[] ObstacleMaterialKeywords = { "balance_beam", "grind_rail", "pole" };
-
-        private static bool HasObstacleMaterial(MeshRenderer meshRenderer)
-        {
-            if (meshRenderer == null) return false;
-
-            foreach (Material material in meshRenderer.sharedMaterials)
-            {
-                if (material == null) continue;
-                string nameLower = material.name.ToLowerInvariant();
-                foreach (string keyword in ObstacleMaterialKeywords)
-                {
-                    if (nameLower.Contains(keyword)) return true;
-                }
-            }
-            return false;
         }
 
         #endregion

@@ -31,6 +31,8 @@ namespace Blocks.Gameplay.Core
                 "downArrow" => "Down",
                 "leftArrow" => "Left",
                 "rightArrow" => "Right",
+                "equals" => "=",
+                "minus" => "-",
                 _ when controlName.Length == 1 => controlName.ToUpperInvariant(),
                 _ => char.ToUpperInvariant(controlName[0]) + controlName.Substring(1)
             };

@@ -33,6 +33,9 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float exitMargin = 0.35f;
         [SerializeField] private bool isTube;
 
+        [Tooltip("On: the waypoints are in this object's own local space, so the rail moves, turns and scales with it (what Set Object Property > Grind Rail builds). Off: the original layout - world-space offsets from this object's position, which follow it when it moves but not when it turns.")]
+        [SerializeField] private bool localSpaceWaypoints;
+
         private float[] m_CumulativeLength;
         private float[] m_TurnAngleAtWaypoint;
         private bool m_TablesBuilt;
@@ -43,6 +46,12 @@ namespace Blocks.Gameplay.Core
         public static IReadOnlyList<GrindRail> ActiveRails => s_ActiveRails;
 
         public float Radius => radius;
+
+        /// <summary>See the field's tooltip.</summary>
+        public bool LocalSpaceWaypoints => localSpaceWaypoints;
+
+        /// <summary>Waypoint <paramref name="i"/> in world space, for either waypoint layout.</summary>
+        private Vector3 PathPoint(int i) => localSpaceWaypoints ? transform.TransformPoint(waypoints[i]) : waypoints[i] + transform.position;
 
         public float TotalLength
         {
@@ -158,6 +167,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnEnable()
         {
+            m_TablesBuilt = false; // lengths are worked out in world space - the object may have been placed since
             s_ActiveRails.Add(this);
             if (waypoints == null || waypoints.Length == 0)
             { 
@@ -187,6 +197,13 @@ namespace Blocks.Gameplay.Core
             EnsureTables();
         }
 
+        /// <summary>Same as <see cref="Configure(Vector3[], float)"/>, choosing the waypoint layout (see <see cref="LocalSpaceWaypoints"/>).</summary>
+        public void Configure(Vector3[] points, float railRadius, bool pointsInLocalSpace)
+        {
+            localSpaceWaypoints = pointsInLocalSpace;
+            Configure(points, railRadius);
+        }
+
         private void EnsureTables()
         {
             if (m_TablesBuilt) return;
@@ -200,6 +217,27 @@ namespace Blocks.Gameplay.Core
             m_CumulativeLength = new float[Mathf.Max(n, 1)];
             m_TurnAngleAtWaypoint = new float[Mathf.Max(n, 1)];
             if (n == 0) return;
+
+            if (localSpaceWaypoints)
+            {
+                // Everything in world space, so a turned or scaled rail measures and bends correctly.
+                m_CumulativeLength[0] = 0f;
+                for (int i = 1; i < n; i++)
+                {
+                    m_CumulativeLength[i] = m_CumulativeLength[i - 1] + Vector3.Distance(PathPoint(i - 1), PathPoint(i));
+                }
+                for (int i = 1; i < n - 1; i++)
+                {
+                    Vector3 inDir = PathPoint(i) - PathPoint(i - 1);
+                    Vector3 outDir = PathPoint(i + 1) - PathPoint(i);
+                    inDir.y = 0f;
+                    outDir.y = 0f;
+                    m_TurnAngleAtWaypoint[i] = inDir.sqrMagnitude > 1e-6f && outDir.sqrMagnitude > 1e-6f
+                        ? Vector3.SignedAngle(inDir, outDir, Vector3.up)
+                        : 0f;
+                }
+                return;
+            }
 
             m_CumulativeLength[0] = 0f;
             for (int i = 1; i < n; i++)
@@ -236,8 +274,8 @@ namespace Blocks.Gameplay.Core
 
             for (int i = 0; i < waypoints.Length - 1; i++)
             {
-                Vector3 a = waypoints[i] + transform.position;
-                Vector3 b = waypoints[i + 1] + transform.position;
+                Vector3 a = PathPoint(i);
+                Vector3 b = PathPoint(i + 1);
                 Vector3 ab = b - a;
                 float lenSqr = ab.sqrMagnitude;
                 float t = lenSqr > 0.0001f ? Mathf.Clamp01(Vector3.Dot(worldPosition - a, ab) / lenSqr) : 0f;
@@ -281,8 +319,8 @@ namespace Blocks.Gameplay.Core
             }
 
             int segment = FindSegment(arcLength);
-            Vector3 a = waypoints[segment] + transform.position;
-            Vector3 b = waypoints[segment + 1] + transform.position;
+            Vector3 a = PathPoint(segment);
+            Vector3 b = PathPoint(segment + 1);
             float segLen = m_CumulativeLength[segment + 1] - m_CumulativeLength[segment];
             float t = segLen > 0.0001f ? (arcLength - m_CumulativeLength[segment]) / segLen : 0f;
 
@@ -331,10 +369,10 @@ namespace Blocks.Gameplay.Core
             Gizmos.color = Color.cyan;
             for (int i = 0; i < waypoints.Length - 1; i++)
             {
-                Gizmos.DrawLine(waypoints[i] + transform.position + Vector3.up * radius, waypoints[i + 1] + transform.position + Vector3.up * radius);
-                Gizmos.DrawWireSphere(waypoints[i] + transform.position + Vector3.up * radius, radius);
+                Gizmos.DrawLine(PathPoint(i) + Vector3.up * radius, PathPoint(i + 1) + Vector3.up * radius);
+                Gizmos.DrawWireSphere(PathPoint(i) + Vector3.up * radius, radius);
             }
-            Gizmos.DrawWireSphere(waypoints[waypoints.Length - 1] + transform.position + Vector3.up * radius, radius);
+            Gizmos.DrawWireSphere(PathPoint(waypoints.Length - 1) + Vector3.up * radius, radius);
         }
     }
 }

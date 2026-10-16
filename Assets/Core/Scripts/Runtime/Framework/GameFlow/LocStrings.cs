@@ -272,6 +272,12 @@ namespace Blocks.Gameplay.Core
             ["Deuteranopia"] = new[] { "Deuteranopía", "Deuteranopia", "Deutéranopie", "Deuteranopie", "Deuteranopia" },
             ["Tritanopia"] = new[] { "Tritanopía", "Tritanopia", "Tritanopie", "Tritanopie", "Tritanopia" },
             ["SETTINGS"] = new[] { "AJUSTES", "IMPOSTAZIONI", "PARAMÈTRES", "EINSTELLUNGEN", "AJUSTES" },
+            ["Loading"] = new[] { "Cargando", "Caricamento", "Chargement", "Laden", "Carregando" },
+            ["Press Any Key to Start"] = new[] { "Pulsa cualquier tecla para empezar", "Premi un tasto per iniziare", "Appuyez sur une touche pour commencer", "Beliebige Taste drücken zum Starten", "Pressione qualquer tecla para começar" },
+            ["Waiting for other players"] = new[] { "Esperando a los demás jugadores", "In attesa degli altri giocatori", "En attente des autres joueurs", "Warte auf die anderen Spieler", "Aguardando os outros jogadores" },
+            ["CAMERA ZOOM IN"] = new[] { "ACERCAR CÁMARA", "ZOOM AVANTI", "ZOOM AVANT", "HERANZOOMEN", "APROXIMAR CÂMERA" },
+            ["CAMERA ZOOM OUT"] = new[] { "ALEJAR CÁMARA", "ZOOM INDIETRO", "ZOOM ARRIÈRE", "HERAUSZOOMEN", "AFASTAR CÂMERA" },
+            ["{0} SECONDS REMAINING"] = new[] { "QUEDAN {0} SEGUNDOS", "{0} SECONDI RIMASTI", "{0} SECONDES RESTANTES", "NOCH {0} SEKUNDEN", "{0} SEGUNDOS RESTANTES" },
         };
     }
 }

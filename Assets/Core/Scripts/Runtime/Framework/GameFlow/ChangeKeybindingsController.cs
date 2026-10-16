@@ -100,8 +100,9 @@ namespace Blocks.Gameplay.Core
     ///
     /// CONTROLS OVERHAUL (2026-10-12): the rows are now Move (gamepad) / Move Forward, Strafe Left, Strafe
     /// Right, Move Back (keyboard), Camera (gamepad only - the mouse always aims), Jump, Parkour, Interact,
-    /// Use Item, Toggle Walk, Bet Yes, Bet No, Bet Multiplier, Dismiss Current Bet, Open Escape Menu and Open
-    /// Wagers Menu. Real actions: Move, Camera = Look, Jump, Parkour = Grab (the old grab button - hold it
+    /// Use Item, Toggle Walk, Bet Yes, Bet No, Bet Multiplier, Dismiss Current Bet, Open Escape Menu, Open
+    /// Wagers Menu, and (added 2026-10-16) Camera Zoom In / Camera Zoom Out - held to zoom; D-Pad Up / Down and
+    /// = / - by default, and the mouse wheel always zooms as well. Real actions: Move, Camera = Look, Jump, Parkour = Grab (the old grab button - hold it
     /// to wall run / grind / climb), Toggle Walk = Sprint (Dan swapped the walk/run speeds, so the Sprint
     /// action is what walks now), Open Escape Menu = Menu. The rest are stored in settings.json until the
     /// game has actions for them. Camera, like Move, only listens for a stick.
@@ -249,6 +250,8 @@ namespace Blocks.Gameplay.Core
             AddRow(list, "DISMISS CURRENT BET", "DismissBet");
             AddRow(list, "OPEN ESCAPE MENU", "OpenEscapeMenu");
             AddRow(list, "OPEN WAGERS MENU", "OpenWagersMenu");
+            AddRow(list, "CAMERA ZOOM IN", "CameraZoomIn");
+            AddRow(list, "CAMERA ZOOM OUT", "CameraZoomOut");
             if (m_UseGamepad) AddRumbleRow(list);
 
             // Same absolutely-positioned bottom-right column as the other GameFlow screens, with Restore
@@ -763,6 +766,8 @@ namespace Blocks.Gameplay.Core
                     "BetMultiplier" => pad.BetMultiplier,
                     "DismissBet" => pad.DismissBet,
                     "OpenWagersMenu" => pad.OpenWagersMenu,
+                    "CameraZoomIn" => pad.CameraZoomIn,
+                    "CameraZoomOut" => pad.CameraZoomOut,
                     _ => "?"
                 };
             }
@@ -777,6 +782,8 @@ namespace Blocks.Gameplay.Core
                 "BetMultiplier" => keys.BetMultiplier,
                 "DismissBet" => keys.DismissBet,
                 "OpenWagersMenu" => keys.OpenWagersMenu,
+                "CameraZoomIn" => keys.CameraZoomIn,
+                "CameraZoomOut" => keys.CameraZoomOut,
                 _ => "?"
             };
         }
@@ -795,6 +802,8 @@ namespace Blocks.Gameplay.Core
                     case "BetMultiplier": pad.BetMultiplier = rawValue; break;
                     case "DismissBet": pad.DismissBet = rawValue; break;
                     case "OpenWagersMenu": pad.OpenWagersMenu = rawValue; break;
+                    case "CameraZoomIn": pad.CameraZoomIn = rawValue; break;
+                    case "CameraZoomOut": pad.CameraZoomOut = rawValue; break;
                 }
                 return;
             }
@@ -809,6 +818,8 @@ namespace Blocks.Gameplay.Core
                 case "BetMultiplier": keys.BetMultiplier = rawValue; break;
                 case "DismissBet": keys.DismissBet = rawValue; break;
                 case "OpenWagersMenu": keys.OpenWagersMenu = rawValue; break;
+                case "CameraZoomIn": keys.CameraZoomIn = rawValue; break;
+                case "CameraZoomOut": keys.CameraZoomOut = rawValue; break;
             }
         }
 

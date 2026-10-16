@@ -29,6 +29,24 @@ namespace Blocks.Gameplay.Core
             return false;
         }
 
+        /// <summary>The keyboard key or gamepad button is being held down.</summary>
+        public static bool IsHeld(string keyboardControl, string gamepadControl)
+        {
+            if (Keyboard.current != null && !string.IsNullOrEmpty(keyboardControl))
+            {
+                var key = Keyboard.current.TryGetChildControl<KeyControl>(keyboardControl);
+                if (key != null && key.isPressed) return true;
+            }
+
+            Gamepad pad = Gamepad.current;
+            if (pad != null && !string.IsNullOrEmpty(gamepadControl) && Application.isFocused)
+            {
+                ButtonControl button = FindButton(pad, gamepadControl);
+                if (button != null && button.isPressed) return true;
+            }
+            return false;
+        }
+
         private static ButtonControl FindButton(Gamepad pad, string name)
         {
             var direct = pad.TryGetChildControl<ButtonControl>(name);

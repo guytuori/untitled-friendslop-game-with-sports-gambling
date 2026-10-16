@@ -241,10 +241,10 @@ namespace Blocks.Gameplay.Core
             }
 
             EditorUtility.SetDirty(selected);
-            Debug.Log($"[Friendslop] Split '{selected.name}' into {created} per-material colliders ({iceSubmeshes} using '{icePhysicMaterial.name}', {climbableSubmeshes} tagged '{nameof(ClimbableWall)}' from '{WallClimbKeyword}' material, {challengeSubmeshes} wired up as challenge start/finish triggers, {spawnPointSubmeshes} '{PlayerSpawnPointKeyword}' tile(s) made invisible, {skipped} skipped as balance-beam/grind-rail/pole/player_spawn_point material - see MapObstacleSetup). Remember to save the scene." +
+            Debug.Log($"[Friendslop] Split '{selected.name}' into {created} per-material colliders ({iceSubmeshes} using '{icePhysicMaterial.name}', {climbableSubmeshes} tagged '{nameof(ClimbableWall)}' from '{WallClimbKeyword}' material, {challengeSubmeshes} wired up as challenge start/finish triggers, {spawnPointSubmeshes} '{PlayerSpawnPointKeyword}' tile(s) made invisible, {skipped} skipped as balance-beam/grind-rail/pole/player_spawn_point material ). Remember to save the scene." +
                 (climbableSubmeshes > 0 ? " Make sure the player prefab has WallClimbAbility on it too, and that its wallLayers includes whatever layer these colliders are on." : "") +
                 (challengeSubmeshes > 0 ? $" Check '{selected.name}''s new ChallengeZone component for its ChallengeDefinition asset and tweak its name/points/pars." : "") +
-                (spawnPointSubmeshes > 0 ? " Run Friendslop > Build Balance Beams And Grind Rails And Poles From Map (or Refresh Everything From Assets) afterward so PlayerSpawnPoint markers get created for these tiles." : ""));
+                (spawnPointSubmeshes > 0 ? " These tiles don't get PlayerSpawnPoint markers any more (the old per-material obstacle tool was removed) - use Friendslop > Set Object Property > Player Spawn Point on a spawn object instead." : ""));
         }
 
         /// <summary>

@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43382ec14880e5b4a98687e08f8e8e4e, type: 3}
+  m_Name: VoiceCatalog
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.VoiceCatalog
+  clips:
+  - id: 10seconds
+    clip: {fileID: 8300000, guid: 9caaf3aa1eadf2f4da60a8782947deac, type: 3}
+  - id: 30seconds
+    clip: {fileID: 8300000, guid: 27f4c5142dfea6d499200c815c203834, type: 3}
+  - id: 321
+    clip: {fileID: 8300000, guid: 2b7932289b540134881ce4253b5ea842, type: 3}
+  - id: five
+    clip: {fileID: 8300000, guid: 70fddf9a213e6b1469acea9ffab4d3a8, type: 3}
+  - id: four
+    clip: {fileID: 8300000, guid: bd415f1a591c1854582b93ab6cd733fd, type: 3}
+  - id: one
+    clip: {fileID: 8300000, guid: 52325fd944d585541bd723c4d21bf65c, type: 3}
+  - id: three
+    clip: {fileID: 8300000, guid: 7647882a76d486748ad6ef09b283c63e, type: 3}
+  - id: time
+    clip: {fileID: 8300000, guid: ca627cc0a45eb1f43982c0a225307db4, type: 3}
+  - id: two
+    clip: {fileID: 8300000, guid: 71d3a815624b9d347a1a518d620bdb83, type: 3}

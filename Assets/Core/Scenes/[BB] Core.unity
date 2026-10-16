@@ -427,6 +427,7 @@ MonoBehaviour:
   gameRulesConfig: {fileID: 11400000, guid: c51b3671a65601b4b8e53c9e777cc9cc, type: 2}
   tallySeconds: 1.5
   resultSeconds: 4
+  playIntro: 1
 --- !u!114 &1129721987
 MonoBehaviour:
   m_ObjectHideFlags: 0

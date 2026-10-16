@@ -24,6 +24,16 @@ namespace Blocks.Gameplay.Core
     /// TARGET: the team target is the round's per-player target times the number of players. The per-player
     /// target is Average Target Score x Target Score Growth^(round - 1) (see MatchProgress.PerPlayerTarget).
     ///
+    /// INTRO: a round starts in the Intro phase (not in practice, or with Play Intro unticked): the course
+    /// flyover with "Press Any Key to Start" (<see cref="MatchIntro"/>). Timers don't run, nobody can move, bet
+    /// or claim challenges. Each player's press reaches the master client (<see cref="ReportLocalIntroReady"/>);
+    /// once every player in the session has pressed, the master switches to Countdown for everyone.
+    ///
+    /// COUNTDOWN: between the intro (or the scene loading, with Play Intro unticked) and Playing - the
+    /// announcer's "3, 2, 1, PARKOUR!" (<see cref="RoundAnnouncer"/>). Still no timers, moving, betting or Esc
+    /// menu. It lasts <see cref="CountdownSeconds"/> - the moment "PARKOUR!" starts in the 321 clip - and then
+    /// the master switches to Playing. Not in practice.
+    ///
     /// ROUND END: Playing -> Tallying (a short pause so the last bonus points reach everyone's score) ->
     /// Ended (the result: everyone's scores added up against the target, shown for a few seconds; every
     /// client records the results in MatchProgress at this point) -> the master client loads the Round
@@ -38,10 +48,15 @@ namespace Blocks.Gameplay.Core
         {
             Playing = 0,
             Tallying = 1,
-            Ended = 2
+            Ended = 2,
+            Intro = 3,     // before Playing: the course flyover, waiting for everyone to press a key (see MatchIntro)
+            Countdown = 4  // after the intro, before Playing: "3, 2, 1, PARKOUR!" (see RoundAnnouncer)
         }
 
         private const int MaxPlayers = 32;
+
+        /// <summary>Seconds of "3, 2, 1" before the round starts: where "PARKOUR!" begins in the 321 voice clip.</summary>
+        public const float CountdownSeconds = 1.192f;
         private const string RoundOverInputLock = "RoundOver";
 
         [Header("Configuration")]
@@ -53,6 +68,9 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("Seconds the result is shown before everyone moves on to Round Results / Final Score.")]
         [SerializeField] private float resultSeconds = 4f;
+
+        [Tooltip("Show the course flyover and wait for everyone to press a key before each round (never in practice).")]
+        [SerializeField] private bool playIntro = true;
 
         /// <summary>The single RoundTimer for the current scene, once it has awoken.</summary>
         public static RoundTimer Instance { get; private set; }
@@ -69,6 +87,8 @@ namespace Blocks.Gameplay.Core
         [Networked] private TickTimer NetPhaseTimer { get; set; }
         [Networked, Capacity(MaxPlayers)] private NetworkArray<int> NetFinishedIds => default;
         [Networked] private int NetFinishedCount { get; set; }
+        [Networked, Capacity(MaxPlayers)] private NetworkArray<int> NetIntroReadyIds => default;
+        [Networked] private int NetIntroReadyCount { get; set; }
 
         private HostGameRulesData m_Rules;
         private float m_LastTimeRemaining = -1f;
@@ -76,6 +96,7 @@ namespace Blocks.Gameplay.Core
         private int m_LastPhase = -1;
         private int m_LastFinishedKey;
         private int m_LastRoundKey;
+        private int m_LastIntroReadyCount = -1;
         private bool m_LoadRequested;
         private bool m_ResultsRecorded;
         private readonly HashSet<ulong> m_FadedPlayers = new HashSet<ulong>();
@@ -105,6 +126,15 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>Only meaningful once <see cref="Phase"/> is Ended: the team's final total.</summary>
         public int FinalTeamTotal => IsSpawned ? NetFinalTeamTotal : 0;
+
+        /// <summary>During the intro: how many players have pressed a key.</summary>
+        public int IntroReadyCount => IsSpawned ? Mathf.Clamp(NetIntroReadyCount, 0, MaxPlayers) : 0;
+
+        /// <summary>Players in the session right now.</summary>
+        public int ActivePlayerCount => CountPlayers();
+
+        /// <summary>Raised on every client when another player presses a key during the intro.</summary>
+        public event Action IntroReadyChanged;
 
         /// <summary>Points per whole second left on the bonus timer when reaching the end point.</summary>
         public int BonusPointsPerSecond => Rules.BonusPointsPerSecond;
@@ -154,10 +184,16 @@ namespace Blocks.Gameplay.Core
                 NetBonusRemaining = Mathf.Max(0, m_Rules.BonusTimeSeconds);
                 NetRoundNumber = round;
                 NetPerPlayerTarget = MatchProgress.PerPlayerTarget(m_Rules, round);
-                NetPhase = (int)RoundPhase.Playing;
+                RoundPhase start = PracticeMode.IsActive ? RoundPhase.Playing : playIntro ? RoundPhase.Intro : RoundPhase.Countdown;
+                NetPhase = (int)start;
+                if (start == RoundPhase.Countdown) NetPhaseTimer = TickTimer.CreateFromSeconds(Runner, CountdownSeconds);
                 NetFinishedCount = 0;
+                NetIntroReadyCount = 0;
                 NetInitialized = true;
             }
+
+            if (NetPhase == (int)RoundPhase.Intro) MatchIntro.Begin(this);
+            if (!PracticeMode.IsActive) RoundAnnouncer.Begin(this); // the countdown, time callouts and "TIME!"
 
             // End points in the scene itself (maps placed by hand); MatchLayout does the same for its map.
             PlayerEndPoint.SetUpAllInLoadedScenes();
@@ -172,6 +208,23 @@ namespace Blocks.Gameplay.Core
 
             switch ((RoundPhase)NetPhase)
             {
+                case RoundPhase.Intro:
+                    if (EveryoneIntroReady())
+                    {
+                        NetPhase = (int)RoundPhase.Countdown;
+                        NetPhaseTimer = TickTimer.CreateFromSeconds(Runner, CountdownSeconds);
+                        Debug.Log($"[Round] Everyone's ready - round {NetRoundNumber} countdown.", this);
+                    }
+                    break;
+
+                case RoundPhase.Countdown:
+                    if (NetPhaseTimer.ExpiredOrNotRunning(Runner))
+                    {
+                        NetPhase = (int)RoundPhase.Playing;
+                        Debug.Log($"[Round] Round {NetRoundNumber} starts.", this);
+                    }
+                    break;
+
                 case RoundPhase.Playing:
                     NetTimeRemaining = Mathf.Max(0f, NetTimeRemaining - Runner.DeltaTime);
                     NetBonusRemaining = Mathf.Max(0f, NetBonusRemaining - Runner.DeltaTime);
@@ -289,6 +342,53 @@ namespace Blocks.Gameplay.Core
 
         #endregion
 
+        #region Intro
+
+        /// <summary>This machine's player pressed a key on the intro (MatchIntro).</summary>
+        public void ReportLocalIntroReady()
+        {
+            if (!IsSpawned || NetPhase != (int)RoundPhase.Intro) return;
+            IntroReadyRpc();
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void IntroReadyRpc(RpcInfo info = default)
+        {
+            ulong playerId = NetworkPlayers.ToClientId(info.Source);
+            if (playerId == 0) playerId = NetworkPlayers.ToClientId(Runner.LocalPlayer);
+            if (playerId == 0 || NetPhase != (int)RoundPhase.Intro || IsIntroReady(playerId)) return;
+
+            int count = Mathf.Clamp(NetIntroReadyCount, 0, MaxPlayers);
+            if (count >= MaxPlayers) return;
+            NetIntroReadyIds.Set(count, (int)playerId);
+            NetIntroReadyCount = count + 1;
+            DetectChanges();
+        }
+
+        private bool IsIntroReady(ulong playerId)
+        {
+            int count = Mathf.Clamp(NetIntroReadyCount, 0, MaxPlayers);
+            for (int i = 0; i < count; i++)
+            {
+                if ((ulong)NetIntroReadyIds[i] == playerId) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Every player in the session (not just everyone who ever pressed) has pressed a key.</summary>
+        private bool EveryoneIntroReady()
+        {
+            int players = 0;
+            foreach (PlayerRef player in Runner.ActivePlayers)
+            {
+                if (!IsIntroReady(NetworkPlayers.ToClientId(player))) return false;
+                players++;
+            }
+            return players > 0;
+        }
+
+        #endregion
+
         #region Team Score
 
         /// <summary>Everyone's current score added up.</summary>
@@ -341,6 +441,12 @@ namespace Blocks.Gameplay.Core
                 RoundInfoChanged?.Invoke();
             }
 
+            if (NetIntroReadyCount != m_LastIntroReadyCount)
+            {
+                m_LastIntroReadyCount = NetIntroReadyCount;
+                IntroReadyChanged?.Invoke();
+            }
+
             int finishedKey = BuildFinishedKey();
             if (finishedKey != m_LastFinishedKey)
             {
@@ -390,7 +496,8 @@ namespace Blocks.Gameplay.Core
 
         private void OnPhaseChangedLocally(RoundPhase phase)
         {
-            if (phase == RoundPhase.Playing) return;
+            // The intro and the countdown handle their own locks (MatchIntro, RoundAnnouncer).
+            if (phase == RoundPhase.Playing || phase == RoundPhase.Intro || phase == RoundPhase.Countdown) return;
 
             // The round is over for everyone - nobody moves any more.
             CorePlayerManager local = NetworkPlayers.Local;

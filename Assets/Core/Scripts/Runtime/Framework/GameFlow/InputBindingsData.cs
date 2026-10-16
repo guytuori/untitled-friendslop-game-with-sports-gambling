@@ -36,6 +36,10 @@ namespace Blocks.Gameplay.Core
         public string DismissBet = "4";
 
         public string OpenWagersMenu = "5";
+
+        // The mouse wheel always zooms too (CoreCameraController); these are for holding a key instead.
+        public string CameraZoomIn = "equals";
+        public string CameraZoomOut = "minus";
     }
 
     /// <summary>
@@ -58,6 +62,10 @@ namespace Blocks.Gameplay.Core
         public string DismissBet = "rightTrigger";  // R2
 
         public string OpenWagersMenu = "select";    // Select (- on a Switch)
+
+        // Held to zoom the camera in / out (CoreCameraController). The right stick already aims.
+        public string CameraZoomIn = "dpad/up";
+        public string CameraZoomOut = "dpad/down";
 
         /// <summary>Change Keybindings' ENABLE RUMBLE checkbox (gamepad layout only). On by default. Read at runtime through <see cref="GamepadRumble"/>.</summary>
         public bool RumbleEnabled = true;

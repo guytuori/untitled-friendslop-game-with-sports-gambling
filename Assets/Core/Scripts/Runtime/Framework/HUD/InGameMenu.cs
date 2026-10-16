@@ -41,6 +41,27 @@ namespace Blocks.Gameplay.Core
         /// <summary>True while any player's Escape menu is open on this machine (there's only ever one).</summary>
         public static bool IsOpen { get; private set; }
 
+        /// <summary>
+        /// While true the Menu button does nothing (the round's "3, 2, 1" countdown, see RoundAnnouncer).
+        /// Use <see cref="Suppress"/>, which also closes the menu if it's open.
+        /// </summary>
+        public static bool Suppressed { get; private set; }
+
+        private static InGameMenu s_Instance;
+
+        /// <summary>
+        /// Turns the Menu button off (and closes the menu, unless a settings screen is up - that's left to its
+        /// own Back) or back on.
+        /// </summary>
+        public static void Suppress(bool suppressed)
+        {
+            Suppressed = suppressed;
+            if (!suppressed || s_Instance == null || !IsOpen) return;
+            if (SettingsOverlay.IsOpen || s_Instance.m_Finished || s_Instance.m_Leaving) return;
+            if (s_Instance.m_Picker != null && s_Instance.m_Picker.IsOpen) s_Instance.ClosePicker();
+            s_Instance.Close();
+        }
+
         private VisualElement m_Overlay;
         private VisualElement m_MenuPanel;
         private VisualElement m_ConfirmPanel;
@@ -83,6 +104,7 @@ namespace Blocks.Gameplay.Core
 
             m_ChallengeMode = PracticeMode.IsChallenge;
             m_HudRoot = root;
+            s_Instance = this;
             BuildUI(root);
             CoreInputHandler.MenuPressed += HandleMenuPressed;
             SettingsOverlay.Closed += HandleSettingsClosed;
@@ -93,6 +115,7 @@ namespace Blocks.Gameplay.Core
         {
             CoreInputHandler.MenuPressed -= HandleMenuPressed;
             PracticeMode.ChallengeFinished -= ShowFinished;
+            if (s_Instance == this) s_Instance = null;
             SettingsOverlay.Closed -= HandleSettingsClosed;
             if (IsOpen)
             {
@@ -258,6 +281,7 @@ namespace Blocks.Gameplay.Core
         private void HandleMenuPressed(InputControl control)
         {
             if (m_Leaving) return;
+            if (Suppressed && !IsOpen) return; // the round's countdown
             if (m_Finished || (m_Picker != null && m_Picker.IsOpen)) return; // pick something (or B / Esc out of the list)
             if (SettingsOverlay.IsOpen) return; // a settings screen is up - its own Back closes it
 

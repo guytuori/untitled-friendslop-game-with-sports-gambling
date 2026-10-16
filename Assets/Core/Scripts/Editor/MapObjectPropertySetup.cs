@@ -8,7 +8,7 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// Assigns a single <see cref="MapObjectPropertyType"/> to one or more whole selected objects, and
     /// builds/tears down whatever collider(s) and component(s) that property needs - the small-object
-    /// counterpart to <see cref="MapColliderSetup"/> and <see cref="MapObstacleSetup"/>, which used to
+    /// counterpart to <see cref="MapColliderSetup"/> and the old MapObstacleSetup (removed 2026-10-16), which used to
     /// derive the same properties per-submesh from a single giant, multi-material combined map mesh (by
     /// material name).
     ///
@@ -37,11 +37,14 @@ namespace Blocks.Gameplay.Core
     ///   class summary). To chain several beam objects into one continuous run, hand-assign their Next In
     ///   Chain / Previous In Chain fields in the Inspector after tagging each one - exactly like before,
     ///   this tool doesn't need to do that automatically anymore since each beam is now its own object.
-    /// - Grind Rail: no collider at all (rails were always collider-less - a proximity-snap mechanic, not
-    ///   a physical surface). This tool DOES auto-detect the object's long axis from its mesh (unlike
-    ///   Pole/Balance Beam) and buckets a waypoint chain along it, converted to world space, so a curved
-    ///   rail object still produces a reasonably faithful path - see MapObstacleSetup's BuildRail, which
-    ///   this mirrors.
+    /// - Grind Rail (rebuilt 2026-10-16): turns the exported rail into Dan's segmented grind rail - see
+    ///   <see cref="GrindRailBuilder"/>. The rail's centre line is traced from the mesh's bars (any shape:
+    ///   straight, bent, sloped, rings, several rails in one object), each run gets a GrindRail with local-space
+    ///   waypoints along the top of the bar, rings are split into two overlapping halves (Dan's double-ring
+    ///   trick), and his Grind-layer segment colliders (sized to the bar) are built along it under a
+    ///   "[Grind Rail]" child. The exported mesh stays as the visible rail (the user preferred the map editor's
+    ///   look to Dan's cylinders). A mesh that isn't made of thin bars falls back to one path along its long
+    ///   axis (the old behaviour).
     /// - Player Spawn Point: no collider, renderer hidden (its original material(s) are saved on the
     ///   object's MapObjectProperty and restored automatically if you switch it to any other property
     ///   later), plus a <see cref="PlayerSpawnPoint"/> marker - GameManager auto-discovers these at
@@ -305,6 +308,7 @@ namespace Blocks.Gameplay.Core
             RemoveComponent<Pole>(obj);
             RemoveComponent<BalanceBeam>(obj);
             RemoveComponent<GrindRail>(obj);
+            GrindRailBuilder.Remove(obj); // also turns the exported mesh back on
             RemoveComponent<PlayerSpawnPoint>(obj);
             RemoveComponent<PlayerEndPoint>(obj);
             RemoveComponent<WaterVolume>(obj);
@@ -373,6 +377,18 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private static void BuildGrindRail(GameObject obj, MeshFilter meshFilter)
         {
+            List<GrindRailBuilder.RailPath> paths = GrindRailBuilder.ExtractPaths(meshFilter.sharedMesh, out string problem);
+            if (paths == null)
+            {
+                Debug.LogWarning($"[Friendslop] '{obj.name}': couldn't trace the rail's path ({problem}) - using one straight-ish path along the mesh's longest direction instead.", obj);
+                paths = new List<GrindRailBuilder.RailPath> { new GrindRailBuilder.RailPath { Points = LongAxisPath(meshFilter) } };
+            }
+            Debug.Log($"[Friendslop] '{obj.name}' is now a grind rail: {GrindRailBuilder.Build(obj, paths)}.", obj);
+        }
+
+        /// <summary>The old way: waypoints bucketed along the mesh's long axis (local space).</summary>
+        private static List<Vector3> LongAxisPath(MeshFilter meshFilter)
+        {
             Vector3[] localVerts = meshFilter.sharedMesh.vertices;
             var points = new List<Vector3>(localVerts);
 
@@ -385,16 +401,7 @@ namespace Blocks.Gameplay.Core
                 waypointsLocal = new List<Vector3> { extremeA, extremeB };
             }
 
-            float radius = Mathf.Max(MaxDistanceToPolyline(points, waypointsLocal), MinCrossSectionRadius);
-
-            var waypointsWorld = new Vector3[waypointsLocal.Count];
-            for (int i = 0; i < waypointsLocal.Count; i++)
-            {
-                waypointsWorld[i] = obj.transform.TransformPoint(waypointsLocal[i]);
-            }
-
-            GrindRail rail = Undo.AddComponent<GrindRail>(obj);
-            rail.Configure(waypointsWorld, radius);
+            return waypointsLocal;
         }
 
         /// <summary>

@@ -33,6 +33,7 @@ GameObject:
   - component: {fileID: 5966205889610531261}
   - component: {fileID: 6569999559478425308}
   - component: {fileID: 1014762151436196122}
+  - component: {fileID: 2938024110608592086}
   m_Layer: 3
   m_Name: '[BB] CorePlayer_robot'
   m_TagString: Player
@@ -126,6 +127,8 @@ MonoBehaviour:
   onJumpReleased: {fileID: 11400000, guid: 4c295680fb10f4080ae6688f6a96a009, type: 2}
   onSprintStateChanged: {fileID: 11400000, guid: c3ec94fe2e7dd47aaadddb5e98e7c375, type: 2}
   onGrabStateChanged: {fileID: 11400000, guid: 8f025844fa794da8b5eab619f5139e5c, type: 2}
+  onGrabPressed: {fileID: 0}
+  onGrabReleased: {fileID: 0}
   onPrimaryActionPressed: {fileID: 11400000, guid: f48adbe17161042ef8cf65a5a455594a, type: 2}
   onPrimaryActionReleased: {fileID: 11400000, guid: a670f0da4a4d64cea91ff13081e68da8, type: 2}
   onMenuPressed: {fileID: 11400000, guid: 5f76e3427057c467fa2f4de049753b9e, type: 2}
@@ -209,6 +212,11 @@ MonoBehaviour:
   stickYawSpeed: 200
   stickPitchSpeed: 140
   stickResponseCurve: 1
+  zoomMinDistance: 3
+  defaultZoomOut: 0.8
+  zoomPerNotch: 0.1
+  zoomHoldSeconds: 1.25
+  zoomSmoothing: 14
   onLookInput: {fileID: 11400000, guid: 8af931367978e4bc9bae53b88856ff5b, type: 2}
 --- !u!114 &8754785922802519086
 MonoBehaviour:
@@ -419,10 +427,13 @@ MonoBehaviour:
   climbSpeedMultiplier: 0.5
   shimmySpeedMultiplier: 0.5
   staminaCostPerSecond: 8
-  jumpOffHeightMultiplier: 1
-  jumpOffPushForce: 6
+  jumpHeight: 2.2
+  jumpPushForce: 7
   regrabCooldown: 0.25
+  poleAngleLowerBound: 50
+  poleAngleUpperBound: 125
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+  characterHeight: 2
 --- !u!114 &3308432048302639970
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -444,18 +455,21 @@ MonoBehaviour:
   minPressInto: 0.4
   climbSpeedMultiplier: 0.5
   shimmySpeedMultiplier: 0.5
+  slideSpeedMultiplier: 1
   staminaCostPerSecond: 10
   stickForce: 2
   wallJumpHeight: 2.2
   wallJumpPushForce: 25
   regrabCooldown: 0.25
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+  onGrabPressed: {fileID: 0}
+  onGrabReleased: {fileID: 0}
   animationControls: {fileID: 0}
   topCheckOffsetY: 1
   wallLayer:
     serializedVersion: 2
     m_Bits: 0
-  wallJumpStyle: 0
+  angleToconsiderJumpControlled: 100
 --- !u!114 &6234546863735232799
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -544,6 +558,7 @@ MonoBehaviour:
   - {fileID: 6234546863735232799}
   - {fileID: 6055781965095516926}
   - {fileID: 1014762151436196122}
+  - {fileID: 2938024110608592086}
   - {fileID: 7953130617200337129}
   ForceRemoteRenderTimeframe: 0
 --- !u!114 &6569999559478425308
@@ -602,9 +617,42 @@ MonoBehaviour:
   Animator: {fileID: 4397250744277509611}
   ApplyTiming: 2
   SyncSettings: 127
-  StateHashes: 0000000084ca1cc0f9c6230b1c6a54339e2518b671a7e1076b36dbedb1afdc305a6c54cd8a18fce4b9abd9d3fd143d581376f52d0b878ad8e5e542ad2b26b0be9bd70fe062eeef729ff9d7077a2aa9012be8f304
+  StateHashes: 0000000084ca1cc0f9c6230b1c6a54339e2518b671a7e1076b36dbedb1afdc305a6c54cd8a18fce4b9abd9d3fd143d581376f52d0b878ad8e5e542ad2b26b0be9bd70fe062eeef729ff9d70797a04ef32fcbea22fa2254c04249f011
   TriggerHashes: 0000000018dd2738c8919f480b878ad8797964ad6661c296
   TotalWords: 7
+--- !u!114 &2938024110608592086
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4416926081852918481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49f7019665d36be4686a05b26ea9265d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.WallRunAbility
+  wallLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  wallCheckDistance: 0.6
+  wallCheckRadius: 0.15
+  maxWallSurfaceAngle: 20
+  minPressInto: 0.4
+  climbSpeedMultiplier: 0.5
+  shimmySpeedMultiplier: 0.5
+  staminaCostPerSecond: 10
+  stickForce: 2
+  wallJumpHeight: 2.2
+  wallJumpPushForce: 7
+  regrabCooldown: 0.25
+  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+  animationControls: {fileID: 0}
+  topCheckOffsetY: 1
+  wallLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  wallJumpStyle: 0
 --- !u!1 &8338988566280778634
 GameObject:
   m_ObjectHideFlags: 0

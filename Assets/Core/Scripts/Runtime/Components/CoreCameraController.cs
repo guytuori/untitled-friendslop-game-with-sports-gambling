@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Unity.Cinemachine;
 using System.Collections.Generic;
 
@@ -8,6 +9,15 @@ namespace Blocks.Gameplay.Core
     /// Manages the player's camera rig, handling look input and switching between different camera modes.
     /// This component works with Cinemachine to control the active virtual camera by adjusting priorities.
     /// It should be attached to the player prefab and will only activate for the local owner.
+    ///
+    /// ZOOM (added 2026-10-16): the mouse wheel, or holding Camera Zoom In / Camera Zoom Out (Change
+    /// Keybindings; D-Pad Up / Down and = / - by default), moves the camera closer or further. The range
+    /// runs from <see cref="zoomMinDistance"/> (3 m - twice as close as the original 6 m default) out to
+    /// wherever puts the camera mode's own Camera Distance (12 m in [BB] FreeLook) at
+    /// <see cref="defaultZoomOut"/> (80%) of the way out - 14.25 m with the current numbers - and the camera
+    /// starts at that default. Each wheel notch is a fixed fraction of the current distance, so it feels the
+    /// same close in and far out. The zoom is kept between rounds (not saved between game launches). It
+    /// sets the CinemachineThirdPersonFollow's Camera Distance; the deoccluder still pulls in past walls.
     /// </summary>
     public class CoreCameraController : CoreNetworkBehaviour
     {
@@ -41,6 +51,20 @@ namespace Blocks.Gameplay.Core
         [Range(1f, 3f)]
         [SerializeField] private float stickResponseCurve = 1f;
 
+        [Header("Zoom")]
+        [Tooltip("Closest the camera can get, in meters.")]
+        [SerializeField] private float zoomMinDistance = 3f;
+        [Tooltip("How far out the camera mode's own Camera Distance is in the zoom range (0.8 = 80% of the way out). The range's far end is worked out from this.")]
+        [Range(0.1f, 1f)]
+        [SerializeField] private float defaultZoomOut = 0.8f;
+        [Tooltip("Each mouse wheel notch moves the camera this fraction of its current distance closer or further.")]
+        [Range(0.01f, 0.5f)]
+        [SerializeField] private float zoomPerNotch = 0.1f;
+        [Tooltip("Seconds to go all the way from closest to furthest while holding Camera Zoom In / Out.")]
+        [SerializeField] private float zoomHoldSeconds = 1.25f;
+        [Tooltip("How quickly the camera catches up with the zoom (higher = snappier).")]
+        [SerializeField] private float zoomSmoothing = 14f;
+
         [Header("Listening to Events")]
         [Tooltip("Event that provides look input from the CoreInputHandler.")]
         [SerializeField] private Vector2Event onLookInput;
@@ -67,6 +91,13 @@ namespace Blocks.Gameplay.Core
         private float m_VerticalLookLimit;
         private Vector2 m_StickLook;
         private CoreInputHandler m_StickInputSource;
+
+        // Zoom: 0 = closest .. 1 = furthest, kept for the next round's player (-1 = not set yet).
+        private static float s_ZoomOut = -1f;
+        private float m_ZoomTarget = -1f, m_ZoomDistance;
+        private CinemachineThirdPersonFollow m_ZoomFollow;
+        private readonly Dictionary<CinemachineThirdPersonFollow, float> m_FollowDefaults = new Dictionary<CinemachineThirdPersonFollow, float>();
+        private InputBindingsData m_Bindings;
 
         // Runtime references.
         private CinemachineBrain m_CinemachineBrain;
@@ -113,8 +144,13 @@ namespace Blocks.Gameplay.Core
                     m_StickInputSource = GetComponent<CoreInputHandler>();
                     if (m_StickInputSource != null) m_StickInputSource.StickLookChanged += SetStickLookInput;
                 }
+
+                m_Bindings = InputBindingsStore.Load();
+                InputBindingsStore.Saved += ReloadBindings;
             }
         }
+
+        private void ReloadBindings() => m_Bindings = InputBindingsStore.Load();
 
         public override void OnNetworkDespawn()
         {
@@ -143,6 +179,9 @@ namespace Blocks.Gameplay.Core
                     m_StickInputSource = null;
                 }
                 m_StickLook = Vector2.zero;
+                InputBindingsStore.Saved -= ReloadBindings;
+                m_ZoomFollow = null;
+                m_FollowDefaults.Clear();
             }
             base.OnNetworkDespawn();
         }
@@ -159,6 +198,8 @@ namespace Blocks.Gameplay.Core
                 Quaternion verticalRotation = Quaternion.Euler(m_CurrentVerticalLookAngle, 0f, 0f);
                 lookTarget.rotation = horizontalRotation * verticalRotation;
             }
+
+            if (IsOwner) UpdateZoom(Time.unscaledDeltaTime);
         }
 
         #endregion
@@ -441,6 +482,81 @@ namespace Blocks.Gameplay.Core
         public bool IsCameraModeRegistered(string modeName)
         {
             return m_RegisteredCameraModes.Exists(m => m.ModeName == modeName);
+        }
+
+        #endregion
+
+        #region Zoom
+
+        /// <summary>Mouse wheel / held zoom buttons -> the active camera mode's Camera Distance (see the class summary).</summary>
+        private void UpdateZoom(float deltaTime)
+        {
+            CinemachineThirdPersonFollow follow = ActiveCameraMode != null && ActiveCameraMode.CinemachineCamera != null
+                ? ActiveCameraMode.CinemachineCamera.GetComponent<CinemachineThirdPersonFollow>()
+                : null;
+            if (follow == null) return;
+
+            // The mode's own distance (before we ever changed it) is the default, 80% of the way out.
+            if (!m_FollowDefaults.TryGetValue(follow, out float standard))
+            {
+                standard = Mathf.Max(0.1f, follow.CameraDistance);
+                m_FollowDefaults[follow] = standard;
+            }
+            float min = Mathf.Min(zoomMinDistance, standard);
+            float max = min + (standard - min) / Mathf.Max(0.01f, defaultZoomOut);
+
+            if (follow != m_ZoomFollow || m_ZoomTarget < 0f)
+            {
+                m_ZoomFollow = follow;
+                m_ZoomTarget = s_ZoomOut >= 0f ? Mathf.Lerp(min, max, s_ZoomOut) : standard;
+                m_ZoomDistance = m_ZoomTarget;
+            }
+
+            if (CanZoom())
+            {
+                float notches = ScrollNotches();
+                if (notches != 0f) m_ZoomTarget *= Mathf.Pow(1f - zoomPerNotch, notches); // wheel up = closer
+
+                float hold = 0f;
+                if (m_Bindings != null)
+                {
+                    if (BoundControls.IsHeld(m_Bindings.Keyboard.CameraZoomIn, m_Bindings.Gamepad.CameraZoomIn)) hold -= 1f;
+                    if (BoundControls.IsHeld(m_Bindings.Keyboard.CameraZoomOut, m_Bindings.Gamepad.CameraZoomOut)) hold += 1f;
+                }
+                if (hold != 0f && max > min)
+                {
+                    float rate = Mathf.Log(max / min) / Mathf.Max(0.1f, zoomHoldSeconds); // whole range in zoomHoldSeconds
+                    m_ZoomTarget *= Mathf.Exp(hold * rate * deltaTime);
+                }
+            }
+
+            m_ZoomTarget = Mathf.Clamp(m_ZoomTarget, min, max);
+            s_ZoomOut = max > min ? Mathf.InverseLerp(min, max, m_ZoomTarget) : 1f;
+            m_ZoomDistance += (m_ZoomTarget - m_ZoomDistance) * (1f - Mathf.Exp(-zoomSmoothing * deltaTime));
+            follow.CameraDistance = m_ZoomDistance;
+        }
+
+        /// <summary>Not while a menu has the controls (Esc menu, betting pause) or the intro owns the camera.</summary>
+        private static bool CanZoom()
+        {
+            if (!Application.isFocused) return false;
+            if (CoreInputHandler.GameplayInputBlocked || InGameMenu.IsOpen || SettingsOverlay.IsOpen) return false;
+            if (MatchIntro.IsActive) return false;
+            return true;
+        }
+
+        /// <summary>Mouse wheel notches this frame (+ = away from you / up), whichever scroll scale the Input System uses.</summary>
+        private static float ScrollNotches()
+        {
+            Mouse mouse = Mouse.current;
+            if (mouse == null) return 0f;
+            float y = mouse.scroll.ReadValue().y;
+            if (Mathf.Abs(y) < 0.0001f) return 0f;
+
+            // KeepPlatformSpecificInputRange reports 120 per notch on Windows; UniformAcrossAllPlatforms reports about 1.
+            bool raw = InputSystem.settings != null &&
+                       InputSystem.settings.scrollDeltaBehavior == InputSettings.ScrollDeltaBehavior.KeepPlatformSpecificInputRange;
+            return Mathf.Clamp(raw ? y / 120f : y, -5f, 5f);
         }
 
         #endregion
