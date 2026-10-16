@@ -305,8 +305,8 @@ MonoBehaviour:
   moveSpeed: 9
   sprintSpeed: 3
   rotationSmoothTime: 0.1
-  speedChangeRate: 5
-  forceDecayRate: 2
+  speedChangeRate: 25
+  forceDecayRate: 5
   gravity: -30
   jumpHeight: 5
   groundedOffset: -0.14
@@ -364,7 +364,7 @@ MonoBehaviour:
   initialModeName: FreeLook
   enableLookInput: 1
   defaultLookSensitivity: 3
-  defaultVerticalLookLimit: 70
+  defaultVerticalLookLimit: 89
   stickDeadzone: 0.1
   stickYawSpeed: 200
   stickPitchSpeed: 140
@@ -421,7 +421,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 08b1147bca1a54974a6f52d1a504f530, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  airControl: 1
+  airControl: 0.3
   airRotationSpeed: 999
   conserveMomentum: 1
   minIceTurnGrip: 0.1
@@ -550,7 +550,7 @@ MonoBehaviour:
   fallOffHop: 2
   sameRailReentryGuard: 0.2
   snapDetectionRadius: 0.9
-  jumpOffHeightMultiplier: 0.3
+  jumpOffHeightMultiplier: 2
   momentumDecayDelay: 9
   airborneMomentumDecayPerSecond: 0.5
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
@@ -582,7 +582,10 @@ MonoBehaviour:
   jumpHeight: 2.2
   jumpPushForce: 7
   regrabCooldown: 0.25
+  poleAngleLowerBound: 50
+  poleAngleUpperBound: 125
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+  characterHeight: 2
 --- !u!114 &7587005557142702197
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -618,7 +621,6 @@ MonoBehaviour:
   wallLayer:
     serializedVersion: 2
     m_Bits: 0
-  wallJumpStyle: 0
   angleToconsiderJumpControlled: 100
 --- !u!114 &1069646715921968806
 MonoBehaviour:
@@ -671,7 +673,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 204474276cdae4814a085c01d89437ed, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.DoubleJumpAddon
-  doubleJumpHeight: 2
+  doubleJumpHeight: 5
   staminaCost: 0
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!114 &5505897753791863388

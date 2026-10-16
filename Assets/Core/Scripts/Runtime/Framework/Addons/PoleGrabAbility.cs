@@ -187,6 +187,8 @@ namespace Blocks.Gameplay.Core
 
         #region Pole Movement
     
+
+
         public bool IsPoleHorizontal(Pole _pole)
         {
             bool isHorizontal = Mathf.Abs(_pole.transform.eulerAngles.x) < poleAngleUpperBound && Mathf.Abs(_pole.transform.eulerAngles.x) > poleAngleLowerBound;
@@ -202,9 +204,11 @@ namespace Blocks.Gameplay.Core
         {
             if (IsPoleHorizontal(m_CurrentPole))
             {
-                ProcessHorizontalPoleMovement(rawInput, ref modifier);
+                ProcessSwingPoleMovement(rawInput, ref modifier);
                 return;
             }
+            Vector3 offset = (new Vector3(m_CurrentPole.transform.position.x,transform.position.y, m_CurrentPole.transform.position.z) - transform.position).normalized;
+            Vector3 fwd = Vector3.Cross(transform.up, offset);
 
             float climbSpeed = m_Motor.moveSpeed * climbSpeedMultiplier;
             float shimmySpeed = m_Motor.moveSpeed * shimmySpeedMultiplier;
@@ -222,26 +226,38 @@ namespace Blocks.Gameplay.Core
             Vector3 refDir = Vector3.Cross(axis, Vector3.up).sqrMagnitude > 0.0001f
                 ? Vector3.Cross(axis, Vector3.up).normalized
                 : Vector3.forward;
+
             Vector3 outward = Quaternion.AngleAxis(m_AngleDegrees, axis) * refDir;
+
             m_LastOutwardDir = outward;
 
             Vector3 targetPos = m_CurrentPole.Center + axis * m_HeightAlongAxis + outward * radius;
 
             m_Motor.SetPosition(targetPos, teleport: false);
             m_Motor.SetVerticalVelocity(0f);
+
+            m_Motor.RotationOverride = () => m_CurrentPole != null
+                ? Quaternion.LookRotation(fwd, Vector3.up)
+                : m_Motor.transform.rotation;
+
             modifier.OverrideGravity = true;
         }
 
+
+
         private void ProcessHorizontalPoleMovement(Vector2 rawInput, ref MovementModifier modifier)
         {
+            Vector3 offset = (new Vector3(transform.position.x, m_CurrentPole.transform.position.y, transform.position.z) - transform.position).normalized;
+            Vector3 fwd = Vector3.Cross(transform.right, offset);
+
 
             float climbSpeed = m_Motor.moveSpeed * climbSpeedMultiplier;
-            float shimmySpeed = m_Motor.moveSpeed * shimmySpeedMultiplier;
+            float shimmySpeed = m_Motor.moveSpeed * shimmySpeedMultiplier * 0.2f;
 
             float halfHeight = m_CurrentPole.WorldHalfHeight;
             m_HeightAlongAxis = Mathf.Clamp(m_HeightAlongAxis + rawInput.x * climbSpeed * Time.deltaTime, -halfHeight, halfHeight);
 
-            float radius = m_CurrentPole.WorldRadius + m_Controller.radius;
+            float radius = m_CurrentPole.WorldRadius;// + m_Controller.height;
             float circumference = 2f * Mathf.PI * Mathf.Max(0.01f, radius);
             float degreesPerSecond = (shimmySpeed / circumference) * 360f;
             // Positive stick-right shimmies clockwise, viewed from above looking down the pole's axis.
@@ -255,10 +271,45 @@ namespace Blocks.Gameplay.Core
             m_LastOutwardDir = outward;
 
             Vector3 targetPos = m_CurrentPole.Center + axis * m_HeightAlongAxis + outward * radius;
+            offset = (new Vector3(transform.position.x, m_CurrentPole.transform.position.y, transform.position.z)) - m_Motor.transform.position;
 
             m_Motor.SetPosition(targetPos, teleport: false);
             m_Motor.SetVerticalVelocity(0f);
             modifier.OverrideGravity = true;
+
+
+            m_Motor.RotationOverride = () => m_CurrentPole != null
+                   ? transform.rotation * Quaternion.AngleAxis(rawInput.y * degreesPerSecond * Time.deltaTime, m_CurrentPole.transform.up)
+                   : m_Motor.transform.rotation;
+
+        }
+        private void ProcessSwingPoleMovement(Vector2 rawInput, ref MovementModifier modifier)
+        {
+            Vector3 offset = (new Vector3(transform.position.x, m_CurrentPole.transform.position.y, transform.position.z) - transform.position).normalized;
+            Vector3 fwd = Vector3.Cross(transform.right, offset);
+
+
+            float climbSpeed = m_Motor.moveSpeed * climbSpeedMultiplier;
+            float shimmySpeed = m_Motor.moveSpeed * shimmySpeedMultiplier * 0.2f;
+
+            float halfHeight = m_CurrentPole.WorldHalfHeight;
+            m_HeightAlongAxis = Mathf.Clamp(m_HeightAlongAxis + rawInput.x * climbSpeed * Time.deltaTime, -halfHeight, halfHeight);
+
+
+            Vector3 axis = m_CurrentPole.Axis;
+    
+
+            Vector3 targetPos = m_CurrentPole.Center + axis * m_HeightAlongAxis + (characterHeight * Vector3.down);
+
+            m_Motor.SetPosition(targetPos, teleport: false);
+            m_Motor.SetVerticalVelocity(0f);
+            modifier.OverrideGravity = true;
+
+            Vector3 pointOnPole = m_CurrentPole.transform.position + (m_CurrentPole.Axis * m_HeightAlongAxis);
+            m_Motor.RotationOverride = () => m_CurrentPole != null
+            ? Quaternion.LookRotation((new Vector3(pointOnPole.x, transform.position.y, pointOnPole.z) + transform.forward)  - transform.position, Vector3.up)
+            : m_Motor.transform.rotation;
+
         }
 
 
@@ -271,22 +322,24 @@ namespace Blocks.Gameplay.Core
             m_HeightAlongAxis = height;
             m_LastOutwardDir = outward; // so RotationOverride below faces the right way from frame one
             m_Motor.SetVerticalVelocity(0f);
+
             if (m_CurrentPole == null) { return; }
+
             if (IsPoleHorizontal(m_CurrentPole))
             {
+                Vector3 pointOnPole = m_CurrentPole.transform.position + (m_CurrentPole.Axis * m_HeightAlongAxis);
                 m_Motor.RotationOverride = () => m_CurrentPole != null
-                ? Quaternion.LookRotation(transform.forward, Vector3.up)
+                ? Quaternion.LookRotation(( new Vector3(pointOnPole.x, transform.position.y, pointOnPole.z) + transform.forward) - transform.position , Vector3.up)
                 : m_Motor.transform.rotation;
                 return;
             }
+
             m_Motor.RotationOverride = () => m_CurrentPole != null
                 ? Quaternion.LookRotation(-m_LastOutwardDir, Vector3.up)
                 : m_Motor.transform.rotation;
+
             return;
-            m_Motor.RotationOverride = () => m_CurrentPole != null
-                ? Quaternion.LookRotation(new Vector3(m_CurrentPole.transform.position.x, transform.position.y, m_CurrentPole.transform.position.z) - transform.position, Vector3.up)
-                : m_Motor.transform.rotation;
-            return;
+
             
         }
 
@@ -354,7 +407,7 @@ namespace Blocks.Gameplay.Core
             
         }
 
- 
+
         #endregion
 
         #region Detection
@@ -364,6 +417,7 @@ namespace Blocks.Gameplay.Core
         /// climbable range and whose outer surface is within grab range of the player - analogous to
         /// GrindRailAbility.TryDetectRail, just gated on Grab being held instead of automatic proximity.
         /// </summary>
+        public float characterHeight = 2;
         private bool TryDetectPole(out Pole foundPole, out float angleDegrees, out float height, out Vector3 outwardDir)
         {
             foundPole = null;
@@ -372,7 +426,8 @@ namespace Blocks.Gameplay.Core
             outwardDir = Vector3.forward;
 
             float bestDist = grabDetectionRange;
-            Vector3 playerPos = m_Motor.transform.position;
+            
+            Vector3 playerPos = m_Motor.transform.position + (transform.up * characterHeight);
 
             var poles = Pole.ActivePoles;
             for (int i = 0; i < poles.Count; i++)
@@ -393,6 +448,7 @@ namespace Blocks.Gameplay.Core
 
                 Vector3 axis = pole.Axis;
                 Vector3 toPlayer = playerPos - closestOnAxis;
+                toPlayer = toPlayer.normalized;
                 Vector3 outward = toPlayer - Vector3.Project(toPlayer, axis);
                 Vector3 refDir = Vector3.Cross(axis, Vector3.up).sqrMagnitude > 0.0001f
                     ? Vector3.Cross(axis, Vector3.up).normalized

@@ -317,6 +317,13 @@ namespace Blocks.Gameplay.Core
             float rawArc = m_ArcLength + m_TravelSign * m_Speed * Time.deltaTime;
             if (!m_CurrentRail.IsArcWithinRail(rawArc))
             {
+                if (TryDetectRail(out GrindRail rail, out float arc, out float travelSign))
+                {
+                    TransitionRail();
+                    EnterRail(rail, arc, travelSign);
+                    return;
+                }
+
                 // Ran off the end under your own speed - carry that speed into the air as momentum
                 // rather than just stopping dead, so a well-timed jump off the tail of a rail still
                 // reaches the next one.
@@ -325,6 +332,7 @@ namespace Blocks.Gameplay.Core
                 m_MomentumAirTime = 0f;
                 ExitRail();
                 return;
+               
             }
 
             m_ArcLength = rawArc;
@@ -376,9 +384,9 @@ namespace Blocks.Gameplay.Core
                     
                 //}
                 m_Motor.RotationOverride = () => Quaternion.Lerp(transform.rotation, targetRot, rotateToSurfaceSpeed * Time.deltaTime);
-                previousPosition = ridePos;
+                
             }
-
+            previousPosition = ridePos;
             m_Motor.SetPosition(ridePos, teleport: false);
             
         }
@@ -418,6 +426,19 @@ namespace Blocks.Gameplay.Core
             m_CurrentRail.Evaluate(m_ArcLength, out _, out Vector3 tangent, out _, out _);
             Vector3 travelTangent = m_TravelSign >= 0f ? tangent : -tangent;
             return Quaternion.LookRotation(travelTangent, Vector3.up);
+        }
+
+        private void TransitionRail()
+        {
+            if (!IsOnRail) return;
+
+            //m_LastRail = m_CurrentRail;
+            //m_LastRailGuardTimer = sameRailReentryGuard;
+
+            //IsOnRail = false;
+            //m_CurrentRail = null;
+            //currentWaypoint = -1;
+
         }
 
         /// <summary>Leaves the current rail. Always applies the (short) same-rail re-entry guard - see the class summary for why that's brief here, unlike BalanceBeamAbility's long one.</summary>
@@ -510,9 +531,9 @@ namespace Blocks.Gameplay.Core
             float jumpVelocity = Mathf.Sqrt(Mathf.Max(01.01f, jumpOffHeightMultiplier * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
             travelTangent = (transform.position - previousPosition).normalized;
 
-           
+
             m_AirborneMomentum = travelTangent * 5;
-            m_Motor.SetVerticalVelocity( jumpVelocity + m_AirborneMomentum.y);
+            m_Motor.SetVerticalVelocity(jumpVelocity + m_AirborneMomentum.y);
             m_MomentumAirTime = 0f;
 
             ExitRail();
@@ -520,7 +541,7 @@ namespace Blocks.Gameplay.Core
 
         private void ProcessAirborneMomentum(ref MovementModifier modifier)
         {
-            if (m_AirborneMomentum.sqrMagnitude < 0.01f)
+            if (m_AirborneMomentum.sqrMagnitude < 0.01f || m_Motor.IsClimbing)
             {
                 m_AirborneMomentum = Vector3.zero;
                 m_MomentumAirTime = 0f;
@@ -560,6 +581,7 @@ namespace Blocks.Gameplay.Core
             {
                 GrindRail rail = rails[i];
                 if (rail == null) continue;
+                if (rail == m_CurrentRail) continue;
                 if (rail == m_LastRail && m_LastRailGuardTimer > 0f) continue;
 
                 float candidateArc = rail.ProjectToArcLength(playerPos, out bool withinRail);
@@ -578,7 +600,7 @@ namespace Blocks.Gameplay.Core
                 travelSign = Vector3.Dot(approachDir, tangent) < 0f ? -1f : 1f;
             }
 
-            return foundRail != null;
+            return foundRail != null && foundRail != m_CurrentRail;
         }
 
         public GrindRail TryGetRail()
