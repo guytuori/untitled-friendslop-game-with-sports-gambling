@@ -199,7 +199,11 @@ namespace Blocks.Gameplay.Core
                 lookTarget.rotation = horizontalRotation * verticalRotation;
             }
 
-            if (IsOwner) UpdateZoom(Time.unscaledDeltaTime);
+            if (IsOwner)
+            {
+                UpdateZoom(Time.unscaledDeltaTime);
+                ApplyFieldOfView();
+            }
         }
 
         #endregion
@@ -482,6 +486,25 @@ namespace Blocks.Gameplay.Core
         public bool IsCameraModeRegistered(string modeName)
         {
             return m_RegisteredCameraModes.Exists(m => m.ModeName == modeName);
+        }
+
+        #endregion
+
+        #region Field of view
+
+        /// <summary>
+        /// Graphics Settings > Field of View (vertical degrees, 60-120) -> the active camera mode's lens, every
+        /// frame so a change from Esc > Settings shows immediately. While MatchIntro has Cinemachine paused the
+        /// lens isn't output to the camera, so the flyover keeps whatever the camera last had.
+        /// </summary>
+        private void ApplyFieldOfView()
+        {
+            CinemachineCamera cam = ActiveCameraMode != null ? ActiveCameraMode.CinemachineCamera : null;
+            if (cam == null) return;
+            float fov = GraphicsSettingsService.Current != null
+                ? GraphicsSettingsService.Current.ClampedFieldOfView
+                : GraphicsSettingsData.DefaultFieldOfView;
+            if (!Mathf.Approximately(cam.Lens.FieldOfView, fov)) cam.Lens.FieldOfView = fov;
         }
 
         #endregion
