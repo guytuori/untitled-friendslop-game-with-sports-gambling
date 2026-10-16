@@ -77,7 +77,7 @@ namespace Blocks.Gameplay.Core
         private bool m_SnappedToNetworked;
         private float m_LastReportTime = float.NegativeInfinity;
         private AudioClip m_WaterSound;
-        private CharacterController m_LocalController;
+        private CapsuleCollider m_LocalController; // the player's collision capsule
         private CorePlayerManager m_LocalControllerOwner;
 
         /// <summary>True on a map with rising water.</summary>
@@ -323,7 +323,7 @@ namespace Blocks.Gameplay.Core
             if (m_LocalControllerOwner != local)
             {
                 m_LocalControllerOwner = local;
-                m_LocalController = local.GetComponent<CharacterController>();
+                m_LocalController = local.GetComponent<CapsuleCollider>();
             }
 
             Bounds body = m_LocalController != null && m_LocalController.enabled

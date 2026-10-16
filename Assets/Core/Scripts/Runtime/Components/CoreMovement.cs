@@ -7,9 +7,28 @@ namespace Blocks.Gameplay.Core
 {
     /// <summary>
     /// Handles player movement, including walking, sprinting, jumping, and gravity.
-    /// This component is built upon a CharacterController and uses a system of <see cref="IMovementAbility"/>
+    /// This component drives a Rigidbody + CapsuleCollider (it used to be a CharacterController - see
+    /// "RIGIDBODY" below) and uses a system of <see cref="IMovementAbility"/>
     /// to modularly handle different movement actions like walking, jumping and dashing.
     /// It is responsible for processing inputs and applying movement and rotation.
+    ///
+    /// RIGIDBODY (2026-10-16, Dan's experiment; was CharacterController.Move):
+    ///   - The abilities are unchanged: each frame they still produce a velocity, and where the old code called
+    ///     CharacterController.Move(velocity * dt) this now sets Rigidbody.linearVelocity = velocity, so PhysX
+    ///     resolves the collisions (and moving/kinematic things can push the player). Gravity stays our own
+    ///     (useGravity off), rotation is frozen and set by us, and the capsule uses a frictionless material
+    ///     so it doesn't stick to walls; GroundGrip still reads the ground's own material.
+    ///   - What CharacterController did for free is redone here: grounded movement on a slope is projected
+    ///     along the slope (no sliding while standing, no hopping walking down), and <see cref="stepOffset"/>
+    ///     lifts the player onto ledges up to 0.25 m (see TryStepUp).
+    ///   - Dynamic only on the owner. Other players' copies are kinematic (NetworkTransform moves them), and so
+    ///     is the owner's while grinding or on a pole (those abilities place the player directly with
+    ///     SetPosition) or while the capsule is off (eliminated / finished).
+    ///   - The owner's body interpolates, so its transform is written by physics: rotation goes through
+    ///     Rigidbody.MoveRotation (SetRotation) and teleports through SetPosition (transform + body together).
+    ///     Nothing should write the owner's transform on its own while it's dynamic.
+    ///   - Player-vs-player collision is still off (the capsule excludes the Player and PlayerHitBox layers,
+    ///     same as the CharacterController did).
     ///
     /// Networking (Photon Fusion, Shared mode): only the owning client (State Authority) runs the movement,
     /// in Update, exactly as before. The position/rotation reach everyone else through the Fusion
@@ -17,7 +36,7 @@ namespace Blocks.Gameplay.Core
     /// component moves the object in Update rather than FixedUpdateNetwork) - this component used to be a
     /// Netcode for GameObjects NetworkTransform itself.
     /// </summary>
-    [RequireComponent(typeof(CharacterController))]
+    [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider))]
     public class CoreMovement : CoreNetworkBehaviour
     {
         #region Enums
@@ -97,6 +116,12 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float slopeForce = 5f;
         [Tooltip("Multiplier for raycast length when detecting slopes.")]
         [SerializeField] private float slopeForceRayLength = 1.5f;
+
+        [Header("Rigidbody")]
+        [Tooltip("Tallest ledge the player walks straight up onto (what CharacterController's Step Offset did).")]
+        [SerializeField] private float stepOffset = 0.25f;
+        [Tooltip("Rigidbody mass. Only matters for pushing / being pushed by other physics objects.")]
+        [SerializeField] private float bodyMass = 70f;
 
         [Header("Movement Control")]
         [Tooltip("Enables or disables the application of movement from abilities and gravity. When disabled, the character will not move.")]
@@ -227,12 +252,24 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public Vector3 LastMoveDirection { get; private set; }
 
+        /// <summary>The player's collision capsule (replaces the old CharacterController's radius/height/center).</summary>
+        public CapsuleCollider Capsule => m_Capsule;
+
+        /// <summary>The player's Rigidbody. Move the player through CoreMovement (velocity, SetPosition), not this.</summary>
+        public Rigidbody Body => m_Body;
+
         /// <summary>
         /// Gets the rotation transform.
         /// </summary>
         public Transform RotationTransform => rotationTransform;
 
-        private CharacterController m_CharacterController;
+        private Rigidbody m_Body;
+        private CapsuleCollider m_Capsule;
+        private bool m_BodyConfigured;
+        // The yaw last given to the interpolated body (its transform lags behind what we set - see SetRotation).
+        private float m_Yaw;
+        private bool m_YawValid;
+        private static PhysicsMaterial s_Frictionless;
         private List<IMovementAbility> m_Abilities = new List<IMovementAbility>();
         private float m_VerticalVelocity;
         private float m_RotationVelocity;
@@ -265,7 +302,7 @@ namespace Blocks.Gameplay.Core
 
         private void Awake()
         {
-            m_CharacterController = GetComponent<CharacterController>();
+            SetUpBody();
             m_NetworkTransform = GetComponent<NetworkTransform>();
             m_InitialGravity = gravity;
 
@@ -283,6 +320,7 @@ namespace Blocks.Gameplay.Core
 
         private void Update()
         {
+            SyncBodyMode();
             if (!IsOwner) return;
             // Update landing timer when grounded
             if (IsGrounded)
@@ -298,14 +336,7 @@ namespace Blocks.Gameplay.Core
                 {
                     m_VerticalVelocity += gravity * Time.deltaTime;
                 }
-                if (m_CharacterController.enabled)
-                {
-                    Vector3 verticalMove = new Vector3(0, m_VerticalVelocity, 0) * Time.deltaTime;
-                    if (!float.IsNaN(verticalMove.x) && !float.IsNaN(verticalMove.y) && !float.IsNaN(verticalMove.z))
-                    {
-                        m_CharacterController.Move(verticalMove);
-                    }
-                }
+                ApplyMovement(new Vector3(0, m_VerticalVelocity, 0) * Time.deltaTime);
                 return;
             }
 
@@ -390,21 +421,25 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Sets the character's position, disabling and re-enabling the CharacterController to avoid issues.
+        /// Sets the character's position (transform and Rigidbody together). A teleport also takes the
+        /// transform's current rotation as the body's (callers set transform.rotation first, then call this)
+        /// and stops the body.
         /// </summary>
         /// <param name="position">The target position.</param>
         /// <param name="teleport">If true, tells the Fusion NetworkTransform this is a teleport, so other clients snap instead of interpolating.</param>
         public void SetPosition(Vector3 position, bool teleport = true)
         {
-            if (m_CharacterController != null && m_CharacterController.enabled)
+            transform.position = position;
+            if (m_Body != null)
             {
-                m_CharacterController.enabled = false;
-                transform.position = position;
-                m_CharacterController.enabled = true;
-            }
-            else
-            {
-                transform.position = position;
+                m_Body.position = position;
+                if (teleport)
+                {
+                    m_Body.rotation = transform.rotation;
+                    m_Yaw = transform.eulerAngles.y;
+                    m_YawValid = true;
+                    if (!m_Body.isKinematic) m_Body.linearVelocity = Vector3.zero;
+                }
             }
 
             if (IsOwner && teleport && m_NetworkTransform != null)
@@ -584,7 +619,7 @@ namespace Blocks.Gameplay.Core
         #region Private Methods
 
         /// <summary>
-        /// Processes all movement abilities and applies their resulting modifiers to the CharacterController.
+        /// Processes all movement abilities and applies their resulting modifiers to the Rigidbody.
         /// </summary>
         private void ProcessAbilities()
         {
@@ -642,13 +677,27 @@ namespace Blocks.Gameplay.Core
             // Combine horizontal and vertical movement and apply it
             Vector3 movement = finalModifier.ArealVelocity;
             movement.y = m_VerticalVelocity;
+            bool hasMoveInput = MoveInput.x != 0 || MoveInput.y != 0;
 
-            // Apply extra downward force on slopes when moving
-            IsOnSlope = OnSlope();
-            if (IsOnSlope && (MoveInput.x != 0 || MoveInput.y != 0))
+            IsOnSlope = OnSlope(out Vector3 slopeNormal);
+            if (IsOnSlope && IsGrounded && !finalModifier.OverrideGravity && m_VerticalVelocity <= 0f)
             {
+                // Standing/walking on a slope: walk along it at full speed and press into it along its
+                // normal (pressing straight down would slide a frictionless capsule downhill).
+                Vector3 areal = finalModifier.ArealVelocity;
+                Vector3 flat = new Vector3(areal.x, 0f, areal.z);
+                Vector3 along = Vector3.ProjectOnPlane(flat, slopeNormal);
+                if (along.sqrMagnitude > 1e-6f) along = along.normalized * flat.magnitude;
+                float press = -m_VerticalVelocity + (hasMoveInput ? slopeForce : 0f);
+                movement = along + Vector3.up * areal.y - slopeNormal * press;
+            }
+            else if (IsOnSlope && hasMoveInput)
+            {
+                // Apply extra downward force on slopes when moving
                 movement += Vector3.down * slopeForce;
             }
+
+            if (IsGrounded && !m_Body.isKinematic) TryStepUp(finalModifier.ArealVelocity);
 
             Vector3 finalMovementVector = movement * Time.deltaTime;
 
@@ -659,14 +708,192 @@ namespace Blocks.Gameplay.Core
                 finalMovementVector = FinalMoveCalculationOverride(finalMovementVector);
             }
 
-            if (m_CharacterController != null && m_CharacterController.enabled)
+            ApplyMovement(finalMovementVector);
+        }
+
+        // ----- Rigidbody -----
+
+        /// <summary>Finds (or, on an old prefab that still has a CharacterController, adds) the Rigidbody and capsule and sets them up.</summary>
+        private void SetUpBody()
+        {
+            m_Capsule = GetComponent<CapsuleCollider>();
+            if (m_Capsule == null)
             {
-                // Prevent NaN values from breaking transform
-                if (!float.IsNaN(finalMovementVector.x) && !float.IsNaN(finalMovementVector.y) && !float.IsNaN(finalMovementVector.z))
+                m_Capsule = gameObject.AddComponent<CapsuleCollider>();
+                var old = GetComponent<CharacterController>();
+                if (old != null)
                 {
-                    m_CharacterController.Move(finalMovementVector);
+                    m_Capsule.center = old.center;
+                    m_Capsule.radius = old.radius;
+                    m_Capsule.height = old.height;
+                    m_Capsule.excludeLayers = old.excludeLayers;
+                    old.enabled = false;
+                }
+                else
+                {
+                    m_Capsule.center = new Vector3(0f, 0.93f, 0f);
+                    m_Capsule.radius = 0.28f;
+                    m_Capsule.height = 1.8f;
+                    m_Capsule.excludeLayers = LayerMask.GetMask("Player", "PlayerHitBox");
                 }
             }
+            m_Capsule.direction = 1;
+
+            if (s_Frictionless == null)
+            {
+                s_Frictionless = new PhysicsMaterial("Player (frictionless)")
+                {
+                    dynamicFriction = 0f,
+                    staticFriction = 0f,
+                    bounciness = 0f,
+                    frictionCombine = PhysicsMaterialCombine.Minimum,
+                    bounceCombine = PhysicsMaterialCombine.Minimum
+                };
+            }
+            if (m_Capsule.sharedMaterial == null) m_Capsule.sharedMaterial = s_Frictionless;
+
+            m_Body = GetComponent<Rigidbody>();
+            if (m_Body == null) m_Body = gameObject.AddComponent<Rigidbody>();
+            m_Body.useGravity = false;
+            m_Body.mass = Mathf.Max(0.01f, bodyMass);
+            m_Body.linearDamping = 0f;
+            m_Body.angularDamping = 0f;
+            m_Body.constraints = RigidbodyConstraints.FreezeRotation;
+            m_BodyConfigured = false;
+            SetKinematic(true); // until we know we own it (see SyncBodyMode)
+        }
+
+        /// <summary>Dynamic only for the owner while it's moving itself; kinematic otherwise (see the class summary).</summary>
+        private void SyncBodyMode()
+        {
+            if (m_Body == null) return;
+            bool kinematic = !IsOwner || m_Capsule == null || !m_Capsule.enabled || IsGrinding || IsPoleGrabbing;
+            if (m_BodyConfigured && kinematic == m_Body.isKinematic) return;
+            SetKinematic(kinematic);
+        }
+
+        private void SetKinematic(bool kinematic)
+        {
+            m_BodyConfigured = true;
+            if (kinematic)
+            {
+                if (!m_Body.isKinematic)
+                {
+                    m_Body.linearVelocity = Vector3.zero;
+                    // The interpolated transform trails the body a little; catch it up before we stop interpolating.
+                    transform.SetPositionAndRotation(m_Body.position, m_Body.rotation);
+                }
+                m_Body.interpolation = RigidbodyInterpolation.None;
+                // Kinematic bodies don't support sweep-based CCD (PhysX warns), so switch mode first.
+                m_Body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                m_Body.isKinematic = true;
+            }
+            else
+            {
+                m_Body.position = transform.position;
+                m_Body.rotation = transform.rotation;
+                m_Body.isKinematic = false;
+                m_Body.collisionDetectionMode = CollisionDetectionMode.Continuous; // fast falls don't tunnel through thin floors
+                m_Body.interpolation = RigidbodyInterpolation.Interpolate;
+                m_Body.linearVelocity = Vector3.zero;
+                m_Yaw = transform.eulerAngles.y;
+                m_YawValid = true;
+            }
+        }
+
+        /// <summary>
+        /// What CharacterController.Move(displacement) used to be: a dynamic body gets displacement / dt as its
+        /// velocity (PhysX does the collisions); a kinematic owner body (grinding, pole) is just moved.
+        /// </summary>
+        private void ApplyMovement(Vector3 displacement)
+        {
+            if (m_Body == null || m_Capsule == null || !m_Capsule.enabled) return;
+            if (float.IsNaN(displacement.x) || float.IsNaN(displacement.y) || float.IsNaN(displacement.z)) return;
+
+            if (m_Body.isKinematic)
+            {
+                transform.position += displacement;
+                return;
+            }
+
+            float dt = Time.deltaTime;
+            m_Body.linearVelocity = dt > 1e-6f ? displacement / dt : Vector3.zero;
+        }
+
+        /// <summary>The layers the player's capsule collides with: the layer collision matrix minus the capsule's Exclude Layers.</summary>
+        private int CollisionMask()
+        {
+            int mask = 0;
+            for (int i = 0; i < 32; i++)
+            {
+                if (!Physics.GetIgnoreLayerCollision(gameObject.layer, i)) mask |= 1 << i;
+            }
+            return mask & ~m_Capsule.excludeLayers.value & ~m_Body.excludeLayers.value;
+        }
+
+        /// <summary>
+        /// Rotates <paramref name="target"/>. Our own interpolated body is rotated only through the Rigidbody:
+        /// writing its transform would get synced back into the body at the next physics step together with the
+        /// (lagging) interpolated position, dragging the player backwards.
+        /// </summary>
+        private void SetRotation(Transform target, Quaternion rotation)
+        {
+            if (target == transform && m_Body != null && !m_Body.isKinematic)
+            {
+                m_Body.MoveRotation(rotation);
+                m_Yaw = rotation.eulerAngles.y;
+                m_YawValid = true;
+                return;
+            }
+            target.rotation = rotation;
+        }
+
+        /// <summary>The yaw to smooth from: what we last set, for our own interpolated body (its transform lags), else the transform's.</summary>
+        private float CurrentYaw(Transform target)
+        {
+            if (target == transform && m_YawValid && m_Body != null && !m_Body.isKinematic) return m_Yaw;
+            return target.eulerAngles.y;
+        }
+
+        /// <summary>
+        /// CharacterController's Step Offset: walking into a ledge no taller than <see cref="stepOffset"/>
+        /// (a near-vertical face at the feet, open space above it, flat-enough ground on top, and room for the
+        /// capsule up there) lifts the player onto it.
+        /// </summary>
+        private void TryStepUp(Vector3 arealVelocity)
+        {
+            if (stepOffset <= 0f || m_Capsule == null) return;
+            Vector3 flat = new Vector3(arealVelocity.x, 0f, arealVelocity.z);
+            float speed = flat.magnitude;
+            if (speed < 0.1f) return;
+            Vector3 dir = flat / speed;
+
+            int mask = CollisionMask();
+            Vector3 pos = m_Body.position;
+            float radius = m_Capsule.radius;
+            float bottom = pos.y + m_Capsule.center.y - m_Capsule.height * 0.5f;
+            float reach = radius + speed * Time.deltaTime + 0.1f;
+            Vector3 feet = new Vector3(pos.x, bottom + 0.03f, pos.z);
+
+            // A face in front of the feet...
+            if (!Physics.Raycast(feet, dir, out RaycastHit face, reach, mask, QueryTriggerInteraction.Ignore)) return;
+            if (face.normal.y > 0.7f) return; // that's a slope, walked normally
+            // ...that ends below step height.
+            if (Physics.Raycast(feet + Vector3.up * stepOffset, dir, reach, mask, QueryTriggerInteraction.Ignore)) return;
+
+            Vector3 above = face.point + dir * Mathf.Min(0.1f, radius * 0.5f);
+            above.y = bottom + stepOffset + 0.05f;
+            if (!Physics.Raycast(above, Vector3.down, out RaycastHit top, stepOffset + 0.05f, mask, QueryTriggerInteraction.Ignore)) return;
+            if (top.normal.y < 0.7f) return;
+            float rise = top.point.y - bottom;
+            if (rise <= 0.01f || rise > stepOffset) return;
+
+            Vector3 raised = pos + Vector3.up * (rise + 0.01f);
+            Vector3 c = raised + m_Capsule.center;
+            float half = Mathf.Max(0f, m_Capsule.height * 0.5f - radius);
+            if (Physics.CheckCapsule(c + Vector3.down * half, c + Vector3.up * half, radius * 0.95f, mask, QueryTriggerInteraction.Ignore)) return;
+
+            m_Body.MovePosition(raised); // through the body only, so interpolation smooths the step (see SetRotation)
         }
 
         /// <summary>
@@ -680,7 +907,7 @@ namespace Blocks.Gameplay.Core
 
             if (RotationOverride != null)
             {
-                targetTransform.rotation = RotationOverride();
+                SetRotation(targetTransform, RotationOverride());
                 return;
             }
 
@@ -690,8 +917,8 @@ namespace Blocks.Gameplay.Core
             if (isCoupled)
             {
                 // Rotate towards the camera's target direction
-                float rotation = Mathf.SmoothDampAngle(targetTransform.eulerAngles.y, TargetRotationY, ref m_RotationVelocity, rotationSmoothTime);
-                targetTransform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
+                float rotation = Mathf.SmoothDampAngle(CurrentYaw(targetTransform), TargetRotationY, ref m_RotationVelocity, rotationSmoothTime);
+                SetRotation(targetTransform, Quaternion.Euler(0.0f, rotation, 0.0f));
             }
             else if (FacingDirectionOverride.HasValue && FacingDirectionOverride.Value.sqrMagnitude > 0.01f)
             {
@@ -700,15 +927,15 @@ namespace Blocks.Gameplay.Core
                 // on a low-grip surface). Rotate towards that direction instead of horizontalVelocity.
                 Vector3 facing = FacingDirectionOverride.Value;
                 float targetAngle = Mathf.Atan2(facing.x, facing.z) * Mathf.Rad2Deg;
-                float rotation = Mathf.SmoothDampAngle(targetTransform.eulerAngles.y, targetAngle, ref m_RotationVelocity, rotationSmoothTime);
-                targetTransform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
+                float rotation = Mathf.SmoothDampAngle(CurrentYaw(targetTransform), targetAngle, ref m_RotationVelocity, rotationSmoothTime);
+                SetRotation(targetTransform, Quaternion.Euler(0.0f, rotation, 0.0f));
             }
             else if (horizontalVelocity.magnitude > 0.1f)
             {
                 // Rotate towards the direction of movement
                 float targetAngle = Mathf.Atan2(horizontalVelocity.x, horizontalVelocity.z) * Mathf.Rad2Deg;
-                float rotation = Mathf.SmoothDampAngle(targetTransform.eulerAngles.y, targetAngle, ref m_RotationVelocity, rotationSmoothTime);
-                targetTransform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
+                float rotation = Mathf.SmoothDampAngle(CurrentYaw(targetTransform), targetAngle, ref m_RotationVelocity, rotationSmoothTime);
+                SetRotation(targetTransform, Quaternion.Euler(0.0f, rotation, 0.0f));
             }
         }
 
@@ -770,17 +997,20 @@ namespace Blocks.Gameplay.Core
         /// Checks if the character is currently on a slope by raycasting downward.
         /// </summary>
         /// <returns>True if on a slope, false otherwise.</returns>
-        private bool OnSlope()
+        private bool OnSlope(out Vector3 normal)
         {
+            normal = Vector3.up;
             if (JumpRequested || m_VerticalVelocity > 0)
                 return false;
 
             RaycastHit hit;
-            Vector3 rayStart = transform.position;
-            float rayLength = m_CharacterController.height / 2 * slopeForceRayLength;
+            // From a little above the feet: the interpolated transform can sit a hair inside the ground.
+            Vector3 rayStart = transform.position + Vector3.up * 0.1f;
+            float rayLength = m_Capsule.height / 2 * slopeForceRayLength + 0.1f;
 
             if (Physics.Raycast(rayStart, Vector3.down, out hit, rayLength, groundLayers, QueryTriggerInteraction.Ignore))
             {
+                normal = hit.normal;
                 if (hit.normal != Vector3.up)
                     return true;
             }

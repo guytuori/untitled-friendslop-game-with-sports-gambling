@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Blocks.Gameplay.Core
 {
 
-    [RequireComponent(typeof(CharacterController))]
+    [RequireComponent(typeof(CapsuleCollider))]
     public class WallRunAbility : CoreNetworkBehaviour, IMovementAbility, IPlayerAddon
     {
         #region IMovementAbility
@@ -56,7 +56,7 @@ namespace Blocks.Gameplay.Core
         public Vector3 WallNormal { get; private set; }
 
         private CoreMovement m_Motor;
-        private CharacterController m_Controller;
+        private CapsuleCollider m_Controller;
         private CoreStatsHandler m_CoreStats;
         [SerializeField] private CoreAnimator animationControls;
         private bool m_IsActive = true;
@@ -68,7 +68,7 @@ namespace Blocks.Gameplay.Core
         public void Initialize(CoreMovement movementController)
         {
             m_Motor = movementController;
-            m_Controller = m_Motor.GetComponent<CharacterController>();
+            m_Controller = m_Motor.GetComponent<CapsuleCollider>();
         }
 
         public MovementModifier Process()

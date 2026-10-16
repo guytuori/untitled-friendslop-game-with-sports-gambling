@@ -46,7 +46,7 @@ namespace Blocks.Gameplay.Core
     /// clients can see it too, since the movement logic itself only ever runs on the owner (mirroring
     /// how CorePlayerState syncs name/life-state).
     /// </summary>
-    [RequireComponent(typeof(CharacterController))]
+    [RequireComponent(typeof(CapsuleCollider))]
     public class BalanceBeamAbility : CoreNetworkBehaviour, IMovementAbility, IPlayerAddon
     {
         #region IMovementAbility
@@ -104,7 +104,7 @@ namespace Blocks.Gameplay.Core
         [Networked] private float NetBalance { get; set; }
 
         private CoreMovement m_Motor;
-        private CharacterController m_Controller;
+        private CapsuleCollider m_Controller;
         private BalanceBeam m_CurrentBeam;
         private bool m_IsActive = true;
 
@@ -149,7 +149,7 @@ namespace Blocks.Gameplay.Core
         public void Initialize(CoreMovement movementController)
         {
             m_Motor = movementController;
-            m_Controller = m_Motor.GetComponent<CharacterController>();
+            m_Controller = m_Motor.GetComponent<CapsuleCollider>();
         }
 
         public MovementModifier Process()

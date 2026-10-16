@@ -118,14 +118,21 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Handles collision events from the CharacterController.
-        /// If the collided object is an interactable with a trigger mode of OnCollision, triggers interaction.
+        /// Handles the player's capsule touching something (Rigidbody collisions - this was
+        /// OnControllerColliderHit while the player was a CharacterController; Stay, like that, fires every
+        /// frame of contact, and the cooldown keeps it from spamming).
+        /// If the collided object is an interactable with a trigger mode of OnCharacterControllerHit, triggers interaction.
         /// </summary>
-        private void OnControllerColliderHit(ControllerColliderHit hit)
+        private void OnCollisionStay(Collision collision)
+        {
+            if (collision.collider != null) OnBodyHit(collision.collider.gameObject);
+        }
+
+        private void OnBodyHit(GameObject other)
         {
             if (!IsSpawned || !IsOwner || !IsEnabled || m_CooldownTimer > 0) return;
 
-            if (hit.gameObject.TryGetComponent<IInteractable>(out var interactable))
+            if (other.TryGetComponent<IInteractable>(out var interactable))
             {
                 if (interactable.TriggerMode == InteractionTriggerMode.OnCharacterControllerHit && interactable.CanInteract(gameObject))
                 {

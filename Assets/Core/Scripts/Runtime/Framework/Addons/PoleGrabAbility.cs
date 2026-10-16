@@ -24,7 +24,7 @@ namespace Blocks.Gameplay.Core
     /// and zero out WalkAbility's contribution while attached) and IPlayerAddon (for the jump-off input
     /// listener and life-state cleanup).
     /// </summary>
-    [RequireComponent(typeof(CharacterController))]
+    [RequireComponent(typeof(CapsuleCollider))]
     public class PoleGrabAbility : CoreNetworkBehaviour, IMovementAbility, IPlayerAddon
     {
         #region IMovementAbility
@@ -75,7 +75,7 @@ namespace Blocks.Gameplay.Core
         public bool IsOnPole { get; private set; }
 
         private CoreMovement m_Motor;
-        private CharacterController m_Controller;
+        private CapsuleCollider m_Controller;
         private CoreStatsHandler m_CoreStats;
         private bool m_IsActive = true;
         private bool m_ListenersRegistered;
@@ -92,7 +92,7 @@ namespace Blocks.Gameplay.Core
         public void Initialize(CoreMovement movementController)
         {
             m_Motor = movementController;
-            m_Controller = m_Motor.GetComponent<CharacterController>();
+            m_Controller = m_Motor.GetComponent<CapsuleCollider>();
         }
 
         public MovementModifier Process()

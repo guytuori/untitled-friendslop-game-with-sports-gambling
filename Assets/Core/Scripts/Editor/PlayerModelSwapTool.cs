@@ -124,6 +124,9 @@ namespace Blocks.Gameplay.Core
         public static float GetPlayerHeight()
         {
             var player = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+            // The player's collision capsule (a CharacterController before the 2026-10-16 Rigidbody switch).
+            var capsule = player != null ? player.GetComponent<CapsuleCollider>() : null;
+            if (capsule != null) return capsule.height;
             var controller = player != null ? player.GetComponent<CharacterController>() : null;
             return controller != null ? controller.height : DefaultTargetHeight;
         }

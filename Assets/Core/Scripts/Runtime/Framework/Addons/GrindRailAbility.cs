@@ -51,7 +51,7 @@ namespace Blocks.Gameplay.Core
     /// and drives its own copy of the world-space balance bar UI (see BalanceBeamAbility for why it's
     /// built in code rather than from a prefab).
     /// </summary>
-    [RequireComponent(typeof(CharacterController))]
+    [RequireComponent(typeof(CapsuleCollider))]
     public class GrindRailAbility : CoreNetworkBehaviour, IMovementAbility, IPlayerAddon
     {
         #region IMovementAbility
@@ -127,7 +127,7 @@ namespace Blocks.Gameplay.Core
         
         private CorePlayerManager m_playerManager;
         private CoreMovement m_Motor;
-        private CharacterController m_Controller;
+        private CapsuleCollider m_Controller;
         private bool m_IsActive = true;
         private bool m_ListenersRegistered;
 
@@ -173,7 +173,7 @@ namespace Blocks.Gameplay.Core
         public void Initialize(CoreMovement movementController)
         {
             m_Motor = movementController;
-            m_Controller = m_Motor.GetComponent<CharacterController>();
+            m_Controller = m_Motor.GetComponent<CapsuleCollider>();
         }
 
         public MovementModifier Process()

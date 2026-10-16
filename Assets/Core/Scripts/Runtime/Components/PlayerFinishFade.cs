@@ -41,11 +41,11 @@ namespace Blocks.Gameplay.Core
             }
 
             // Nobody should bump into (or stand on) an invisible player. Movement goes off first, the same
-            // way elimination does it (CorePlayerManager), so nothing calls Move on a disabled controller.
+            // way elimination does it (CorePlayerManager); with the capsule off CoreMovement holds the body still.
             if (m_Player != null && m_Player.CoreMovement != null)
             {
                 m_Player.CoreMovement.IsMovementEnabled = false;
-                if (m_Player.CoreMovement.TryGetComponent(out CharacterController controller)) controller.enabled = false;
+                if (m_Player.CoreMovement.Capsule != null) m_Player.CoreMovement.Capsule.enabled = false;
             }
 
             var renderers = new List<Renderer>();

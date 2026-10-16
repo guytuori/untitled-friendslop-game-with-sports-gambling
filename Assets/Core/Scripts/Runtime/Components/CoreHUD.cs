@@ -563,7 +563,7 @@ namespace Blocks.Gameplay.Core
             if (camera == null || panel == null) return;
 
             float headHeight = 2f;
-            if (TryGetComponent(out CharacterController controller)) headHeight = controller.center.y + controller.height * 0.5f;
+            if (TryGetComponent(out CapsuleCollider controller)) headHeight = controller.center.y + controller.height * 0.5f;
             Vector3 head = transform.position + Vector3.up * (headHeight + 0.35f);
 
             if (camera.WorldToViewportPoint(head).z <= 0f)

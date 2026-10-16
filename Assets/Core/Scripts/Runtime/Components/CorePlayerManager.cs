@@ -354,9 +354,9 @@ namespace Blocks.Gameplay.Core
                     coreMovement.ResetMovementForces();
                 }
 
-                // CharacterController must be disabled when player is eliminated to prevent physics glitches
-                var characterController = coreMovement.GetComponent<CharacterController>();
-                if (characterController != null) characterController.enabled = isActive;
+                // The collision capsule is off while eliminated to prevent physics glitches (CoreMovement then
+                // makes the Rigidbody kinematic). It used to be the CharacterController.
+                if (coreMovement.Capsule != null) coreMovement.Capsule.enabled = isActive;
             }
 
             foreach (var addon in m_Addons)

@@ -59,7 +59,7 @@ namespace Blocks.Gameplay.Core
         private bool m_Registered;
         private int m_AppliedCount = -1;
         private AudioClip m_CoinSound;
-        private CharacterController m_LocalController;
+        private CapsuleCollider m_LocalController; // the player's collision capsule
         private CorePlayerManager m_LocalControllerOwner;
 
         public int PointsPerPickup => pointsPerPickup;
@@ -240,7 +240,7 @@ namespace Blocks.Gameplay.Core
             if (m_LocalControllerOwner != local)
             {
                 m_LocalControllerOwner = local;
-                m_LocalController = local.GetComponent<CharacterController>();
+                m_LocalController = local.GetComponent<CapsuleCollider>();
             }
 
             // The player's body as an upright capsule-ish column.
