@@ -1859,7 +1859,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6251269800812467819, guid: c76a512aceefbe140ac1a3f5b6da8c02, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -20.12
+      value: -15.84
       objectReference: {fileID: 0}
     - target: {fileID: 6251269800812467819, guid: c76a512aceefbe140ac1a3f5b6da8c02, type: 3}
       propertyPath: m_LocalPosition.y
@@ -1867,7 +1867,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6251269800812467819, guid: c76a512aceefbe140ac1a3f5b6da8c02, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 6.68
+      value: 2.77
       objectReference: {fileID: 0}
     - target: {fileID: 6251269800812467819, guid: c76a512aceefbe140ac1a3f5b6da8c02, type: 3}
       propertyPath: m_LocalRotation.w
@@ -2819,6 +2819,8 @@ MonoBehaviour:
   radius: 0.2
   exitMargin: 0.5
   isTube: 1
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!65 &319891188
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3030,6 +3032,8 @@ MonoBehaviour:
   radius: 0.2
   exitMargin: 0.5
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!65 &330033681
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3446,6 +3450,8 @@ MonoBehaviour:
   radius: 11.536807
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!1 &380348065
 GameObject:
   m_ObjectHideFlags: 0
@@ -4995,6 +5001,8 @@ MonoBehaviour:
   radius: 6.4584155
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!114 &529389162
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5922,6 +5930,8 @@ MonoBehaviour:
   radius: 0.2828071
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!1 &673465308
 GameObject:
   m_ObjectHideFlags: 0
@@ -6092,6 +6102,8 @@ MonoBehaviour:
   radius: 0.2828071
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!1 &684123576
 GameObject:
   m_ObjectHideFlags: 0
@@ -8920,6 +8932,8 @@ MonoBehaviour:
   radius: 0.2
   exitMargin: 0.5
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!65 &974735248
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -10020,6 +10034,7 @@ MonoBehaviour:
   gameRulesConfig: {fileID: 11400000, guid: 026db8941acd78b42a8103900e602d89, type: 2}
   tallySeconds: 1.5
   resultSeconds: 4
+  playIntro: 0
 --- !u!114 &1129721987
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10671,6 +10686,8 @@ MonoBehaviour:
   radius: 0.15
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!65 &1205748491
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -12135,7 +12152,7 @@ Camera:
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 767
+    m_Bits: 1791
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -12758,6 +12775,8 @@ MonoBehaviour:
   radius: 0.15
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!65 &1372758955
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -13008,6 +13027,8 @@ MonoBehaviour:
   radius: 6.4584155
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!114 &1390756681
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17110,6 +17131,8 @@ MonoBehaviour:
   radius: 0.14142114
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!114 &1751950689
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17651,6 +17674,8 @@ MonoBehaviour:
   radius: 4.9936175
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!1 &1875506548
 GameObject:
   m_ObjectHideFlags: 0
@@ -18391,7 +18416,7 @@ GameObject:
   - component: {fileID: 1968042034}
   - component: {fileID: 1968042033}
   - component: {fileID: 1968042032}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: ground
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -20468,6 +20493,8 @@ MonoBehaviour:
   radius: 0.14142114
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!114 &256835726519305455
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21011,6 +21038,8 @@ MonoBehaviour:
   radius: 6.4584155
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!1001 &2464605479680486478
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -21966,6 +21995,8 @@ MonoBehaviour:
   radius: 0.15
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!1 &4952165500910301671
 GameObject:
   m_ObjectHideFlags: 0
@@ -22001,6 +22032,8 @@ MonoBehaviour:
   radius: 6.4584155
   exitMargin: 0.35
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!4 &5004847609828538554 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -3910990755373119420, guid: 55146326a82ea5f4389cabceedf130be, type: 3}
@@ -22925,6 +22958,8 @@ MonoBehaviour:
   radius: 0.2
   exitMargin: 0.5
   isTube: 0
+  localSpaceWaypoints: 0
+  closedLoop: 0
 --- !u!1 &8505635198601849412
 GameObject:
   m_ObjectHideFlags: 0

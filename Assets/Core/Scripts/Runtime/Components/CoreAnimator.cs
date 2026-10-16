@@ -50,6 +50,7 @@ namespace Blocks.Gameplay.Core
 
         public readonly string ANIMATION_grindrail_slide = "slide";
         public readonly string ANIMATION_wall_hang = "wall_hang_idle";
+        public readonly string ANIMATION_pole_hang = "bar_hang_idle";
 
         #endregion
 

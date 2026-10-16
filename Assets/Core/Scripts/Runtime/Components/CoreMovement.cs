@@ -378,6 +378,11 @@ namespace Blocks.Gameplay.Core
         public void ApplyExternalForce(Vector3 force, ForceMode forceMode)
         {
             if (!IsOwner) return;
+            if (force == Vector3.zero)
+            {
+                m_ExternalForce = Vector3.zero;
+                return;
+            }
 
             if (forceMode == ForceMode.Impulse)
             {

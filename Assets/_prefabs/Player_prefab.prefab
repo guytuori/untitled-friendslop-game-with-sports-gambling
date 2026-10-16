@@ -191,7 +191,6 @@ GameObject:
   - component: {fileID: 5505897753791863388}
   - component: {fileID: 8341354711323544292}
   - component: {fileID: 7646443965227562787}
-  - component: {fileID: 9055665561745365384}
   m_Layer: 3
   m_Name: Player_prefab
   m_TagString: Player
@@ -314,7 +313,7 @@ MonoBehaviour:
   groundedRadius: 0.28
   groundLayers:
     serializedVersion: 2
-    m_Bits: 1
+    m_Bits: 1279
   slopeForce: 5
   slopeForceRayLength: 1.5
   isMovementEnabled: 1
@@ -591,6 +590,7 @@ MonoBehaviour:
   poleAngleLowerBound: 50
   poleAngleUpperBound: 125
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+  animationControls: {fileID: 0}
   characterHeight: 2
 --- !u!114 &7587005557142702197
 MonoBehaviour:
@@ -716,7 +716,6 @@ MonoBehaviour:
   - {fileID: 1069646715921968806}
   - {fileID: 4329355585666520379}
   - {fileID: 7646443965227562787}
-  - {fileID: 9055665561745365384}
   - {fileID: 7182270174313902824}
   ForceRemoteRenderTimeframe: 0
 --- !u!114 &8341354711323544292
@@ -775,42 +774,9 @@ MonoBehaviour:
   Animator: {fileID: 1389975223400714321}
   ApplyTiming: 2
   SyncSettings: 127
-  StateHashes: 0000000084ca1cc0f9c6230b1c6a54339e2518b671a7e1076b36dbedb1afdc305a6c54cd8a18fce4b9abd9d3fd143d581376f52d0b878ad8e5e542ad2b26b0be9bd70fe062eeef729ff9d70797a04ef32fcbea22fa2254c04249f011
+  StateHashes: 0000000084ca1cc0f9c6230b1c6a54339e2518b671a7e1076b36dbedb1afdc305a6c54cd8a18fce4b9abd9d3fd143d581376f52d0b878ad8e5e542ad2b26b0be9bd70fe062eeef729ff9d70797a04ef32fcbea22fa2254c04249f011d786dc4e73cfd051
   TriggerHashes: 0000000018dd2738c8919f480b878ad8797964ad6661c296
   TotalWords: 7
---- !u!114 &9055665561745365384
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1637903110319045308}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 49f7019665d36be4686a05b26ea9265d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.WallRunAbility
-  wallLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  wallCheckDistance: 0.6
-  wallCheckRadius: 0.15
-  maxWallSurfaceAngle: 20
-  minPressInto: 0.4
-  climbSpeedMultiplier: 0.5
-  shimmySpeedMultiplier: 0.5
-  staminaCostPerSecond: 10
-  stickForce: 2
-  wallJumpHeight: 2.2
-  wallJumpPushForce: 7
-  regrabCooldown: 0.25
-  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
-  animationControls: {fileID: 0}
-  topCheckOffsetY: 1
-  wallLayer:
-    serializedVersion: 2
-    m_Bits: 0
-  wallJumpStyle: 0
 --- !u!1 &1735581466166165262
 GameObject:
   m_ObjectHideFlags: 0

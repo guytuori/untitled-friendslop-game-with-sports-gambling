@@ -77,6 +77,13 @@ namespace Blocks.Gameplay.Core
         private CoreMovement m_Motor;
         private CharacterController m_Controller;
         private CoreStatsHandler m_CoreStats;
+
+        //for Qol
+        [SerializeField] private CoreAnimator animationControls;
+        private CorePlayerManager corePlayerManager;
+        private Camera playerCamera;
+
+
         private bool m_IsActive = true;
         private bool m_ListenersRegistered;
 
@@ -325,6 +332,12 @@ namespace Blocks.Gameplay.Core
 
             if (m_CurrentPole == null) { return; }
 
+            if (Animator())
+            {
+                Animator().Animator.ResetTrigger(Animator().m_AnimIDTrigger_exitAbility);
+                Animator().PlayAnimation(Animator().ANIMATION_pole_hang);
+            }
+
             if (IsPoleHorizontal(m_CurrentPole))
             {
                 Vector3 pointOnPole = m_CurrentPole.transform.position + (m_CurrentPole.Axis * m_HeightAlongAxis);
@@ -360,6 +373,7 @@ namespace Blocks.Gameplay.Core
             {
                 m_Motor.RotationOverride = null;
             }
+            if (Animator()) { Animator().SetAnimationTrigger(Animator().m_AnimIDTrigger_exitAbility); }
         }
 
         #endregion
@@ -469,5 +483,27 @@ namespace Blocks.Gameplay.Core
         }
 
         #endregion
+
+        public CoreAnimator Animator()
+        {
+            if (animationControls == null)
+            {
+                animationControls = GetComponentInChildren<CoreAnimator>();
+            }
+
+            return animationControls;
+        }
+        public CorePlayerManager CorePlayer()
+        {
+            if (corePlayerManager == null) { corePlayerManager = GetComponent<CorePlayerManager>(); }
+            return corePlayerManager;
+        }
+        public Camera PlayerCamera()
+        {
+            //because the the player was not set up to know its camera, use camera.main until
+            //the player controller is fixed
+            if (playerCamera == null) { playerCamera = Camera.main; }
+            return playerCamera;
+        }
     }
 }

@@ -133,9 +133,8 @@ namespace Blocks.Gameplay.Core
             float jumpVelocity = Mathf.Sqrt(doubleJumpHeight * -2f * m_CoreMovement.gravity);
 
             // Apply velocity directly
-            
-            m_CoreMovement.ApplyExternalForce(m_CoreMovement.transform.forward * (1 + m_doubleJumpedCount),ForceMode.Impulse);
             m_CoreMovement.SetVerticalVelocity(jumpVelocity);
+
             PlayerActions.Report(m_CoreMovement.gameObject, PlayerAction.Jump); // counted for wagers (LocalActionTracker)
             // Reset any downward force/gravity accumulation if needed, though SetVerticalVelocity handles the main part
         }

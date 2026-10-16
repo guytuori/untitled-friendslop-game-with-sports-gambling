@@ -123,30 +123,33 @@ namespace Blocks.Gameplay.Core
                 return modifier;
             }
 
+            //the timer should tick even if the ability is blocked
             if (m_RegrabTimer > 0f)
             {
                 m_RegrabTimer -= Time.deltaTime;
             }
+    
+           // 
 
-            if (m_Motor.IsGrounded)
+            if (!IsClimbing)
+            {
+                if (m_Motor.MovementAbilityActive()) { return modifier; }
+
+                if (m_Motor.IsGrabHeld && m_RegrabTimer <= 0f && TryFindClimbableWall(out Vector3 wallNormal))
+                {
+                    EnterClimb(wallNormal);
+                }
+
+                return modifier;
+            }
+
+
+            if (IsClimbing && m_Motor.IsGrounded)
             {
                 ExitClimb();
                 return modifier;
             }
 
-            if (!IsClimbing)
-            {
-                // Only stick to a wall while Grab is held - per the design, jumping toward a wall while
-                // holding Grab is what grabs it, as opposed to the old WallSlideAbility which clung to
-                // any wall you pressed into while airborne.
-                if (m_Motor.IsGrabHeld && m_RegrabTimer <= 0f && TryFindClimbableWall(out Vector3 wallNormal))
-                {
-                    EnterClimb(wallNormal);
-                }
-                return modifier;
-            }
-
-            
             float cost = staminaCostPerSecond * Time.deltaTime;
             if (m_CoreStats == null || !m_CoreStats.TryConsumeStat(StatKeys.Stamina, cost, OwnerClientId) || !m_Motor.IsGrabHeld)
             {
@@ -258,6 +261,7 @@ namespace Blocks.Gameplay.Core
             velocity = velocity.normalized - WallNormal.normalized;
 
             velocity = velocity * magnitude;
+            velocity = (Vector3.up * vertSpeed * rawInput.y) + (transform.right * horizSpeed * rawInput.x);
             m_Motor.SetVerticalVelocity(velocity.y);
             //because of the way claude handles movement vectors we need to seperate the Y component
             velocity.y = 0;
@@ -266,51 +270,18 @@ namespace Blocks.Gameplay.Core
             modifier.OverrideGravity = true;
         }
 
-        private void ProcessWallSLideMovement(ref MovementModifier modifier)
-        {
-            Vector2 rawInput = m_Motor.MoveInput;
-
-            if (HasReachedWallEnd( new Vector2(rawInput.x, -slideSpeedMultiplier * m_Motor.moveSpeed)))
-            {
-                modifier.ArealVelocity = Vector3.zero;
-                m_Motor.SetMoveInput(Vector2.zero);
-                m_Motor.SetVerticalVelocity(-slideSpeedMultiplier * m_Motor.moveSpeed);
-
-                //slide off the wall
-                ExitClimb();
-                return;
-            }
-
-
-            Vector3 up = Vector3.up;
-            Vector3 alongWall = Vector3.Cross(WallNormal, up).normalized;
-
-            float vertSpeed = m_Motor.moveSpeed * -slideSpeedMultiplier;
-            float horizSpeed = m_Motor.moveSpeed * shimmySpeedMultiplier;
-            Vector3 velocity = (up  * vertSpeed) + (transform.right * (rawInput.x * horizSpeed));
-
-            float magnitude = velocity.magnitude;
-            //get a vector that is only along the wall and not going away or into it
-            //NOTE: this means climbing walls have to be a flat surface, if we want them to curve at all
-            //multiple walls would need to be used, or this logic changed
-            velocity = velocity.normalized - WallNormal.normalized;
-
-            velocity = velocity * magnitude;
-            m_Motor.SetVerticalVelocity(velocity.y);
-            //because of the way claude handles movement vectors we need to seperate the Y component
-            velocity.y = 0;
-            modifier.ArealVelocity = velocity;
-
-            modifier.OverrideGravity = true;
-        }
 
         private void EnterClimb(Vector3 wallNormal)
         {
+            if (IsClimbing) { return; }
+
             WallNormal = wallNormal;
             IsClimbing = true;
+
             if (m_Motor != null)
             {
                 m_Motor.SetVerticalVelocity(0f);
+                m_Motor.ApplyExternalForce(Vector3.zero,ForceMode.Impulse);
                 //NOTE: I think the user should maintain their orientation when wall grabbing
                 //starting the wall movement is when the override should kick it, otherwise it should
                 //just feel like a quick spiderman stick
@@ -466,7 +437,7 @@ namespace Blocks.Gameplay.Core
                // inputDir = -WallNormal;orld 
             }
 
-            Vector3 capsuleCenter = m_Controller.transform.TransformPoint(m_Controller.center);
+            Vector3 capsuleCenter = m_Controller.transform.position;// TransformPoint(m_Controller.center);
             // Cast from the capsule's own center, not a point offset out near its surface. This
             // check needs to succeed precisely when the player is pressed flush against a wall - but
             // the character controller's skin width (this project's is 0.02) leaves less real-world
@@ -482,33 +453,36 @@ namespace Blocks.Gameplay.Core
             Vector3 castOrigin = capsuleCenter;
             float castDistance = m_Controller.radius + wallCheckDistance;
 
-            if (!Physics.SphereCast(castOrigin, wallCheckRadius, inputDir, out RaycastHit hit, castDistance, wallLayers, QueryTriggerInteraction.Ignore))
+            if (Physics.SphereCast(castOrigin, wallCheckRadius, inputDir, out RaycastHit hit, castDistance, wallLayers, QueryTriggerInteraction.Ignore))
             {
-                return false;
+                float angleFromHorizontalPlane = Vector3.Angle(hit.normal, Vector3.up);
+
+                if (Mathf.Abs(angleFromHorizontalPlane - 90f) > maxWallSurfaceAngle)
+                {
+                    return false; // too shallow - this is a floor, ceiling or ramp, not a wall
+                }
+                if (!IsSurfaceClimbable(hit))
+                {
+                    return false;
+                }
+                if (!IsClimbing)
+                {
+                    float pressAmount = Vector3.Dot(inputDir, -hit.normal);
+                    //if (pressAmount < minPressInto)
+                    //{
+                    //    return false; // brushing past the wall, not pressing into it - only checked on initial attach
+                    //}
+                }
+
+                
+
+                wallNormal = hit.normal;
+                return true;
+
             }
 
-            float angleFromHorizontalPlane = Vector3.Angle(hit.normal, Vector3.up);
-            if (Mathf.Abs(angleFromHorizontalPlane - 90f) > maxWallSurfaceAngle)
-            {
-                return false; // too shallow - this is a floor, ceiling or ramp, not a wall
-            }
-
-            if (!IsClimbing)
-            {
-                float pressAmount = Vector3.Dot(inputDir, -hit.normal);
-                //if (pressAmount < minPressInto)
-                //{
-                //    return false; // brushing past the wall, not pressing into it - only checked on initial attach
-                //}
-            }
-
-            if (!IsSurfaceClimbable(hit))
-            {
-                return false;
-            }
-
-            wallNormal = hit.normal;
-            return true;
+            return false;
+            
         }
 
         /// <summary>
@@ -532,7 +506,6 @@ namespace Blocks.Gameplay.Core
             if (input == Vector2.zero) return Vector3.zero;
 
             Vector3 inputDirection = new Vector3(input.x, 0f, input.y).normalized;
-            return inputDirection;
             switch (m_Motor.directionMode)
             {
                 case CoreMovement.MovementDirectionMode.CharacterRelative:

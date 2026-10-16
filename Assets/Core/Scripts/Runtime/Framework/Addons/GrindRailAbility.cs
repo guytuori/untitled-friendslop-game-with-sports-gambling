@@ -296,7 +296,7 @@ namespace Blocks.Gameplay.Core
 
             float maxSpeed = maxSpeedMultiplier * m_Motor.moveSpeed;
             float minSpeed = minSpeedMultiplier * m_Motor.moveSpeed;
-            float accel = railAcceleration + (m_Motor.IsSprinting ? sprintAccelerationBonus : 0f);
+            float accel = railAcceleration;// + (m_Motor.IsSprinting ? sprintAccelerationBonus : 0f);
 
             // Downhill (tangent pointing down along the direction you're actually travelling) speeds
             // you up, uphill slows you down - travelTangent.y is negative heading downhill.
