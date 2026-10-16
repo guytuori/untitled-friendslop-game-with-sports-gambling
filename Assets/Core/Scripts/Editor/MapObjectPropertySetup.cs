@@ -40,8 +40,9 @@ namespace Blocks.Gameplay.Core
     /// - Grind Rail (rebuilt 2026-10-16): turns the exported rail into Dan's segmented grind rail - see
     ///   <see cref="GrindRailBuilder"/>. The rail's centre line is traced from the mesh's bars (any shape:
     ///   straight, bent, sloped, rings, several rails in one object), each run gets a GrindRail with local-space
-    ///   waypoints along the top of the bar, rings are split into two overlapping halves (Dan's double-ring
-    ///   trick), and his Grind-layer segment colliders (sized to the bar) are built along it under a
+    ///   waypoints along the top of the bar (about one per meter, like Dan's), a ring becomes one looping
+    ///   rail (GrindRail closedLoop - no hand-offs between halves), and his Grind-layer segment colliders
+    ///   (sized to the bar) are built along it under a
     ///   "[Grind Rail]" child. The exported mesh stays as the visible rail (the user preferred the map editor's
     ///   look to Dan's cylinders). A mesh that isn't made of thin bars falls back to one path along its long
     ///   axis (the old behaviour).

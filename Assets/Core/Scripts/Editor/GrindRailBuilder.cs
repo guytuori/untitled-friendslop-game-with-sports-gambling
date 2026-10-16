@@ -18,9 +18,11 @@ namespace Blocks.Gameplay.Core
     ///    (e.g. two rings) each become their own. If the edge lengths don't split (not a thin-bar mesh) the
     ///    caller falls back to one path along the mesh's long axis.
     /// 2. THE GRIND PATHS. One GrindRail per path, its waypoints in the object's own local space (so the rail
-    ///    turns with a rotated challenge), along the top of the bar (the rider sits Dan's 0.15 m above that). A
-    ///    closed loop is split into two halves that overlap by one bar at each joint - Dan's double-ring trick:
-    ///    GrindRailAbility hops onto the other half when it runs off the end of one.
+    ///    turns with a rotated challenge), along the top of the bar (the rider sits Dan's 0.15 m above that),
+    ///    one about every meter like the ones Dan's GenerateWaypoints makes. A ring is ONE looping GrindRail
+    ///    (closedLoop): you go round and round without ever reaching an end. (Dan's double ring is two
+    ///    half-rails the player hops between instead; each hop restarts the grind at entry speed and holds you
+    ///    at the joint for a moment, which made rings slow and sticky - the loop has no joint.)
     /// 3. DAN'S SEGMENTS, WITHOUT HIS LOOK. A "grindrailSegment" on the Grind layer with a capsule collider the
     ///    bar's own thickness for every straight run (split into pieces of up to 5 m like his) - what his rails
     ///    have for the surface raycast and collisions - but no cylinders or collars: the exported mesh stays as
@@ -35,6 +37,7 @@ namespace Blocks.Gameplay.Core
 
         // From Dan's obstacle_grindrail_segmented, in meters.
         public const float MaxSegmentLength = 5f;
+        public const float WaypointSpacing = 1f;      // Dan's GenerateWaypoints steps 1 m
         public const float RiderOffset = 0.15f;       // GrindRail.radius: the rider sits this far above the path
         public const float DefaultBarRadius = 0.15f;  // when the bar's thickness can't be measured (fallback path)
         private const float MinBarRadius = 0.05f;
@@ -294,18 +297,8 @@ namespace Blocks.Gameplay.Core
                 List<Vector3> simplified = Simplify(path.Points, path.Closed);
                 segments += BuildSegments(segmentsRoot.transform, owner, simplified, path.Closed, radius, grindLayer, ref length);
 
-                if (path.Closed)
-                {
-                    loops++;
-                    foreach (List<Vector3> half in SplitLoop(path.Points))
-                    {
-                        AddRail(container.transform, ++railCount, Simplify(half, false), lift, ignoreLayer);
-                    }
-                }
-                else
-                {
-                    AddRail(container.transform, ++railCount, simplified, lift, ignoreLayer);
-                }
+                if (path.Closed) loops++;
+                AddRail(container.transform, ++railCount, Resample(owner, simplified, path.Closed), lift, ignoreLayer, path.Closed);
             }
 
             // Rails built by the first version of this tool hid the exported mesh - the mesh is the look now.
@@ -315,7 +308,7 @@ namespace Blocks.Gameplay.Core
                 renderer.enabled = true;
             }
 
-            return $"{railCount} grind path(s){(loops > 0 ? $" ({loops} loop(s), each split into two halves)" : "")}, {segments} segment(s), {length:0.#} m of rail";
+            return $"{railCount} grind path(s){(loops > 0 ? $" ({loops} of them loop(s))" : "")}, {segments} segment(s), {length:0.#} m of rail";
         }
 
         /// <summary>Deletes what <see cref="Build"/> made (and turns the exported mesh back on if an older version hid it).</summary>
@@ -332,39 +325,30 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        private static void AddRail(Transform parent, int number, List<Vector3> points, Vector3 lift, int layer)
+        private static void AddRail(Transform parent, int number, List<Vector3> points, Vector3 lift, int layer, bool loop)
         {
-            var go = new GameObject($"Rail {number}") { layer = layer };
+            var go = new GameObject(loop ? $"Rail {number} (loop)" : $"Rail {number}") { layer = layer };
             go.transform.SetParent(parent, false);
             var waypoints = new Vector3[points.Count];
             for (int i = 0; i < points.Count; i++) waypoints[i] = points[i] + lift;
             GrindRail rail = go.AddComponent<GrindRail>();
-            rail.Configure(waypoints, RiderOffset, pointsInLocalSpace: true);
+            rail.Configure(waypoints, RiderOffset, pointsInLocalSpace: true, loop: loop);
         }
 
-        /// <summary>Two halves of a loop that overlap by one bar at each joint (the loop's own points, not simplified yet).</summary>
-        private static IEnumerable<List<Vector3>> SplitLoop(List<Vector3> loop)
+        /// <summary>Extra points so they're no more than WaypointSpacing (world meters) apart, like Dan's generated rails. A loop's first point isn't repeated.</summary>
+        private static List<Vector3> Resample(Transform owner, List<Vector3> points, bool closed)
         {
-            var points = new List<Vector3>(loop);
-            while (points.Count < 4)
+            var result = new List<Vector3>();
+            int runs = closed ? points.Count : points.Count - 1;
+            for (int i = 0; i < runs; i++)
             {
-                // A tiny loop: add midpoints so each half still has a bar to spare.
-                var denser = new List<Vector3>();
-                for (int i = 0; i < points.Count; i++)
-                {
-                    denser.Add(points[i]);
-                    denser.Add((points[i] + points[(i + 1) % points.Count]) * 0.5f);
-                }
-                points = denser;
+                Vector3 a = points[i], b = points[(i + 1) % points.Count];
+                float worldLength = owner.TransformVector(b - a).magnitude;
+                int pieces = Mathf.Max(1, Mathf.CeilToInt(worldLength / WaypointSpacing - 1e-3f));
+                for (int k = 0; k < pieces; k++) result.Add(Vector3.Lerp(a, b, k / (float)pieces));
             }
-
-            int m = points.Count, h = m / 2;
-            var first = new List<Vector3>();
-            for (int i = 0; i <= h + 1; i++) first.Add(points[i % m]);
-            var second = new List<Vector3>();
-            for (int i = h; i <= m + 1; i++) second.Add(points[i % m]);
-            yield return first;
-            yield return second;
+            if (!closed && points.Count > 0) result.Add(points[points.Count - 1]);
+            return result;
         }
 
         /// <summary>

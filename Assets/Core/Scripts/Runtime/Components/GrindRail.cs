@@ -36,6 +36,12 @@ namespace Blocks.Gameplay.Core
         [Tooltip("On: the waypoints are in this object's own local space, so the rail moves, turns and scales with it (what Set Object Property > Grind Rail builds). Off: the original layout - world-space offsets from this object's position, which follow it when it moves but not when it turns.")]
         [SerializeField] private bool localSpaceWaypoints;
 
+        [Tooltip("Local-space rails only: the last waypoint joins back to the first and the rail never ends - you ride round and round (a ring) until you jump or fall off.")]
+        [SerializeField] private bool closedLoop;
+
+        // Local-space rails: a bend's push is spread over this much rail either side of it (see BuildLocalTables).
+        private const float TurnSpreadMeters = 3f;
+
         private float[] m_CumulativeLength;
         private float[] m_TurnAngleAtWaypoint;
         private bool m_TablesBuilt;
@@ -50,8 +56,18 @@ namespace Blocks.Gameplay.Core
         /// <summary>See the field's tooltip.</summary>
         public bool LocalSpaceWaypoints => localSpaceWaypoints;
 
-        /// <summary>Waypoint <paramref name="i"/> in world space, for either waypoint layout.</summary>
-        private Vector3 PathPoint(int i) => localSpaceWaypoints ? transform.TransformPoint(waypoints[i]) : waypoints[i] + transform.position;
+        /// <summary>True for a ring: the path joins back on itself and never ends (see the closedLoop field).</summary>
+        public bool IsLoop => closedLoop && localSpaceWaypoints && waypoints != null && waypoints.Length >= 3;
+
+        /// <summary>Points along the path: the waypoints, plus the first one again at the end of a loop.</summary>
+        private int PathCount => waypoints == null ? 0 : IsLoop ? waypoints.Length + 1 : waypoints.Length;
+
+        /// <summary>Path point <paramref name="i"/> in world space, for either waypoint layout (wraps round a loop).</summary>
+        private Vector3 PathPoint(int i)
+        {
+            if (i >= waypoints.Length) i -= waypoints.Length;
+            return localSpaceWaypoints ? transform.TransformPoint(waypoints[i]) : waypoints[i] + transform.position;
+        }
 
         public float TotalLength
         {
@@ -198,9 +214,10 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>Same as <see cref="Configure(Vector3[], float)"/>, choosing the waypoint layout (see <see cref="LocalSpaceWaypoints"/>).</summary>
-        public void Configure(Vector3[] points, float railRadius, bool pointsInLocalSpace)
+        public void Configure(Vector3[] points, float railRadius, bool pointsInLocalSpace, bool loop = false)
         {
             localSpaceWaypoints = pointsInLocalSpace;
+            closedLoop = loop;
             Configure(points, railRadius);
         }
 
@@ -213,31 +230,16 @@ namespace Blocks.Gameplay.Core
 
         private void BuildTables()
         {
+            if (localSpaceWaypoints)
+            {
+                BuildLocalTables();
+                return;
+            }
+
             int n = waypoints.Length;
             m_CumulativeLength = new float[Mathf.Max(n, 1)];
             m_TurnAngleAtWaypoint = new float[Mathf.Max(n, 1)];
             if (n == 0) return;
-
-            if (localSpaceWaypoints)
-            {
-                // Everything in world space, so a turned or scaled rail measures and bends correctly.
-                m_CumulativeLength[0] = 0f;
-                for (int i = 1; i < n; i++)
-                {
-                    m_CumulativeLength[i] = m_CumulativeLength[i - 1] + Vector3.Distance(PathPoint(i - 1), PathPoint(i));
-                }
-                for (int i = 1; i < n - 1; i++)
-                {
-                    Vector3 inDir = PathPoint(i) - PathPoint(i - 1);
-                    Vector3 outDir = PathPoint(i + 1) - PathPoint(i);
-                    inDir.y = 0f;
-                    outDir.y = 0f;
-                    m_TurnAngleAtWaypoint[i] = inDir.sqrMagnitude > 1e-6f && outDir.sqrMagnitude > 1e-6f
-                        ? Vector3.SignedAngle(inDir, outDir, Vector3.up)
-                        : 0f;
-                }
-                return;
-            }
 
             m_CumulativeLength[0] = 0f;
             for (int i = 1; i < n; i++)
@@ -258,6 +260,61 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
+        /// Local-space rails: lengths in world space (so a turned or scaled rail measures correctly), and each
+        /// point's turn as degrees of bend per meter of rail - every bend's angle spread evenly over
+        /// <see cref="TurnSpreadMeters"/> either side of it - so how hard a bend pushes the balance meter
+        /// depends on how sharp it really is, not on how far apart the waypoints happen to be. A loop wraps
+        /// round (its first point's neighbours include its last).
+        /// </summary>
+        private void BuildLocalTables()
+        {
+            int count = PathCount;
+            m_CumulativeLength = new float[Mathf.Max(count, 1)];
+            m_TurnAngleAtWaypoint = new float[Mathf.Max(count, 1)];
+            if (count == 0) return;
+
+            for (int i = 1; i < count; i++)
+            {
+                m_CumulativeLength[i] = m_CumulativeLength[i - 1] + Vector3.Distance(PathPoint(i - 1), PathPoint(i));
+            }
+            float total = m_CumulativeLength[count - 1];
+            bool loop = IsLoop;
+
+            var bend = new float[count];
+            for (int i = 0; i < count; i++)
+            {
+                int previous = i - 1, next = i + 1;
+                if (loop)
+                {
+                    if (i == count - 1) continue;      // the same point as 0, counted there
+                    if (i == 0) previous = count - 2;
+                }
+                else if (previous < 0 || next >= count)
+                {
+                    continue;
+                }
+                Vector3 inDir = PathPoint(i) - PathPoint(previous);
+                Vector3 outDir = PathPoint(next) - PathPoint(i);
+                inDir.y = 0f;
+                outDir.y = 0f;
+                if (inDir.sqrMagnitude > 1e-6f && outDir.sqrMagnitude > 1e-6f) bend[i] = Vector3.SignedAngle(inDir, outDir, Vector3.up);
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                float sum = 0f;
+                for (int j = 0; j < count; j++)
+                {
+                    if (bend[j] == 0f) continue;
+                    float d = Mathf.Abs(m_CumulativeLength[i] - m_CumulativeLength[j]);
+                    if (loop) d = Mathf.Min(d, total - d);
+                    if (d <= TurnSpreadMeters) sum += bend[j];
+                }
+                m_TurnAngleAtWaypoint[i] = sum / (2f * TurnSpreadMeters);
+            }
+        }
+
+        /// <summary>
         /// Projects a world position onto the whole path and returns the arc length of the closest
         /// point on it, plus whether that closest point actually falls within the rail's playable
         /// range (including <see cref="exitMargin"/> grace at either end) - a position far past one
@@ -272,7 +329,7 @@ namespace Blocks.Gameplay.Core
             float bestDistSqr = float.MaxValue;
             float bestArc = 0f;
 
-            for (int i = 0; i < waypoints.Length - 1; i++)
+            for (int i = 0; i < PathCount - 1; i++)
             {
                 Vector3 a = PathPoint(i);
                 Vector3 b = PathPoint(i + 1);
@@ -293,7 +350,7 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>True if the given (unclamped) arc length is within the rail's playable range, including the end-grace margin.</summary>
-        public bool IsArcWithinRail(float arcLength) => arcLength >= -exitMargin && arcLength <= TotalLength + exitMargin;
+        public bool IsArcWithinRail(float arcLength) => IsLoop || (arcLength >= -exitMargin && arcLength <= TotalLength + exitMargin);
 
         /// <summary>
         /// Evaluates the rail at a given arc length: the raw path point (the rider's actual position
@@ -307,7 +364,7 @@ namespace Blocks.Gameplay.Core
         public void Evaluate(float arcLength, out Vector3 point, out Vector3 tangent, out Vector3 right, out float turnSharpness)
         {
             EnsureTables();
-            arcLength = Mathf.Clamp(arcLength, 0f, TotalLength);
+            arcLength = IsLoop && TotalLength > 0f ? Mathf.Repeat(arcLength, TotalLength) : Mathf.Clamp(arcLength, 0f, TotalLength);
 
             if (waypoints.Length < 2)
             {
@@ -367,7 +424,7 @@ namespace Blocks.Gameplay.Core
             if (waypoints == null || waypoints.Length < 2) return;
 
             Gizmos.color = Color.cyan;
-            for (int i = 0; i < waypoints.Length - 1; i++)
+            for (int i = 0; i < PathCount - 1; i++)
             {
                 Gizmos.DrawLine(PathPoint(i) + Vector3.up * radius, PathPoint(i + 1) + Vector3.up * radius);
                 Gizmos.DrawWireSphere(PathPoint(i) + Vector3.up * radius, radius);
