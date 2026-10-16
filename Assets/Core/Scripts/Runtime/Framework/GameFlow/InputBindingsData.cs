@@ -105,15 +105,27 @@ namespace Blocks.Gameplay.Core
     /// GraphicsSettingsController's own choice ordering ever changes - see that class for how each
     /// dropdown's index maps to and from these fields. Defaults (1920x1080, 60fps, VSync off, Full Screen)
     /// match the spec's stated defaults exactly.
+    ///
+    /// FieldOfView (added 2026-10-16) is the in-game camera's vertical field of view in degrees, 60-120 (the
+    /// Field of View slider). 80 is the [BB] FreeLook camera's own lens setting. Applied every frame by
+    /// CoreCameraController; read it through <see cref="ClampedFieldOfView"/> so an edited or old
+    /// settings.json can't push it out of range.
     /// </summary>
     [Serializable]
     public class GraphicsSettingsData
     {
+        public const int MinFieldOfView = 60;
+        public const int MaxFieldOfView = 120;
+        public const int DefaultFieldOfView = 80;
+
         public int ResolutionWidth = 1920;
         public int ResolutionHeight = 1080;
         public int FrameRate = 60;
         public bool VSyncEnabled = false;
         public bool Fullscreen = true;
+        public int FieldOfView = DefaultFieldOfView;
+
+        public int ClampedFieldOfView => FieldOfView <= 0 ? DefaultFieldOfView : Mathf.Clamp(FieldOfView, MinFieldOfView, MaxFieldOfView);
     }
 
     /// <summary>

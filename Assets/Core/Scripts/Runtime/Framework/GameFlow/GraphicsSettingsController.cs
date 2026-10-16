@@ -52,7 +52,7 @@ namespace Blocks.Gameplay.Core
     /// PreventDefault always runs for them (see OnDropdownNavigationMove), the same "don't trust the
     /// automatic navigation, override it explicitly" lesson every GameFlow settings screen in this project
     /// already established. While NOT editing, Up/Down move focus explicitly to the previous/next dropdown
-    /// in <see cref="m_DropdownsInOrder"/> (Resolution/Frame Rate/VSync/Windowed Mode, clamped at each end -
+    /// in <see cref="m_RowsInOrder"/> (Resolution/Frame Rate/VSync/Windowed Mode/Field of View, clamped at each end -
     /// no wraparound), rather than whatever the automatic navigation would have picked.
     ///
     /// Outside edit mode, Right on a focused dropdown is the only thing that leaves the dropdown column -
@@ -64,7 +64,8 @@ namespace Blocks.Gameplay.Core
     /// existing InputBindingsStore/InputBindingsData.Graphics field - when Save Changes is clicked.
     ///
     /// Restore Defaults (above Save Changes, above Back - same order as every other settings screen) resets
-    /// all four dropdowns back to their spec defaults (1920 x 1080, 60 FPS, VSync Off, Full Screen) at once,
+    /// all four dropdowns and the Field of View slider back to their defaults (1920 x 1080, 60 FPS, VSync Off,
+    /// Full Screen, 80°) at once,
     /// live-applies that, and refreshes the dropdown visuals. It does NOT save by itself - same "still just
     /// a working change until Save Changes" convention as every other settings screen, and Back discards
     /// any unsaved change the same way too.
@@ -78,6 +79,13 @@ namespace Blocks.Gameplay.Core
     ///   - Action buttons: Up/Down move explicitly along Restore Defaults/Save Changes/Back (see
     ///     OnActionNavigationMove); Left always crosses back to the Resolution dropdown; Right is inert.
     /// Same SuppressDefaultNavigation (PreventDefault + StopPropagation) mechanism throughout.
+    ///
+    /// FIELD OF VIEW (added 2026-10-16): a SliderInt row under Windowed Mode, 60-120 degrees (vertical FOV,
+    /// default 80 = the [BB] FreeLook camera's lens), shown as e.g. "80°". It works like the Audio screen's
+    /// sliders: Submit enters edit mode, Left/Right then step it by <see cref="FieldOfViewStep"/> (clamped),
+    /// Submit commits, Cancel reverts; Up/Down do nothing while editing. Not editing, it's just the last row
+    /// of the Up/Down order (<see cref="m_RowsInOrder"/>) and Right goes to Save Changes like the dropdowns.
+    /// A mouse drag sets it to any whole degree. Applied live in-game by CoreCameraController.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class GraphicsSettingsController : MonoBehaviour
@@ -115,6 +123,9 @@ namespace Blocks.Gameplay.Core
         // Index 0 = Full Screen, index 1 = Windowed - matches the spec's own stated order, with Full Screen (index 0) the default.
         private const int DefaultWindowedIndex = 0;
 
+        /// <summary>Degrees per Left/Right press while the Field of View slider is being edited.</summary>
+        private const int FieldOfViewStep = 5;
+
         private GraphicsSettingsData m_Settings;
 
         private DropdownField m_ResolutionDropdown;
@@ -124,8 +135,20 @@ namespace Blocks.Gameplay.Core
 
         private readonly Dictionary<DropdownField, System.Action<int>> m_DropdownOnChanged = new Dictionary<DropdownField, System.Action<int>>();
 
-        /// <summary>Fixed Up/Down order the dropdowns navigate in while not editing - see OnDropdownNavigationMove. Populated once all four exist, at the end of BuildUI.</summary>
-        private DropdownField[] m_DropdownsInOrder;
+        private SliderInt m_FieldOfViewSlider;
+        private Label m_FieldOfViewValueLabel;
+
+        /// <summary>Fixed Up/Down order of the settings rows while not editing: the four dropdowns, then the Field of View slider. Populated at the end of BuildUI.</summary>
+        private VisualElement[] m_RowsInOrder;
+
+        /// <summary>The slider currently in edit mode (only Field of View for now), or null.</summary>
+        private SliderInt m_EditingSlider;
+
+        /// <summary>The value m_EditingSlider had right before entering edit mode, restored if the edit is cancelled.</summary>
+        private int m_ValueBeforeEdit;
+
+        /// <summary>True while any control on this screen is in edit mode.</summary>
+        private bool IsEditing => m_EditingDropdown != null || m_EditingSlider != null;
 
         /// <summary>The dropdown currently in edit mode, or null if none - see the class summary's "EDIT MODE" section.</summary>
         private DropdownField m_EditingDropdown;
@@ -166,7 +189,8 @@ namespace Blocks.Gameplay.Core
                 ResolutionHeight = source.ResolutionHeight,
                 FrameRate = source.FrameRate,
                 VSyncEnabled = source.VSyncEnabled,
-                Fullscreen = source.Fullscreen
+                Fullscreen = source.Fullscreen,
+                FieldOfView = source.ClampedFieldOfView
             };
         }
 
@@ -232,7 +256,7 @@ namespace Blocks.Gameplay.Core
             root.RegisterCallback<NavigationCancelEvent>(evt =>
             {
                 evt.StopPropagation();
-                if (m_EditingDropdown != null) return;
+                if (IsEditing) return;
                 MenuUI.PlaySound(cancelSound);
                 OnBackClicked();
             });
@@ -283,7 +307,8 @@ namespace Blocks.Gameplay.Core
                 m_Settings.Fullscreen = (idx == 0);
                 LiveApply();
             });
-            m_DropdownsInOrder = new[] { m_ResolutionDropdown, m_FrameRateDropdown, m_VSyncDropdown, m_WindowedDropdown };
+            m_FieldOfViewSlider = AddFieldOfViewRow(dropdownColumn);
+            m_RowsInOrder = new VisualElement[] { m_ResolutionDropdown, m_FrameRateDropdown, m_VSyncDropdown, m_WindowedDropdown, m_FieldOfViewSlider };
 
             // Same absolutely-positioned bottom-right column as every other GameFlow settings screen, with
             // Restore Defaults and Save Changes above Back.
@@ -380,7 +405,7 @@ namespace Blocks.Gameplay.Core
             {
                 ExitEditMode(commit: true);
             }
-            else if (m_EditingDropdown == null)
+            else if (!IsEditing)
             {
                 EnterEditMode(dropdown);
             }
@@ -444,7 +469,7 @@ namespace Blocks.Gameplay.Core
         /// Up/Down always call SuppressDefaultNavigation, editing or not - UI Toolkit's automatic
         /// nearest-neighbor navigation is never allowed to run for them on this screen. While editing,
         /// Up/Down cycle CycleDropdown one option per press instead of moving focus. While NOT editing,
-        /// Up/Down move focus to the previous/next dropdown in <see cref="m_DropdownsInOrder"/> instead.
+        /// Up/Down move focus to the previous/next row in <see cref="m_RowsInOrder"/> instead.
         /// Left/Right are inert in every state - the spec calls this out explicitly for the editing case
         /// ("right and left shouldn't do anything while in edit mode"), and there's nothing for a dropdown
         /// to scrub the way a slider has a continuous value, so Left stays inert while not editing too;
@@ -473,13 +498,13 @@ namespace Blocks.Gameplay.Core
             {
                 case NavigationMoveEvent.Direction.Up:
                     if (isEditing) CycleDropdown(dropdown, -1);
-                    else FocusAdjacentDropdown(dropdown, -1);
+                    else FocusAdjacentRow(dropdown, -1);
                     SuppressDefaultNavigation(evt);
                     break;
 
                 case NavigationMoveEvent.Direction.Down:
                     if (isEditing) CycleDropdown(dropdown, 1);
-                    else FocusAdjacentDropdown(dropdown, 1);
+                    else FocusAdjacentRow(dropdown, 1);
                     SuppressDefaultNavigation(evt);
                     break;
 
@@ -514,16 +539,163 @@ namespace Blocks.Gameplay.Core
             dropdown.index = newIndex; // fires RegisterValueChangedCallback, same as a native popup selection would
         }
 
-        /// <summary>Moves focus to the previous (step -1) or next (step 1) dropdown in m_DropdownsInOrder, or does nothing if already at that end - no wraparound.</summary>
-        private void FocusAdjacentDropdown(DropdownField from, int step)
+        /// <summary>Moves focus to the previous (step -1) or next (step 1) row in m_RowsInOrder, or does nothing if already at that end - no wraparound.</summary>
+        private void FocusAdjacentRow(VisualElement from, int step)
         {
-            int index = System.Array.IndexOf(m_DropdownsInOrder, from);
+            int index = System.Array.IndexOf(m_RowsInOrder, from);
             if (index < 0) return;
 
             int next = index + step;
-            if (next < 0 || next >= m_DropdownsInOrder.Length) return;
+            if (next < 0 || next >= m_RowsInOrder.Length) return;
 
-            m_DropdownsInOrder[next].Focus();
+            m_RowsInOrder[next].Focus();
+        }
+
+        // ----- Field of View slider -----
+
+        private static string DegreesText(int degrees) => $"{degrees}\u00B0";
+
+        /// <summary>
+        /// Label + SliderInt (60-120) + "80°" value label, laid out to line up with the dropdown rows above.
+        /// Handlers are closures over this slider, never evt.target (see the class summary). Submit/Cancel
+        /// are bubble phase and Move is TrickleDown, same as AudioSettingsController.AddSliderRow.
+        /// </summary>
+        private SliderInt AddFieldOfViewRow(VisualElement parent)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginBottom = 14;
+
+            var nameLabel = new Label("FIELD OF VIEW");
+            nameLabel.style.color = Color.white;
+            nameLabel.style.fontSize = 16;
+            nameLabel.style.width = 160;
+            row.Add(nameLabel);
+
+            int initial = m_Settings.ClampedFieldOfView;
+            var slider = new SliderInt
+            {
+                lowValue = GraphicsSettingsData.MinFieldOfView,
+                highValue = GraphicsSettingsData.MaxFieldOfView,
+                value = initial
+            };
+            slider.style.width = 180;
+            SetFocusedVisual(slider, false);
+            slider.RegisterCallback<FocusInEvent>(_ => SetFocusedVisual(slider, true));
+            slider.RegisterCallback<FocusOutEvent>(_ => SetFocusedVisual(slider, false));
+            slider.RegisterCallback<NavigationSubmitEvent>(evt => OnSliderSubmit(slider, evt));
+            slider.RegisterCallback<NavigationCancelEvent>(evt => OnSliderCancel(slider, evt));
+            slider.RegisterCallback<NavigationMoveEvent>(evt => OnSliderNavigationMove(slider, evt), TrickleDown.TrickleDown);
+            row.Add(slider);
+
+            var valueLabel = new Label(DegreesText(initial));
+            valueLabel.style.color = Color.white;
+            valueLabel.style.fontSize = 16;
+            valueLabel.style.width = 50;
+            valueLabel.style.marginLeft = 10;
+            row.Add(valueLabel);
+            m_FieldOfViewValueLabel = valueLabel;
+
+            slider.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.newValue == evt.previousValue) return;
+                valueLabel.text = DegreesText(evt.newValue);
+                m_Settings.FieldOfView = evt.newValue;
+                LiveApply();
+            });
+
+            parent.Add(row);
+            return slider;
+        }
+
+        /// <summary>Submit on the focused slider enters edit mode; Submit again while editing it commits and exits.</summary>
+        private void OnSliderSubmit(SliderInt slider, NavigationSubmitEvent evt)
+        {
+            if (m_EditingSlider == slider)
+            {
+                ExitSliderEditMode(commit: true);
+            }
+            else if (!IsEditing)
+            {
+                m_EditingSlider = slider;
+                m_ValueBeforeEdit = slider.value;
+                SetEditingVisual(slider, true);
+                if (selectSound != null)
+                {
+                    AudioVolumeService.PlayOneShot(selectSound, AudioCategory.UISoundEffects, Vector3.zero);
+                }
+            }
+
+            evt.PreventDefault();
+            evt.StopPropagation();
+        }
+
+        /// <summary>Cancel while the slider is being edited puts back its pre-edit value; a no-op otherwise (the root handler then treats it as Back).</summary>
+        private void OnSliderCancel(SliderInt slider, NavigationCancelEvent evt)
+        {
+            if (m_EditingSlider != slider) return;
+
+            ExitSliderEditMode(commit: false);
+            evt.PreventDefault();
+            evt.StopPropagation();
+        }
+
+        private void ExitSliderEditMode(bool commit)
+        {
+            if (m_EditingSlider == null) return;
+
+            SliderInt slider = m_EditingSlider;
+            m_EditingSlider = null;
+            SetEditingVisual(slider, false);
+
+            if (!commit)
+            {
+                slider.SetValueWithoutNotify(m_ValueBeforeEdit);
+                m_FieldOfViewValueLabel.text = DegreesText(m_ValueBeforeEdit);
+                m_Settings.FieldOfView = m_ValueBeforeEdit;
+                LiveApply();
+
+                if (cancelSound != null)
+                {
+                    AudioVolumeService.PlayOneShot(cancelSound, AudioCategory.UISoundEffects, Vector3.zero);
+                }
+            }
+            else if (selectSound != null)
+            {
+                AudioVolumeService.PlayOneShot(selectSound, AudioCategory.UISoundEffects, Vector3.zero);
+            }
+        }
+
+        /// <summary>
+        /// Editing: Left/Right step the value by FieldOfViewStep (clamped), Up/Down do nothing. Not editing:
+        /// Up/Down move along m_RowsInOrder, Right goes to Save Changes, Left is inert. Every direction is
+        /// suppressed so SliderInt's own scrub and UI Toolkit's automatic navigation never run.
+        /// </summary>
+        private void OnSliderNavigationMove(SliderInt slider, NavigationMoveEvent evt)
+        {
+            bool isEditing = m_EditingSlider == slider;
+
+            switch (evt.direction)
+            {
+                case NavigationMoveEvent.Direction.Up:
+                    if (!isEditing) FocusAdjacentRow(slider, -1);
+                    break;
+
+                case NavigationMoveEvent.Direction.Down:
+                    if (!isEditing) FocusAdjacentRow(slider, 1);
+                    break;
+
+                case NavigationMoveEvent.Direction.Right:
+                    if (isEditing) slider.value = Mathf.Min(slider.highValue, slider.value + FieldOfViewStep);
+                    else m_SaveButton.Focus();
+                    break;
+
+                case NavigationMoveEvent.Direction.Left:
+                    if (isEditing) slider.value = Mathf.Max(slider.lowValue, slider.value - FieldOfViewStep);
+                    break;
+            }
+            SuppressDefaultNavigation(evt);
         }
 
         /// <summary>Wires the action buttons' own navigation - see OnActionNavigationMove. Registered as per-button closures, matching AddDropdownRow's own registration, rather than one shared handler reading evt.target.</summary>
@@ -566,7 +738,7 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        /// <summary>Moves focus to the previous (step -1) or next (step 1) button in m_ButtonsInOrder, or does nothing if already at that end - no wraparound. Same pattern as FocusAdjacentDropdown.</summary>
+        /// <summary>Moves focus to the previous (step -1) or next (step 1) button in m_ButtonsInOrder, or does nothing if already at that end - no wraparound. Same pattern as FocusAdjacentRow.</summary>
         private void FocusAdjacentButton(Button from, int step)
         {
             int index = System.Array.IndexOf(m_ButtonsInOrder, from);
@@ -641,7 +813,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnRestoreDefaultsClicked()
         {
-            if (m_EditingDropdown != null) return; // don't reset mid-edit, see class summary
+            if (IsEditing) return; // don't reset mid-edit, see class summary
 
             m_Settings = new GraphicsSettingsData();
             LiveApply();
@@ -655,11 +827,13 @@ namespace Blocks.Gameplay.Core
             m_FrameRateDropdown.SetValueWithoutNotify(m_FrameRateDropdown.choices[FrameRateIndexFromSettings(m_Settings)]);
             m_VSyncDropdown.SetValueWithoutNotify(m_VSyncDropdown.choices[VSyncIndexFromSettings(m_Settings)]);
             m_WindowedDropdown.SetValueWithoutNotify(m_WindowedDropdown.choices[WindowedIndexFromSettings(m_Settings)]);
+            m_FieldOfViewSlider.SetValueWithoutNotify(m_Settings.ClampedFieldOfView);
+            m_FieldOfViewValueLabel.text = DegreesText(m_Settings.ClampedFieldOfView);
         }
 
         private void OnSaveChangesClicked()
         {
-            if (m_EditingDropdown != null) return; // don't save mid-edit, see class summary
+            if (IsEditing) return; // don't save mid-edit, see class summary
 
             // Loads the current on-disk data (rather than just writing a lone GraphicsSettingsData) so
             // saving Graphics here can never clobber Keyboard/Gamepad/Audio settings saved from the other
@@ -671,7 +845,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnBackClicked()
         {
-            if (m_EditingDropdown != null) return; // don't leave mid-edit, see class summary
+            if (IsEditing) return; // don't leave mid-edit, see class summary
             if (SettingsOverlay.TryClose(this)) return; // in a match: back to the Escape menu
             MenuTransition.LoadScene(settingsSceneName);
         }
