@@ -32,9 +32,25 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public void Raise()
         {
+            // These assets outlive scenes and sessions, so a listener whose object was destroyed without
+            // unregistering is dropped here rather than called. And one listener throwing doesn't stop the rest.
             for (int i = m_Listeners.Count - 1; i >= 0; i--)
             {
-                m_Listeners[i].Invoke();
+                if (i >= m_Listeners.Count) continue; // a listener unregistered others
+                System.Action listener = m_Listeners[i];
+                if (listener.Target is Object owner && owner == null)
+                {
+                    m_Listeners.RemoveAt(i);
+                    continue;
+                }
+                try
+                {
+                    listener.Invoke();
+                }
+                catch (System.Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
             }
         }
 

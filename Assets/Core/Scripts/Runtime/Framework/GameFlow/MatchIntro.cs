@@ -185,6 +185,9 @@ namespace Blocks.Gameplay.Core
                     continue;
                 }
                 if (m_HiddenHud.ContainsKey(child)) continue;
+                // Already hidden (e.g. by its UXML) - leave it alone. Hiding it and then "restoring" its code-set
+                // display value, which is unset for a UXML-hidden element, would show it (see CoreHUD's round banner).
+                if (child.resolvedStyle.display == DisplayStyle.None && child.style.display.keyword == StyleKeyword.Null) continue;
                 m_HiddenHud[child] = child.style.display;
                 child.style.display = DisplayStyle.None;
             }

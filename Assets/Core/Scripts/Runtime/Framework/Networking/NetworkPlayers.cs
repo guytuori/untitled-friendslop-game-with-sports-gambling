@@ -130,6 +130,7 @@ namespace Blocks.Gameplay.Core
             ulong id = player.OwnerClientId;
             if (id == 0) return;
 
+            PurgeDestroyed(); // avatars from an earlier session that never unregistered
             s_Players[id] = player;
             if (!s_SortedIds.Contains(id))
             {
@@ -148,6 +149,24 @@ namespace Blocks.Gameplay.Core
                 LocalPlayerSpawned?.Invoke(player);
             }
             RosterChanged?.Invoke();
+        }
+
+        private static readonly List<ulong> s_Stale = new List<ulong>();
+
+        /// <summary>Drops entries whose avatar has been destroyed (Unity null).</summary>
+        private static void PurgeDestroyed()
+        {
+            s_Stale.Clear();
+            foreach (KeyValuePair<ulong, CorePlayerManager> pair in s_Players)
+            {
+                if (pair.Value == null) s_Stale.Add(pair.Key);
+            }
+            foreach (ulong stale in s_Stale)
+            {
+                s_Players.Remove(stale);
+                s_SortedIds.Remove(stale);
+            }
+            if (Local == null) Local = null;
         }
 
         internal static void Unregister(CorePlayerManager player)

@@ -669,6 +669,12 @@ namespace Blocks.Gameplay.Core
             return outcome;
         }
 
+        // ADDING A NEW GAME MODE / SESSION TYPE? Check that a second session in the same run still works:
+        // play the new mode -> leave to the menu -> start another mode (and the reverse), with no red errors and
+        // with control of the player. Anything that outlives a scene (DontDestroyOnLoad objects, statics,
+        // ScriptableObject events) must not keep pointing at objects from the previous session's scene - the
+        // 2026-10-17 "no control after Return to Menu" bug was the sound system keeping a destroyed AudioListener.
+        // Reset new per-session statics here. Checklist: project doc claude/new-game-mode-checklist.md.
         private void ResetGameState()
         {
             RoomCode = "";

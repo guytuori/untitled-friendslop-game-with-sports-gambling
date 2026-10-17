@@ -459,6 +459,13 @@ namespace Blocks.Gameplay.Core
                 m_MessageOverlay.style.display = DisplayStyle.None;
             }
 
+            // The round banner and challenge overlay start hidden too. Their UXML says display: none, but that has to
+            // be set here in code as well: MatchIntro hides the HUD during the flyover and afterwards puts back each
+            // element's code-set display value - which for these was "not set", so they reappeared (a stray
+            // "ROUND OVER" in the middle of the screen for the whole round).
+            if (m_RoundBanner != null) m_RoundBanner.style.display = DisplayStyle.None;
+            if (m_ChallengeOverlay != null) m_ChallengeOverlay.style.display = DisplayStyle.None;
+
             // Configure progress bar colors
             if (m_PlayerHealthBar != null)
             {
@@ -1044,6 +1051,14 @@ namespace Blocks.Gameplay.Core
 
             switch (phase)
             {
+                case RoundTimer.RoundPhase.Intro:
+                case RoundTimer.RoundPhase.Countdown:
+                case RoundTimer.RoundPhase.Playing:
+                    // Nothing round-over-ish belongs on screen before or during play (a timed banner like
+                    // "FINISHED!" hides itself).
+                    if (m_BannerHideCoroutine == null && m_RoundBanner != null) m_RoundBanner.style.display = DisplayStyle.None;
+                    break;
+
                 case RoundTimer.RoundPhase.Tallying:
                     ShowBanner("ROUND OVER", "Adding up the scores...", null, 0f);
                     break;

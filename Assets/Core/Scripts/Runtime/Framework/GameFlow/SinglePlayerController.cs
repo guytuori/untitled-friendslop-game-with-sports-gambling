@@ -19,6 +19,9 @@ namespace Blocks.Gameplay.Core
     /// PRACTICE CHALLENGES opens the <see cref="ChallengePicker"/> list over this screen: pick a challenge and
     /// Start to play just that challenge, in the Practice16 / Practice32 map (see <see cref="PracticeMode"/>).
     ///
+    /// SOUND TEST (under Practice Challenges) opens the <see cref="SoundTest"/> popup: listen to any of the game's
+    /// songs. UI sounds and other music are muted while it's open (see that class).
+    ///
     /// How To Play is a placeholder for now (it just logs).
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -63,6 +66,8 @@ namespace Blocks.Gameplay.Core
         private Button m_PracticeButton;
         private Button m_ChallengesButton;
         private ChallengePicker m_ChallengePicker;
+        private Button m_SoundTestButton;
+        private SoundTest m_SoundTest;
 
         private VisualElement m_Popup;
         private VisualElement m_Grid;
@@ -94,10 +99,13 @@ namespace Blocks.Gameplay.Core
             m_Column.Add(m_PracticeButton);
             m_ChallengesButton = MenuUI.MakeButton("Practice Challenges", OpenChallengePicker, selectSound);
             m_Column.Add(m_ChallengesButton);
+            m_SoundTestButton = MenuUI.MakeButton("Sound Test", OpenSoundTest, selectSound);
+            m_Column.Add(m_SoundTestButton);
             m_Column.Add(MenuUI.MakeButton("Back", OnBack, cancelSound));
 
             BuildPracticePopup(root);
             m_ChallengePicker = new ChallengePicker(root, selectSound, cancelSound, StartChallengePractice, CloseChallengePicker);
+            m_SoundTest = new SoundTest(root, CloseSoundTest);
 
             MenuUI.RegisterCancelAsBack(root, cancelSound, OnBack);
             MenuUI.FocusFirst(changeProfileButton);
@@ -129,6 +137,11 @@ namespace Blocks.Gameplay.Core
         /// <summary>B/Esc or Back: closes the practice popup or challenge list if one is open, otherwise back to the main menu.</summary>
         private void OnBack()
         {
+            if (m_SoundTest != null && m_SoundTest.IsOpen)
+            {
+                CloseSoundTest();
+                return;
+            }
             if (m_ChallengePicker != null && m_ChallengePicker.IsOpen)
             {
                 CloseChallengePicker();
@@ -140,6 +153,30 @@ namespace Blocks.Gameplay.Core
                 return;
             }
             MenuTransition.LoadScene(backSceneName);
+        }
+
+        // =====================================================================================
+        // Sound Test
+        // =====================================================================================
+
+        private void OpenSoundTest()
+        {
+            m_Column.SetEnabled(false); // the menu behind the popup can't be reached
+            m_SoundTest.Open();
+        }
+
+        private void CloseSoundTest()
+        {
+            m_SoundTest.Close();
+            m_Column.SetEnabled(true);
+            MenuUI.FocusFirst(m_SoundTestButton);
+        }
+
+        private void OnDestroy()
+        {
+            // Never leave UI sounds muted behind us (e.g. the scene changing while the popup is up).
+            if (m_SoundTest != null && m_SoundTest.IsOpen) m_SoundTest.Close();
+            AudioVolumeService.UISoundsMuted = false;
         }
 
         // =====================================================================================

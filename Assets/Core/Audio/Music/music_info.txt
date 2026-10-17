@@ -1,0 +1,59 @@
+01 - Parkour Predictions!
+Parkour_Predictions.mp3
+loop point: N/A
+
+02 - Parkour Parley
+Parkour_Parkley.mp3 //not implemented yet
+loop point: N/A
+
+03 - Ready to Run
+Ready_to_Run.mp3
+loop point: 1.668s
+
+04 - Wizard Academy
+Wizard_Academy.mp3 //not implemented yet
+loop point: N/A
+
+05 - Dinosaur Country
+Dinosaur_Country.mp3
+loop point: 16.403s
+
+06 - Of Ninjas and Pirates
+Of_Ninjas_and_Pirates.mp3
+loop point: 0.000s
+
+07 - Airship Descent
+Airship_Descent.mp3 //not implemented yet
+loop point: N/A
+
+08 - Twenty Thousand Inches Over the Sea
+Twenty_Thousand_Inches_Over_the_Sea.mp3 //not implemented yet
+loop point: N/A
+
+09 - Red Rock Rock
+Red_Rock_Rock.mp3 //not implemented yet
+loop point: N/A
+
+10 - Invasion Mothership
+Invasion_Mothership.mp3 //not implemented yet
+loop point: N/A
+
+11 - Map 8 work in progress
+Map8.mp3 //not implemented yet
+loop point: N/A
+
+12 - Last Stop
+Last_Stop.mp3
+loop point: 28.571s
+
+13 - Banking on Victory
+Banking_on_Victory.mp3
+loop point 0.209s
+
+14 - Crash Out
+Crash_Out.mp3 //not implemented yet
+loop point: N/A
+
+15 - Credits
+Credits.mp3 //not implemented yet
+loop point: N/A

@@ -191,7 +191,6 @@ GameObject:
   - component: {fileID: 5505897753791863388}
   - component: {fileID: 8341354711323544292}
   - component: {fileID: 7646443965227562787}
-  - component: {fileID: 7301709439652367293}
   m_Layer: 3
   m_Name: CorePlayer
   m_TagString: Player
@@ -234,8 +233,8 @@ CharacterController:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Height: 1.8
-  m_Radius: 0.28
+  m_Height: 1.89
+  m_Radius: 0.294
   m_SlopeLimit: 89
   m_StepOffset: 0.25
   m_SkinWidth: 0.02
@@ -314,7 +313,7 @@ MonoBehaviour:
   groundedRadius: 0.28
   groundLayers:
     serializedVersion: 2
-    m_Bits: 1
+    m_Bits: 1279
   slopeForce: 5
   slopeForceRayLength: 1.5
   isMovementEnabled: 1
@@ -365,7 +364,7 @@ MonoBehaviour:
   initialModeName: FreeLook
   enableLookInput: 1
   defaultLookSensitivity: 3
-  defaultVerticalLookLimit: 70
+  defaultVerticalLookLimit: 89
   stickDeadzone: 0.1
   stickYawSpeed: 200
   stickPitchSpeed: 140
@@ -427,7 +426,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 08b1147bca1a54974a6f52d1a504f530, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  airControl: 1
+  airControl: 0.3
   airRotationSpeed: 999
   conserveMomentum: 1
   minIceTurnGrip: 0.1
@@ -556,7 +555,7 @@ MonoBehaviour:
   fallOffHop: 2
   sameRailReentryGuard: 0.2
   snapDetectionRadius: 0.9
-  jumpOffHeightMultiplier: 0.3
+  jumpOffHeightMultiplier: 2
   momentumDecayDelay: 9
   airborneMomentumDecayPerSecond: 0.5
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
@@ -591,6 +590,7 @@ MonoBehaviour:
   poleAngleLowerBound: 50
   poleAngleUpperBound: 125
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+  animationControls: {fileID: 0}
   characterHeight: 2
 --- !u!114 &7587005557142702197
 MonoBehaviour:
@@ -679,7 +679,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 204474276cdae4814a085c01d89437ed, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.DoubleJumpAddon
-  doubleJumpHeight: 2
+  doubleJumpHeight: 5
   staminaCost: 0
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!114 &5505897753791863388
@@ -694,7 +694,7 @@ MonoBehaviour:
   m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
-  SortKey: 618801057
+  SortKey: 3584907153
   SendPriority: 1
   EnableInterpolation: 1
   Flags: 262402
@@ -716,7 +716,6 @@ MonoBehaviour:
   - {fileID: 1069646715921968806}
   - {fileID: 4329355585666520379}
   - {fileID: 7646443965227562787}
-  - {fileID: 7301709439652367293}
   - {fileID: 7182270174313902824}
   ForceRemoteRenderTimeframe: 0
 --- !u!114 &8341354711323544292
@@ -775,42 +774,9 @@ MonoBehaviour:
   Animator: {fileID: 1389975223400714321}
   ApplyTiming: 2
   SyncSettings: 127
-  StateHashes: 0000000084ca1cc0f9c6230b1c6a54339e2518b671a7e1076b36dbedb1afdc305a6c54cd8a18fce4b9abd9d3fd143d581376f52d0b878ad8e5e542ad2b26b0be9bd70fe062eeef729ff9d70797a04ef32fcbea22fa2254c04249f011
+  StateHashes: 0000000084ca1cc0f9c6230b1c6a54339e2518b671a7e1076b36dbedb1afdc305a6c54cd8a18fce4b9abd9d3fd143d581376f52d0b878ad8e5e542ad2b26b0be9bd70fe062eeef729ff9d70797a04ef32fcbea22fa2254c04249f011d786dc4e73cfd051
   TriggerHashes: 0000000018dd2738c8919f480b878ad8797964ad6661c296
   TotalWords: 7
---- !u!114 &7301709439652367293
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1637903110319045308}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 49f7019665d36be4686a05b26ea9265d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.WallRunAbility
-  wallLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  wallCheckDistance: 0.6
-  wallCheckRadius: 0.15
-  maxWallSurfaceAngle: 20
-  minPressInto: 0.4
-  climbSpeedMultiplier: 0.5
-  shimmySpeedMultiplier: 0.5
-  staminaCostPerSecond: 10
-  stickForce: 2
-  wallJumpHeight: 2.2
-  wallJumpPushForce: 7
-  regrabCooldown: 0.25
-  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
-  animationControls: {fileID: 0}
-  topCheckOffsetY: 1
-  wallLayer:
-    serializedVersion: 2
-    m_Bits: 0
-  wallJumpStyle: 0
 --- !u!1 &1735581466166165262
 GameObject:
   m_ObjectHideFlags: 0

@@ -59,9 +59,16 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public static event Action OnVolumesChanged;
 
+        /// <summary>
+        /// Silences UI sound effects without touching the saved setting - the Sound Test turns this on while it's
+        /// open (so only the song you picked is heard) and off again when you leave it.
+        /// </summary>
+        public static bool UISoundsMuted { get; set; }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void InitializeOnLoad()
         {
+            UISoundsMuted = false;
             Current = InputBindingsStore.Load().Audio;
         }
 
@@ -88,7 +95,7 @@ namespace Blocks.Gameplay.Core
                 AudioCategory.Music => Current.MusicVolume / 10f,
                 AudioCategory.SoundEffects => Current.SoundEffectsVolume / 10f,
                 AudioCategory.Voice => Current.VoiceVolume / 10f,
-                AudioCategory.UISoundEffects => Current.UISoundEffectsEnabled ? Current.SoundEffectsVolume / 10f : 0f,
+                AudioCategory.UISoundEffects => Current.UISoundEffectsEnabled && !UISoundsMuted ? Current.SoundEffectsVolume / 10f : 0f,
                 _ => 1f
             };
             return master * categoryPercent;
@@ -112,7 +119,7 @@ namespace Blocks.Gameplay.Core
         public static void PlayOneShot(AudioClip clip, AudioCategory category, Vector3 position)
         {
             if (clip == null) return;
-            if (category == AudioCategory.UISoundEffects && !Current.UISoundEffectsEnabled) return; // muted - don't even spawn the one-shot
+            if (category == AudioCategory.UISoundEffects && (!Current.UISoundEffectsEnabled || UISoundsMuted)) return; // muted - don't even spawn the one-shot
 
             var temp = new GameObject($"OneShotAudio_{clip.name}");
             temp.transform.position = position;

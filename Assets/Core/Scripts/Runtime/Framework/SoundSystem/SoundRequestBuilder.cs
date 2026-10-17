@@ -83,7 +83,17 @@ public class SoundRequestBuilder
             Reserved = m_ReservedInfo
         };
 
-        return m_SoundSystem.Play(soundInfo, volume);
+        // A sound must never break the code that asked for it: an exception here once cut a new player's spawn
+        // setup short (no control in a second session - a stale AudioListener, see SoundSystem.CurrentListener).
+        try
+        {
+            return m_SoundSystem.Play(soundInfo, volume);
+        }
+        catch (System.Exception exception)
+        {
+            UnityEngine.Debug.LogException(exception);
+            return null;
+        }
     }
 
     /// <summary>

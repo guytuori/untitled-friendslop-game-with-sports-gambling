@@ -68,6 +68,28 @@ namespace Blocks.Gameplay.Core
         #region Public Methods
 
         /// <summary>
+        /// The AudioListener to measure distances from. The SoundSystem lives on the DontDestroyOnLoad CoreDirector, but
+        /// the listener it was given belongs to a scene (the [BB] Core camera) - leave the match and start another and
+        /// that listener is destroyed. Using it threw MissingReferenceException in CorePlayerManager.OnNetworkSpawn (its
+        /// respawn sound), which cut the new player's setup short: no control after Return to Menu -> another practice
+        /// (2026-10-17). So a destroyed listener is replaced by whichever one the current scene has.
+        /// </summary>
+        private Transform CurrentListener()
+        {
+            if (m_ListenerTransform == null)
+            {
+                AudioListener listener = null;
+                foreach (AudioListener candidate in Object.FindObjectsByType<AudioListener>(FindObjectsSortMode.None))
+                {
+                    if (candidate.isActiveAndEnabled) { listener = candidate; break; }
+                    if (listener == null) listener = candidate;
+                }
+                m_ListenerTransform = listener != null ? listener.transform : null;
+            }
+            return m_ListenerTransform;
+        }
+
+        /// <summary>
         /// Create pool of emitters.
         /// An SoundEmitter is required to be allocated by the user for playback of a SoundDef.
         /// A SoundEmitter then triggers n SoundGameObjects (each containing an AudioSource) using the settings within the SoundDef class.
@@ -395,7 +417,7 @@ namespace Blocks.Gameplay.Core
             }
 
             m_SoundEmitterActiveList.Add(soundEmitter);
-            soundEmitter.Play(m_ListenerTransform, m_SoundMixer.MixerGroups);
+            soundEmitter.Play(CurrentListener(), m_SoundMixer.MixerGroups);
             return true;
         }
 

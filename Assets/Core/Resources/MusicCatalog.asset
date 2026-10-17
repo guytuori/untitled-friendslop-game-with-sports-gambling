@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4483e02b1b870b640874d97b7472fbb9, type: 3}
+  m_Name: MusicCatalog
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.MusicCatalog
+  tracks:
+  - id: Banking_on_Victory
+    clip: {fileID: 8300000, guid: 560641bc59388894da9a8be4aebdac07, type: 3}
+    loops: 1
+    loopStartSeconds: 0.209
+    musicalSamples: 311326
+    sourceSampleRate: 44100
+    encoderDelay: 576
+    encoderPadding: 1442
+  - id: Dinosaur_Country
+    clip: {fileID: 8300000, guid: 5ece22fe7b80c30419ce85c65983c4ca, type: 3}
+    loops: 1
+    loopStartSeconds: 16.403
+    musicalSamples: 7839124
+    sourceSampleRate: 44100
+    encoderDelay: 576
+    encoderPadding: 812
+  - id: Last_Stop
+    clip: {fileID: 8300000, guid: 064789f4ef2570e479a94b8b61ec9932, type: 3}
+    loops: 1
+    loopStartSeconds: 28.571
+    musicalSamples: 8739628
+    sourceSampleRate: 44100
+    encoderDelay: 576
+    encoderPadding: 1172
+  - id: Of_Ninjas_and_Pirates
+    clip: {fileID: 8300000, guid: 107f08d89285a944b97e1e915dc961e8, type: 3}
+    loops: 1
+    loopStartSeconds: 0
+    musicalSamples: 2481017
+    sourceSampleRate: 44100
+    encoderDelay: 576
+    encoderPadding: 967
+  - id: Parkour_Predictions
+    clip: {fileID: 8300000, guid: f17c40a0a86d1924389bcaae77943aa3, type: 3}
+    loops: 0
+    loopStartSeconds: 0
+    musicalSamples: 2348703
+    sourceSampleRate: 44100
+    encoderDelay: 576
+    encoderPadding: 801
+  - id: Ready_to_Run
+    clip: {fileID: 8300000, guid: 1fabde3f42794304e8b05ffda9f760e6, type: 3}
+    loops: 1
+    loopStartSeconds: 1.668
+    musicalSamples: 3574499
+    sourceSampleRate: 44100
+    encoderDelay: 576
+    encoderPadding: 733
+  soundTest:
+  - number: 01
+    title: Parkour Predictions!
+    id: Parkour_Predictions
+  - number: 02
+    title: Parkour Parley
+    id: Parkour_Parkley
+  - number: 03
+    title: Ready to Run
+    id: Ready_to_Run
+  - number: 04
+    title: Wizard Academy
+    id: Wizard_Academy
+  - number: 05
+    title: Dinosaur Country
+    id: Dinosaur_Country
+  - number: 06
+    title: Of Ninjas and Pirates
+    id: Of_Ninjas_and_Pirates
+  - number: 07
+    title: Airship Descent
+    id: Airship_Descent
+  - number: 08
+    title: Twenty Thousand Inches Over the Sea
+    id: Twenty_Thousand_Inches_Over_the_Sea
+  - number: 09
+    title: Red Rock Rock
+    id: Red_Rock_Rock
+  - number: 10
+    title: Invasion Mothership
+    id: Invasion_Mothership
+  - number: 11
+    title: Map 8 work in progress
+    id: Map8
+  - number: 12
+    title: Last Stop
+    id: Last_Stop
+  - number: 13
+    title: Banking on Victory
+    id: Banking_on_Victory
+  - number: 14
+    title: Crash Out
+    id: Crash_Out
+  - number: 15
+    title: Credits
+    id: Credits

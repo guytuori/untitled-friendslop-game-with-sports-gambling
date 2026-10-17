@@ -510,6 +510,9 @@ namespace Blocks.Gameplay.Core
                 return;
             }
 
+            // The listener can be gone (destroyed with its scene, or none found) - skip the distance effects then.
+            if (m_ListenerTransform == null) return;
+
             Vector3 position = GetPosition();
             Vector3 listenerPosition = m_ListenerTransform.position;
             float dist = Vector3.Distance(position, listenerPosition);
