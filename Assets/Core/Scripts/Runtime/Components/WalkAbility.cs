@@ -67,6 +67,7 @@ namespace Blocks.Gameplay.Core
         {
             var modifier = new MovementModifier();
             if (m_Motor.MovementAbilityActive()) { return modifier; }
+            if (m_Motor.WalkLockedByExternalForce()) { return modifier; }
             // Determine if we should be using sprint speed
             // If we are grounded, we check the current sprint state
             // If we are in the air and conserving momentum, we use the state from when we left the ground

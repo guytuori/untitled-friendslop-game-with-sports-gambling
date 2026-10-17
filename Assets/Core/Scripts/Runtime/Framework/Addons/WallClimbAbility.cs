@@ -312,7 +312,12 @@ namespace Blocks.Gameplay.Core
             }
             
             //Set the trigger on the primary animator to exit the ability state
-            if (Animator()) { Animator().SetAnimationTrigger(Animator().m_AnimIDTrigger_exitAbility); }
+            //unless another movement ability is already firing
+            if (Animator() && m_Motor.MovementAbilityActive() == false) 
+            {
+                Debug.Log("eXIT CLIMB disable animation trigger");
+                Animator().SetAnimationTrigger(Animator().m_AnimIDTrigger_exitAbility);
+            }
         }
 
         #endregion
@@ -396,15 +401,24 @@ namespace Blocks.Gameplay.Core
         private void HandleJumpPressed()
         {
             if (!m_IsActive || !IsOwner || m_Motor == null) return;
-            if (!IsClimbing) return;
+            if (IsClimbing)
+            {
+                PerformWallJump();
+                return;
+            } 
 
-            PerformWallJump();
+            
         }
         private void HandleGrabPressed()
         {
             if (!m_IsActive || !IsOwner || m_Motor == null) return;
             if (!IsClimbing) return;
+            if (m_Motor.MovementAbilityActive()) return;
 
+            if (m_RegrabTimer <= 0f && TryFindClimbableWall(out Vector3 wallNormal))
+            {
+                EnterClimb(wallNormal);
+            }
         }
         private void HandleGrabReleased()
         {

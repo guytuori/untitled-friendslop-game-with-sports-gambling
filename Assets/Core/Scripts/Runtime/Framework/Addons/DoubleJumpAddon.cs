@@ -133,6 +133,7 @@ namespace Blocks.Gameplay.Core
             float jumpVelocity = Mathf.Sqrt(doubleJumpHeight * -2f * m_CoreMovement.gravity);
 
             // Apply velocity directly
+            m_CoreMovement.ApplyExternalForce(Vector3.zero,ForceMode.Impulse);
             m_CoreMovement.SetVerticalVelocity(jumpVelocity);
 
             PlayerActions.Report(m_CoreMovement.gameObject, PlayerAction.Jump); // counted for wagers (LocalActionTracker)

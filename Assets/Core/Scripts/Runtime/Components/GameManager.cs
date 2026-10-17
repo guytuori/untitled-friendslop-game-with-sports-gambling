@@ -390,7 +390,8 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void PlayRespawnTimerSFX()
         {
-            if (respawnTimerSFX != null)
+            
+            if ( respawnTimerSFX != null)
             {
                 CoreDirector.RequestAudio(respawnTimerSFX)
                      .WithPosition(Vector3.zero)

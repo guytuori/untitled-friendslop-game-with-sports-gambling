@@ -189,7 +189,6 @@ namespace Blocks.Gameplay.Core
         public void PlayAnimation(string _animation)
         {
             if (Animator == null) { return; }
-
             if (ContainsAnimation(Animator, _animation))
             { Animator.Play(_animation); }
         }
@@ -205,7 +204,6 @@ namespace Blocks.Gameplay.Core
         public void SetAnimationTrigger(int _animParameter)
         {
             if (Animator == null) { return; }
-
             SetTriggerNetworked(_animParameter);
         }
 

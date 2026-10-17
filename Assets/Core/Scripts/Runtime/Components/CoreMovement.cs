@@ -603,7 +603,7 @@ namespace Blocks.Gameplay.Core
                 finalModifier.OverrideGravity |= modifier.OverrideGravity;
             }
 
-            if (m_ExternalForce.magnitude > 0.01f)
+            if (m_ExternalForce.magnitude > forceDecayRate * Time.deltaTime)
             {
                 finalModifier.ArealVelocity += m_ExternalForce;
                 m_ExternalForce = Vector3.Lerp(m_ExternalForce, Vector3.zero, forceDecayRate * Time.deltaTime);
@@ -770,7 +770,12 @@ namespace Blocks.Gameplay.Core
             if (IsPoleGrabbing) { return true; }
             return false;
         }
-
+        [SerializeField] private float forceMagnitudeToLockWalk = 1.0f;
+        public bool WalkLockedByExternalForce()
+        {
+            if (m_ExternalForce.magnitude >= forceMagnitudeToLockWalk) { return true; }
+            return false;
+        }
         /// <summary>
         /// Checks if the character is currently on a slope by raycasting downward.
         /// </summary>

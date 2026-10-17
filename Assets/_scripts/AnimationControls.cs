@@ -11,7 +11,7 @@ public class AnimationControls : MonoBehaviour
 
     public void EnterAbility(string _abilityName)
     {
-        
+
     }
 
     public void PlayAnimation(string _animation)

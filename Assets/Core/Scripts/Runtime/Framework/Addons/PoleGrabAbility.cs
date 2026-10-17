@@ -323,6 +323,12 @@ namespace Blocks.Gameplay.Core
 
         private void EnterPole(Pole pole, float angleDegrees, float height, Vector3 outward)
         {
+
+            if (IsPoleHorizontal(pole))
+            {
+                EnterHorizontalPole(pole,angleDegrees,height,outward);
+                return;
+            }
             m_CurrentPole = pole;
             IsOnPole = true;
             m_AngleDegrees = angleDegrees;
@@ -330,7 +336,7 @@ namespace Blocks.Gameplay.Core
             m_LastOutwardDir = outward; // so RotationOverride below faces the right way from frame one
             m_Motor.SetVerticalVelocity(0f);
 
-            if (m_CurrentPole == null) { return; }
+            
 
             if (Animator())
             {
@@ -338,23 +344,46 @@ namespace Blocks.Gameplay.Core
                 Animator().PlayAnimation(Animator().ANIMATION_pole_hang);
             }
 
-            if (IsPoleHorizontal(m_CurrentPole))
-            {
-                Vector3 pointOnPole = m_CurrentPole.transform.position + (m_CurrentPole.Axis * m_HeightAlongAxis);
-                m_Motor.RotationOverride = () => m_CurrentPole != null
-                ? Quaternion.LookRotation(( new Vector3(pointOnPole.x, transform.position.y, pointOnPole.z) + transform.forward) - transform.position , Vector3.up)
-                : m_Motor.transform.rotation;
-                return;
-            }
+ 
 
             m_Motor.RotationOverride = () => m_CurrentPole != null
                 ? Quaternion.LookRotation(-m_LastOutwardDir, Vector3.up)
                 : m_Motor.transform.rotation;
 
             return;
-
-            
         }
+        private void EnterHorizontalPole(Pole pole, float angleDegrees, float height, Vector3 outward)
+        {
+
+            m_CurrentPole = pole;
+            IsOnPole = true;
+            m_AngleDegrees = angleDegrees;
+            m_HeightAlongAxis = height;
+            m_LastOutwardDir = outward; // so RotationOverride below faces the right way from frame one
+            m_Motor.SetVerticalVelocity(0f);
+
+
+            if (Animator())
+            {
+                Animator().Animator.ResetTrigger(Animator().m_AnimIDTrigger_exitAbility);
+                Animator().PlayAnimation(Animator().ANIMATION_pole_hang);
+            }
+
+
+            Vector3 pointOnPole = m_CurrentPole.transform.position + (m_CurrentPole.Axis * m_HeightAlongAxis);
+            Quaternion newRot = Quaternion.LookRotation((new Vector3(pointOnPole.x, transform.position.y, pointOnPole.z) + transform.forward) - transform.position, Vector3.up);
+            newRot = Quaternion.LookRotation(pole.transform.forward,Vector3.up);
+            if (Vector3.Angle(transform.forward, pole.transform.forward) >= 90)
+            { newRot = Quaternion.LookRotation(-pole.transform.forward, Vector3.up); }
+
+            m_Motor.RotationOverride = () => m_CurrentPole != null
+            ? newRot
+            : m_Motor.transform.rotation;
+    
+            return;
+        }
+
+
 
         private void ExitPole(bool applyRegrabCooldown)
         {
