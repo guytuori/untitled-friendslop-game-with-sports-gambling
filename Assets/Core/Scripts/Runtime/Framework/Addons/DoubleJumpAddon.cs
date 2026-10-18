@@ -104,7 +104,7 @@ namespace Blocks.Gameplay.Core
 
             // Only allow double jump if airborne and haven't jumped yet
             //&& !m_HasDoubleJumped
-            if (!m_CoreMovement.IsGrounded )
+            if (!m_CoreMovement.IsGrounded && m_CoreMovement.MovementAbilityActive() == false)
             {
                 AttemptDoubleJump();
             }

@@ -203,7 +203,7 @@ namespace Blocks.Gameplay.Core
             m_InputActions.Player.Grab.canceled += HandleGrabState;
 
             m_InputActions.Player.Grab.canceled += HandleGrabReleased;
-            m_InputActions.Player.Grab.performed += HandleGrabPressed;
+            m_InputActions.Player.Grab.started += HandleGrabPressed;
 
             m_InputActions.Player.PrimaryAction.started += HandlePrimaryActionPressed;
             m_InputActions.Player.PrimaryAction.canceled += HandlePrimaryActionReleased;
@@ -230,7 +230,7 @@ namespace Blocks.Gameplay.Core
 
 
             m_InputActions.Player.Grab.canceled -= HandleGrabReleased;
-            m_InputActions.Player.Grab.performed -= HandleGrabPressed;
+            m_InputActions.Player.Grab.started -= HandleGrabPressed;
 
             m_InputActions.Player.PrimaryAction.started -= HandlePrimaryActionPressed;
             m_InputActions.Player.PrimaryAction.canceled -= HandlePrimaryActionReleased;

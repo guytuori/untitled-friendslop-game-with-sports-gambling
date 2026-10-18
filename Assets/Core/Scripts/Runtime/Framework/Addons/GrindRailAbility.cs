@@ -98,6 +98,12 @@ namespace Blocks.Gameplay.Core
         [Header("Jump Off")]
         [Tooltip("Multiplier applied to the player's normal jumpHeight when jumping off a rail.")]
         [SerializeField, Range(0.3f, 2f)] private float jumpOffHeightMultiplier = 1f;
+
+        [SerializeField] private float launchOffSpeedMultiplier = 1f;
+        private float timeOnRail;
+        [SerializeField] private float bonusMultiplierPerSecond = 0.2f;
+
+
         [Tooltip("How long after jumping (or grinding off the end of a rail) before carried momentum starts decaying - a short plateau so a rail-to-rail jump reads as 'keeping your speed', not an instant slowdown.")]
         [SerializeField] private float momentumDecayDelay = 0.35f;
         [Tooltip("How fast carried momentum decays once the delay above has passed - higher decays faster.")]
@@ -330,11 +336,17 @@ namespace Blocks.Gameplay.Core
                 m_ArcLength = Mathf.Clamp(rawArc, 0f, m_CurrentRail.TotalLength);
                 m_AirborneMomentum = travelTangent * m_Speed;
                 m_MomentumAirTime = 0f;
+                if (m_Motor.IsGrabHeld)
+                {
+                    LaunchOffRail();
+                    return;
+                }
+
                 ExitRail();
                 return;
                
             }
-
+            timeOnRail += Time.deltaTime;
             m_ArcLength = rawArc;
             SnapToRail();
         }
@@ -393,7 +405,7 @@ namespace Blocks.Gameplay.Core
 
         private void EnterRail(GrindRail rail, float arc, float travelSign)
         {
-
+            timeOnRail = 0;
             previousPosition = (transform.position - transform.forward);
             m_CurrentRail = rail;
             IsOnRail = true;
@@ -455,6 +467,10 @@ namespace Blocks.Gameplay.Core
             if (m_Motor != null)
             {
                 m_Motor.RotationOverride = null;
+                if (m_Motor.IsGrabHeld)
+                { 
+                
+                }
             }
             m_Motor.SetGrindState(false);
             //Set the trigger on the primary animator to exit the ability state
@@ -529,16 +545,35 @@ namespace Blocks.Gameplay.Core
             Vector3 travelTangent = m_TravelSign >= 0f ? tangent : -tangent;
 
             float jumpVelocity = Mathf.Sqrt(Mathf.Max(01.01f, jumpOffHeightMultiplier * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
-            travelTangent = (transform.position - previousPosition).normalized;
+           // travelTangent = (transform.position - previousPosition).normalized;
 
 
-            m_AirborneMomentum = travelTangent * 5;
-            m_Motor.SetVerticalVelocity(jumpVelocity + m_AirborneMomentum.y);
+            m_AirborneMomentum = travelTangent * jumpVelocity;
+            m_Motor.SetVerticalVelocity(jumpVelocity);
+            m_Motor.ApplyExternalForce(travelTangent, ForceMode.Impulse);
             m_MomentumAirTime = 0f;
 
             ExitRail();
         }
+        private void LaunchOffRail()
+        {
+            PlayerActions.Report(m_Motor.gameObject, PlayerAction.RailJump); // counted for wagers (LocalActionTracker)
 
+            m_CurrentRail.Evaluate(m_ArcLength, out _, out Vector3 tangent, out _, out _);
+            Vector3 travelTangent = m_TravelSign >= 0f ? tangent : -tangent;
+
+            float launchVelocity = m_Motor.moveSpeed * (launchOffSpeedMultiplier + (timeOnRail * bonusMultiplierPerSecond));
+            // travelTangent = (transform.position - previousPosition).normalized;
+
+
+            m_AirborneMomentum = travelTangent * launchVelocity ;
+            //set to 1 to prevent immediately hitting the ground
+            m_Motor.SetVerticalVelocity(1);
+            m_Motor.ApplyExternalForce(travelTangent, ForceMode.Impulse);
+            m_MomentumAirTime = 0f;
+
+            ExitRail();
+        }
         private void ProcessAirborneMomentum(ref MovementModifier modifier)
         {
             if (m_AirborneMomentum.sqrMagnitude < 0.01f || m_Motor.IsClimbing)

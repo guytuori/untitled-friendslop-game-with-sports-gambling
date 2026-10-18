@@ -18043,7 +18043,7 @@ GameObject:
   - component: {fileID: 1968042034}
   - component: {fileID: 1968042033}
   - component: {fileID: 1968042032}
-  m_Layer: 10
+  m_Layer: 0
   m_Name: ground
   m_TagString: Untagged
   m_Icon: {fileID: 0}

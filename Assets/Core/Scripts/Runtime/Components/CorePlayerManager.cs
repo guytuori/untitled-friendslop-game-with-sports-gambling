@@ -288,6 +288,7 @@ namespace Blocks.Gameplay.Core
             }
 
             if (!coreMovement.IsGrounded) return;
+            if (coreMovement.MovementAbilityActive()) return;
 
             coreMovement.PerformJump();
         }

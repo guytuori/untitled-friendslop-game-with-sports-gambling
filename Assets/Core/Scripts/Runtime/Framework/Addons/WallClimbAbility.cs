@@ -91,6 +91,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private GameEvent onJumpPressed;
         [SerializeField] private GameEvent onGrabPressed;
         [SerializeField] private GameEvent onGrabReleased;
+        [SerializeField] private bool canTapToExit;
         
         /// <summary>True while actively stuck to and climbing a wall.</summary>
         public bool IsClimbing { get; private set; }
@@ -150,8 +151,8 @@ namespace Blocks.Gameplay.Core
                 return modifier;
             }
 
-            float cost = staminaCostPerSecond * Time.deltaTime;
-            if (m_CoreStats == null || !m_CoreStats.TryConsumeStat(StatKeys.Stamina, cost, OwnerClientId) || !m_Motor.IsGrabHeld)
+            float cost = staminaCostPerSecond * Time.deltaTime; //|| !m_Motor.IsGrabHeld
+            if (m_CoreStats == null || !m_CoreStats.TryConsumeStat(StatKeys.Stamina, cost, OwnerClientId) )
             {
                 ExitClimb();
                 return modifier;
@@ -234,8 +235,8 @@ namespace Blocks.Gameplay.Core
             // WalkAbility's contribution before it runs (see the Priority discussion above).
             //m_Motor.SetMoveInput(Vector2.zero);
 
-           // if (rawInput == Vector2.zero) { return; }
-
+            // if (rawInput == Vector2.zero) { return; }
+            modifier.OverrideGravity = true;
             if (HasReachedWallEnd(rawInput))
             {
                 modifier.ArealVelocity = Vector3.zero;
@@ -267,7 +268,6 @@ namespace Blocks.Gameplay.Core
             velocity.y = 0;
             modifier.ArealVelocity = velocity;
             
-            modifier.OverrideGravity = true;
         }
 
 
@@ -277,6 +277,7 @@ namespace Blocks.Gameplay.Core
 
             WallNormal = wallNormal;
             IsClimbing = true;
+            canTapToExit = false;
 
             if (m_Motor != null)
             {
@@ -304,18 +305,19 @@ namespace Blocks.Gameplay.Core
             if (!IsClimbing) return;
 
             IsClimbing = false;
-
+            canTapToExit = false;
             if (m_Motor != null)
             {
                 m_Motor.SetClimbState(false);
                 m_Motor.RotationOverride = null;
             }
             
+
             //Set the trigger on the primary animator to exit the ability state
             //unless another movement ability is already firing
             if (Animator() && m_Motor.MovementAbilityActive() == false) 
             {
-                Debug.Log("eXIT CLIMB disable animation trigger");
+                
                 Animator().SetAnimationTrigger(Animator().m_AnimIDTrigger_exitAbility);
             }
         }
@@ -334,7 +336,7 @@ namespace Blocks.Gameplay.Core
             //if the events were not set on the prefab skip
             if (onGrabPressed == null || onGrabReleased == null) { return; }
             onGrabPressed.RegisterListener(HandleGrabPressed);
-            onGrabReleased.RegisterListener(HandleGrabPressed);
+            onGrabReleased.RegisterListener(HandleGrabReleased);
         }
 
         private void UnregisterListener()
@@ -356,7 +358,9 @@ namespace Blocks.Gameplay.Core
         {
             PlayerActions.Report(m_Motor.gameObject, PlayerAction.WallJump); // counted for wagers (LocalActionTracker)
             Vector3 jumpDirection = WallNormal;
-            
+
+            m_RegrabTimer = regrabCooldown;
+
             float angle = Vector3.Angle(WallNormal, PlayerCamera().transform.forward * wallJumpPushForce);
             //if the player is looking away from the wall, jump in the direction they are looking
             //otherwise jump upward on the wall
@@ -371,7 +375,7 @@ namespace Blocks.Gameplay.Core
             m_Motor.SetVerticalVelocity(jumpVelocity);
 
             ExitClimb();
-            m_RegrabTimer = regrabCooldown;
+            
         }
 
         private void ControlledWallJump()
@@ -413,19 +417,26 @@ namespace Blocks.Gameplay.Core
         {
             if (!m_IsActive || !IsOwner || m_Motor == null) return;
             if (!IsClimbing) return;
-            if (m_Motor.MovementAbilityActive()) return;
+
+           // if (m_Motor.MovementAbilityActive()) return;
 
             if (m_RegrabTimer <= 0f && TryFindClimbableWall(out Vector3 wallNormal))
             {
-                EnterClimb(wallNormal);
+               // EnterClimb(wallNormal);
             }
+ 
         }
         private void HandleGrabReleased()
         {
             if (!m_IsActive || !IsOwner || m_Motor == null) return;
             if (!IsClimbing) return;
+            if (canTapToExit == false)
+            { 
+                canTapToExit = true;
+                return;
 
-            //ExitClimb();
+            }
+            ExitClimb();
         }
         #endregion
 

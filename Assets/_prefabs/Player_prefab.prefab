@@ -310,14 +310,15 @@ MonoBehaviour:
   gravity: -30
   jumpHeight: 5
   groundedOffset: -0.14
-  groundedRadius: 0.28
+  groundedRadius: 0.1
   groundLayers:
     serializedVersion: 2
-    m_Bits: 1279
+    m_Bits: 1271
   slopeForce: 5
   slopeForceRayLength: 1.5
   isMovementEnabled: 1
   rotationTransform: {fileID: 0}
+  forceMagnitudeToLockWalk: 1
 --- !u!114 &7487568768310893986
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -539,8 +540,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3059ff576b05e5442a365c1d1c610564, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GrindRailAbility
-  maxSpeedMultiplier: 12
-  railAcceleration: 2
+  maxSpeedMultiplier: 33
+  railAcceleration: 5
   sprintAccelerationBonus: 1
   minSpeedMultiplier: 0.5
   entrySpeedMultiplier: 1
@@ -556,7 +557,9 @@ MonoBehaviour:
   sameRailReentryGuard: 0.2
   snapDetectionRadius: 0.9
   jumpOffHeightMultiplier: 2
-  momentumDecayDelay: 9
+  launchOffSpeedMultiplier: 1
+  bonusMultiplierPerSecond: 1
+  momentumDecayDelay: 0
   airborneMomentumDecayPerSecond: 0.5
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   barWorldWidth: 1.2
@@ -622,6 +625,7 @@ MonoBehaviour:
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   onGrabPressed: {fileID: 11400000, guid: 87f393b1f11a6d248835e1af7c403761, type: 2}
   onGrabReleased: {fileID: 11400000, guid: 13c5794a2c1524644a2467dac99c665c, type: 2}
+  canTapToExit: 0
   animationControls: {fileID: 0}
   topCheckOffsetY: 1
   wallLayer:
