@@ -262,6 +262,8 @@ MonoBehaviour:
   onLookInput: {fileID: 11400000, guid: 8af931367978e4bc9bae53b88856ff5b, type: 2}
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   onJumpReleased: {fileID: 11400000, guid: 4c295680fb10f4080ae6688f6a96a009, type: 2}
+  onInteractPressed: {fileID: 0}
+  onInteractReleased: {fileID: 0}
   onSprintStateChanged: {fileID: 11400000, guid: c3ec94fe2e7dd47aaadddb5e98e7c375, type: 2}
   onGrabStateChanged: {fileID: 11400000, guid: 8f025844fa794da8b5eab619f5139e5c, type: 2}
   onStatDepleted: {fileID: 11400000, guid: aced99a6f7f354e5c87c8fab171c4c31, type: 2}
@@ -286,6 +288,8 @@ MonoBehaviour:
   onGrabStateChanged: {fileID: 11400000, guid: 8f025844fa794da8b5eab619f5139e5c, type: 2}
   onGrabPressed: {fileID: 11400000, guid: 87f393b1f11a6d248835e1af7c403761, type: 2}
   onGrabReleased: {fileID: 11400000, guid: 13c5794a2c1524644a2467dac99c665c, type: 2}
+  onInteractPressed: {fileID: 11400000, guid: d16d793bf0c73f04f9d4f00e01fa14eb, type: 2}
+  onInteractReleased: {fileID: 11400000, guid: 13c5794a2c1524644a2467dac99c665c, type: 2}
   onPrimaryActionPressed: {fileID: 11400000, guid: f48adbe17161042ef8cf65a5a455594a, type: 2}
   onPrimaryActionReleased: {fileID: 11400000, guid: a670f0da4a4d64cea91ff13081e68da8, type: 2}
   onMenuPressed: {fileID: 11400000, guid: 5f76e3427057c467fa2f4de049753b9e, type: 2}
@@ -458,11 +462,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Kits.GameplayNGO.Core::Kits.GameplayNGO.Core.CoreInteractor
   interactionLayer:
     serializedVersion: 2
-    m_Bits: 1
-  raycastDistance: 5
-  proximityRadius: 2
+    m_Bits: 4294967295
+  raycastDistance: 15
+  proximityRadius: 5
   interactionCooldown: 0.2
-  onInteractPressed: {fileID: 11400000, guid: f48adbe17161042ef8cf65a5a455594a, type: 2}
+  onInteractPressed: {fileID: 11400000, guid: d16d793bf0c73f04f9d4f00e01fa14eb, type: 2}
+  carrySpot: {fileID: 8972878651751432280}
+  carriedObject: {fileID: 0}
 --- !u!114 &6539214089202829798
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1134,6 +1140,7 @@ Transform:
   - {fileID: 1699289951326254754}
   - {fileID: 5431401380911646770}
   - {fileID: 1686662965221165166}
+  - {fileID: 8972878651751432280}
   m_Father: {fileID: 2792324862300817992}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3119530417754408665
@@ -1483,6 +1490,37 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2226726571063610307}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &4194994071358464775
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8972878651751432280}
+  m_Layer: 0
+  m_Name: backpackSpot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8972878651751432280
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4194994071358464775}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0, y: 0.133, z: -0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1756872678646734826}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4433439010831395149
 GameObject:

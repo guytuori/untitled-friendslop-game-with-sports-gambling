@@ -89,6 +89,7 @@ namespace Blocks.Gameplay.Core
 
         // Cooldown timer for automatic physics-based interactions
         private float m_CooldownTimer;
+        private bool isBeingHeld;
 
         #endregion
 
@@ -229,6 +230,14 @@ namespace Blocks.Gameplay.Core
             m_ProcessEffectsCoroutine = StartCoroutine(ProcessInteractionEffects(interactor));
         }
 
+        public void PickedUp()
+        { 
+            m_HasBeenInteracted = true;
+        }
+        public void Drop()
+        {
+            m_HasBeenInteracted = false;
+        }
         /// <summary>
         /// Initiates the server-authoritative process to despawn this network object.
         /// </summary>

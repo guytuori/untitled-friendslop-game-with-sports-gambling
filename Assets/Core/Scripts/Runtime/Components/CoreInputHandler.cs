@@ -45,6 +45,11 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private BoolEvent onGrabStateChanged;
         [SerializeField] private GameEvent onGrabPressed;
         [SerializeField] private GameEvent onGrabReleased;
+
+        [Tooltip("Interact is the input for using objects within the world, either interacting directly or picking up")]
+        [SerializeField] private GameEvent onInteractPressed;
+        [SerializeField] private GameEvent onInteractReleased;
+
         [Tooltip("Raised when the primary action button is pressed.")]
         [SerializeField] private GameEvent onPrimaryActionPressed;
         [Tooltip("Raised when the primary action button is released.")]
@@ -202,8 +207,12 @@ namespace Blocks.Gameplay.Core
             m_InputActions.Player.Grab.started += HandleGrabState;
             m_InputActions.Player.Grab.canceled += HandleGrabState;
 
-            m_InputActions.Player.Grab.canceled += HandleGrabReleased;
             m_InputActions.Player.Grab.started += HandleGrabPressed;
+            m_InputActions.Player.Grab.canceled += HandleGrabReleased;
+
+            m_InputActions.Player.Grab.started += HandleInteractPressed;
+            m_InputActions.Player.Grab.canceled += HandleInteractReleased;
+            
 
             m_InputActions.Player.PrimaryAction.started += HandlePrimaryActionPressed;
             m_InputActions.Player.PrimaryAction.canceled += HandlePrimaryActionReleased;
@@ -227,10 +236,12 @@ namespace Blocks.Gameplay.Core
 
             m_InputActions.Player.Grab.started -= HandleGrabState;
             m_InputActions.Player.Grab.canceled -= HandleGrabState;
-
-
-            m_InputActions.Player.Grab.canceled -= HandleGrabReleased;
+            
             m_InputActions.Player.Grab.started -= HandleGrabPressed;
+            m_InputActions.Player.Grab.canceled -= HandleGrabReleased;
+
+            m_InputActions.Player.Grab.started -= HandleInteractPressed;
+            m_InputActions.Player.Grab.canceled -= HandleInteractReleased;
 
             m_InputActions.Player.PrimaryAction.started -= HandlePrimaryActionPressed;
             m_InputActions.Player.PrimaryAction.canceled -= HandlePrimaryActionReleased;
@@ -262,6 +273,8 @@ namespace Blocks.Gameplay.Core
         private void HandleGrabState(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabStateChanged?.Raise(context.ReadValueAsButton()); }
         private void HandleGrabPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabPressed?.Raise(); }
         private void HandleGrabReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabReleased?.Raise(); }
+        private void HandleInteractPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onInteractPressed?.Raise(); }
+        private void HandleInteractReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onInteractReleased?.Raise(); }
         private void HandlePrimaryActionPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onPrimaryActionPressed?.Raise(); }
         private void HandlePrimaryActionReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onPrimaryActionReleased?.Raise(); }
         private void HandleMenuPressed(InputAction.CallbackContext context)

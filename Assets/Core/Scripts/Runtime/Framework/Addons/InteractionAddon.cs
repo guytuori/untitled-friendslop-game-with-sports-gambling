@@ -40,6 +40,9 @@ namespace Blocks.Gameplay.Core
         private float m_CooldownTimer;
         private readonly Collider[] m_ProximityColliders = new Collider[20];
 
+        [SerializeField] private Transform carrySpot; //where on the player the carried objects sits
+        [SerializeField] private ModularInteractable carriedObject;
+
         #endregion
 
         #region Public Methods
@@ -57,16 +60,18 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public void OnPlayerSpawn()
         {
+            onInteractPressed.RegisterListener(TryInteract);
             if (m_PlayerManager.IsOwner)
             {
                 m_MainCamera = Camera.main;
-                onInteractPressed.RegisterListener(TryInteract);
+               
                 IsEnabled = true;
             }
             else
             {
                 enabled = false;
             }
+            IsEnabled = true;
         }
 
         /// <summary>
@@ -74,9 +79,10 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public void OnPlayerDespawn()
         {
+            onInteractPressed.UnregisterListener(TryInteract);
             if (m_PlayerManager.IsOwner)
             {
-                onInteractPressed.UnregisterListener(TryInteract);
+                
                 ClearFocus();
             }
         }
@@ -97,6 +103,54 @@ namespace Blocks.Gameplay.Core
                 m_CooldownTimer = 0f;
             }
         }
+
+        public ModularInteractable CarriedObject()
+        {
+            return carriedObject;
+        }
+        public void PickUpObject(ModularInteractable _obj)
+        {
+            
+            DropObject();
+            carriedObject = _obj;
+
+            if (carriedObject == null) { return; }
+
+            carriedObject.PickedUp(); 
+
+            if (CarriedObject().GetComponent<Collider>() != null) { CarriedObject().GetComponent<Collider>().enabled = false; }
+            if (CarriedObject().GetComponent<Rigidbody>() != null)
+            {
+                CarriedObject().GetComponent<Rigidbody>().isKinematic = true;
+            }
+            if (carrySpot != null)
+            {
+                CarriedObject().transform.parent = carrySpot; 
+                CarriedObject().transform.localPosition = Vector3.zero; 
+                CarriedObject().transform.localRotation = carrySpot.rotation; 
+
+            }
+
+        }
+        public void DropObject()
+        {
+            if (CarriedObject() == null) { return; }
+
+            //TODO: refactor and move to the interactable object script
+            //only here for intial testing
+
+            CarriedObject().Drop();
+            CarriedObject().transform.parent = null;
+            CarriedObject().transform.position += Vector3.up - transform.forward;
+            if (CarriedObject().GetComponent<Collider>()  != null) { CarriedObject().GetComponent<Collider>().enabled = true; }
+            if (CarriedObject().GetComponent<Rigidbody>()  != null)
+            {
+                CarriedObject().GetComponent<Rigidbody>().isKinematic = false;
+                CarriedObject().GetComponent<Rigidbody>().linearVelocity =  ((Vector3.up - transform.forward) * 5);
+            }
+            
+        }
+
 
         #endregion
 
@@ -131,6 +185,10 @@ namespace Blocks.Gameplay.Core
                 {
                     interactable.Interact(gameObject);
                     m_CooldownTimer = interactionCooldown;
+                    if (hit.transform.GetComponent<ModularInteractable>() != null)
+                    {
+                        PickUpObject(hit.transform.GetComponent<ModularInteractable>());
+                    }
                 }
             }
         }
@@ -164,7 +222,8 @@ namespace Blocks.Gameplay.Core
 
             if (Physics.Raycast(m_MainCamera.transform.position, m_MainCamera.transform.forward, out var hit, raycastDistance, interactionLayer))
             {
-                if (hit.collider.TryGetComponent<IInteractable>(out var raycastTarget) && !IsPhysicsBased(raycastTarget.TriggerMode))
+                //&& !IsPhysicsBased(raycastTarget.TriggerMode)
+                if (hit.collider.TryGetComponent<IInteractable>(out var raycastTarget) )
                 {
                     interactables.Add(raycastTarget);
                 }
@@ -223,6 +282,7 @@ namespace Blocks.Gameplay.Core
             {
                 m_CurrentFocusedInteractable.Interact(gameObject);
                 m_CooldownTimer = interactionCooldown;
+
             }
         }
 

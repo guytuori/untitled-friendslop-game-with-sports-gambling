@@ -44,6 +44,9 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private GameEvent onJumpPressed;
         [Tooltip("Event raised when jump button is released.")]
         [SerializeField] private GameEvent onJumpReleased;
+
+        [SerializeField] private GameEvent onInteractPressed;
+        [SerializeField] private GameEvent onInteractReleased;
         [Tooltip("Event raised when sprint state changes.")]
         [SerializeField] private BoolEvent onSprintStateChanged;
         [Tooltip("Event raised when grab state changes.")]
@@ -277,6 +280,15 @@ namespace Blocks.Gameplay.Core
             coreMovement.SetGrabState(isHeld);
         }
 
+        private void HandleInteractPress( )
+        {
+           
+        }
+        private void HandleInteractRelease()
+        {
+
+
+        }
         private void HandleJump()
         {
             if (!CanMove) return;
@@ -411,6 +423,16 @@ namespace Blocks.Gameplay.Core
                 Debug.LogWarning("[CorePlayerManager] onStatDepleted is null in RegisterEventListeners");
             else
                 onStatDepleted.RegisterListener(HandleStatDepleted);
+
+            if (onInteractPressed == null)
+                Debug.LogWarning("[CorePlayerManager] onInteractPressed is null in RegisterEventListeners");
+            else
+                onInteractPressed.RegisterListener(HandleInteractPress);
+
+            if (onInteractReleased == null)
+                Debug.LogWarning("[CorePlayerManager] onInteractReleased is null in RegisterEventListeners");
+            else
+                onInteractReleased.RegisterListener(HandleInteractRelease);
         }
 
         private void UnregisterEventListeners()
@@ -435,6 +457,14 @@ namespace Blocks.Gameplay.Core
 
             if (onStatDepleted != null)
                 onStatDepleted.UnregisterListener(HandleStatDepleted);
+
+            if (onInteractPressed != null)
+
+                onInteractPressed.UnregisterListener(HandleInteractPress);
+
+            if (onInteractReleased != null)
+
+                onInteractReleased.UnregisterListener(HandleInteractRelease);
         }
 
         private void CacheComponentReferences()
