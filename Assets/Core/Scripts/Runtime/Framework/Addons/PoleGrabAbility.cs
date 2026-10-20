@@ -118,6 +118,7 @@ namespace Blocks.Gameplay.Core
 
             if (!IsOnPole)
             {
+                if (Swing2 != null && Swing2.IsSwinging) return modifier; // Pole Swing 2 has this player
                 if (m_Motor.IsGrabHeld && m_RegrabTimer <= 0f && TryDetectPole(out Pole pole, out float angle, out float height, out Vector3 outward))
                 {
                     EnterPole(pole, angle, height, outward);
@@ -198,14 +199,31 @@ namespace Blocks.Gameplay.Core
 
         public bool IsPoleHorizontal(Pole _pole)
         {
-            bool isHorizontal = Mathf.Abs(_pole.transform.eulerAngles.x) < poleAngleUpperBound && Mathf.Abs(_pole.transform.eulerAngles.x) > poleAngleLowerBound;
-            //check both directions, any orientation that isnt up and down should count as horizontal
-            if (isHorizontal == false)
-            {
-                isHorizontal = Mathf.Abs(_pole.transform.eulerAngles.z) < poleAngleUpperBound && Mathf.Abs(_pole.transform.eulerAngles.z) > poleAngleLowerBound;
-            }
-            return isHorizontal;
+            // (2026-10-20) From the pole's actual axis in the world (Pole.IsHorizontal: more than 45 degrees from
+            // vertical) rather than its transform's euler angles, so poles made by Set Object Property > Pole -
+            // whose axis can be any local axis, e.g. a swing pole modeled lying down - and poles turned -90 / 270
+            // degrees count too. poleAngleLowerBound / poleAngleUpperBound are no longer used.
+            return _pole != null && _pole.IsHorizontal;
         }
+
+        /// <summary>
+        /// Pole Swing 2 (PoleSwing2Ability) on the same player, when it's enabled: it takes over every
+        /// horizontal pole, and this ability then only does climbing poles.
+        /// </summary>
+        private PoleSwing2Ability Swing2
+        {
+            get
+            {
+                if (!m_Swing2Checked)
+                {
+                    m_Swing2 = GetComponent<PoleSwing2Ability>();
+                    m_Swing2Checked = true;
+                }
+                return m_Swing2 != null && m_Swing2.isActiveAndEnabled ? m_Swing2 : null;
+            }
+        }
+        private PoleSwing2Ability m_Swing2;
+        private bool m_Swing2Checked;
 
         private void ProcessPoleMovement(Vector2 rawInput, ref MovementModifier modifier)
         {
@@ -214,7 +232,8 @@ namespace Blocks.Gameplay.Core
                 ProcessSwingPoleMovement(rawInput, ref modifier);
                 return;
             }
-            Vector3 offset = (new Vector3(m_CurrentPole.transform.position.x,transform.position.y, m_CurrentPole.transform.position.z) - transform.position).normalized;
+            Vector3 poleCenter = m_CurrentPole.Center; // the collider's middle - not always the pivot (2026-10-20)
+            Vector3 offset = (new Vector3(poleCenter.x,transform.position.y, poleCenter.z) - transform.position).normalized;
             Vector3 fwd = Vector3.Cross(transform.up, offset);
 
             float climbSpeed = m_Motor.moveSpeed * climbSpeedMultiplier;
@@ -312,7 +331,7 @@ namespace Blocks.Gameplay.Core
             m_Motor.SetVerticalVelocity(0f);
             modifier.OverrideGravity = true;
 
-            Vector3 pointOnPole = m_CurrentPole.transform.position + (m_CurrentPole.Axis * m_HeightAlongAxis);
+            Vector3 pointOnPole = m_CurrentPole.Center + (m_CurrentPole.Axis * m_HeightAlongAxis);
             m_Motor.RotationOverride = () => m_CurrentPole != null
             ? Quaternion.LookRotation((new Vector3(pointOnPole.x, transform.position.y, pointOnPole.z) + transform.forward)  - transform.position, Vector3.up)
             : m_Motor.transform.rotation;
@@ -370,11 +389,15 @@ namespace Blocks.Gameplay.Core
             }
 
 
-            Vector3 pointOnPole = m_CurrentPole.transform.position + (m_CurrentPole.Axis * m_HeightAlongAxis);
-            Quaternion newRot = Quaternion.LookRotation((new Vector3(pointOnPole.x, transform.position.y, pointOnPole.z) + transform.forward) - transform.position, Vector3.up);
-            newRot = Quaternion.LookRotation(pole.transform.forward,Vector3.up);
-            if (Vector3.Angle(transform.forward, pole.transform.forward) >= 90)
-            { newRot = Quaternion.LookRotation(-pole.transform.forward, Vector3.up); }
+            // Face across the pole (level, at right angles to it), whichever way is nearer the way the player
+            // already faces. (2026-10-20: from the pole's axis rather than its transform.forward, which points
+            // straight down for a pole turned about X, or along the pole for one modeled lying down.)
+            Vector3 across = Vector3.Cross(pole.Axis, Vector3.up);
+            if (across.sqrMagnitude < 0.0001f) across = transform.forward;
+            across.y = 0f;
+            across.Normalize();
+            if (Vector3.Dot(transform.forward, across) < 0f) across = -across;
+            Quaternion newRot = Quaternion.LookRotation(across, Vector3.up);
 
             m_Motor.RotationOverride = () => m_CurrentPole != null
             ? newRot
@@ -478,6 +501,7 @@ namespace Blocks.Gameplay.Core
                 Pole pole = poles[i];
                 if (pole == null) continue;
                 if (pole == m_LastPole && m_RegrabTimer > 0f) continue;
+                if (Swing2 != null && pole.IsHorizontal) continue; // Pole Swing 2 does horizontal poles
 
                 Vector3 closestOnAxis = pole.ClosestAxisPoint(playerPos, out float distFromAxis, out bool withinHeight);
                 if (!withinHeight) continue;

@@ -171,11 +171,176 @@ PrefabInstance:
       propertyPath: m_Name
       value: Challenge_16_07
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedComponents:
+    - {fileID: 1017732337921612903, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 3066137726621261518, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 6602198023112215150, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 3676050604191367366, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 1815100096506271261, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 3315231621134257284, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 5653079778255933539, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 5897775103779168052, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 2526585754020845023, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 8904530077779104060, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 2512706654630498215, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 8043317552725449674, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    m_RemovedGameObjects:
+    - {fileID: 869621991955215034, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 8843048581167112106, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+    - {fileID: 4071161960676789753, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3374057518777539503, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8384367006114431031}
+    - targetCorrespondingSourceObject: {fileID: 3374057518777539503, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8384367006114431030}
+    - targetCorrespondingSourceObject: {fileID: 7811759063543854529, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8384367006114431029}
+    - targetCorrespondingSourceObject: {fileID: 7811759063543854529, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8384367006114431028}
+    - targetCorrespondingSourceObject: {fileID: 8969533668366143517, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8384367006114431027}
+    - targetCorrespondingSourceObject: {fileID: 8969533668366143517, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8384367006114431026}
   m_SourcePrefab: {fileID: 100100000, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+--- !u!1 &8384367006114431021 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8969533668366143517, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+  m_PrefabInstance: {fileID: 8384367006114431019}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &8384367006114431023 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7811759063543854529, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+  m_PrefabInstance: {fileID: 8384367006114431019}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &8384367006114431025 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3374057518777539503, guid: 4e55bc379b2feaa438fec97bac884b6a, type: 3}
+  m_PrefabInstance: {fileID: 8384367006114431019}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &8384367006114431026
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8384367006114431021}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c98c1ea2bd4c2446b2783c70f73f4c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.Pole
+  fallbackRadius: 0.15
+  fallbackHalfHeight: 2
+  exitMargin: 0.1
+  grabRange: 1
+--- !u!136 &8384367006114431027
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8384367006114431021}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.14142108
+  m_Height: 8
+  m_Direction: 0
+  m_Center: {x: -4, y: 1, z: 1}
+--- !u!114 &8384367006114431028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8384367006114431023}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c98c1ea2bd4c2446b2783c70f73f4c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.Pole
+  fallbackRadius: 0.15
+  fallbackHalfHeight: 2
+  exitMargin: 0.1
+  grabRange: 1
+--- !u!136 &8384367006114431029
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8384367006114431023}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.14142108
+  m_Height: 8
+  m_Direction: 0
+  m_Center: {x: -4, y: 1, z: 1}
+--- !u!114 &8384367006114431030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8384367006114431025}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c98c1ea2bd4c2446b2783c70f73f4c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.Pole
+  fallbackRadius: 0.15
+  fallbackHalfHeight: 2
+  exitMargin: 0.1
+  grabRange: 1
+--- !u!136 &8384367006114431031
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8384367006114431025}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.14142108
+  m_Height: 8
+  m_Direction: 0
+  m_Center: {x: -4, y: 1, z: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

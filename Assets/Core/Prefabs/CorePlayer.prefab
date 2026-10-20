@@ -191,6 +191,7 @@ GameObject:
   - component: {fileID: 5505897753791863388}
   - component: {fileID: 8341354711323544292}
   - component: {fileID: 7646443965227562787}
+  - component: {fileID: 3563004876585452367}
   m_Layer: 3
   m_Name: CorePlayer
   m_TagString: Player
@@ -592,6 +593,30 @@ MonoBehaviour:
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   animationControls: {fileID: 0}
   characterHeight: 2
+--- !u!114 &3563004876585452367
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1637903110319045308}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e9a0334c514f3aa7529a6c8d235519e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.PoleSwing2Ability
+  grabRange: 1
+  hangDistance: 2
+  minApproachAngle: 45
+  regrabCooldown: 0.4
+  swingGravityScale: 0.6
+  minTopSpeed: 3.5
+  maxTopSpeed: 8
+  staminaCostPerSecond: 0
+  verticalLaunchScale: 1
+  horizontalLaunchScale: 4
+  launchUpBonus: 3
+  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!114 &7587005557142702197
 MonoBehaviour:
   m_ObjectHideFlags: 0

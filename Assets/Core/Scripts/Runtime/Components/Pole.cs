@@ -8,11 +8,15 @@ namespace Blocks.Gameplay.Core
     /// the player onto while Grab is held - see that class for the actual climbing/shimmying behavior.
     /// Put this on the pole's GameObject, alongside its collider.
     ///
-    /// Dimensions are read from a <see cref="CapsuleCollider"/> with `direction` set to Y (1, also the
-    /// component's own default) - the shape built by MapObstacleSetup for "pillar"-textured map
-    /// geometry, so a hand-placed pole with a fresh CapsuleCollider needs no extra configuration. Local
-    /// +Y is treated as "along the pole" (matching the collider's own axis); falls back to the
-    /// serialized fields below if no CapsuleCollider is present.
+    /// Dimensions are read from a <see cref="CapsuleCollider"/> on the same object: its direction is "along
+    /// the pole" (local X, Y or Z), and its center is the pole's middle - so a pole whose pivot isn't at its
+    /// middle (a Total Editor export, pivoted at its glb's origin) and a pole modeled lying down both work.
+    /// Friendslop > Set Object Property > Pole builds that capsule along the mesh's longest side. Without a
+    /// CapsuleCollider, the serialized fallback fields below are used, along local +Y from the pivot.
+    ///
+    /// VERTICAL OR HORIZONTAL is decided by which way the pole's axis points in the world
+    /// (<see cref="IsHorizontal"/>): more than <see cref="HorizontalAngle"/> degrees from straight up counts as
+    /// horizontal - a swing pole (see PoleGrabAbility / PoleSwing2Ability) - otherwise it's a climbing pole.
     ///
     /// The collider stays solid - a pole still blocks ordinary movement like a small wall for anyone
     /// not actively grabbing it. That's compatible with PoleGrabAbility on purpose: the ability always
@@ -42,21 +46,60 @@ namespace Blocks.Gameplay.Core
         /// <summary>How close (world units, from the pole's outer surface) counts as within grab range.</summary>
         public float GrabRange => grabRange;
 
-        /// <summary>World-space direction along the pole's climbable axis (local +Y).</summary>
-        public Vector3 Axis => transform.up;
+        /// <summary>A pole whose axis is more than this many degrees from straight up (or down) is horizontal.</summary>
+        public const float HorizontalAngle = 45f;
 
-        /// <summary>World-space center of the pole.</summary>
-        public Vector3 Center => transform.position;
+        // Which local axis runs along the pole (0 = X, 1 = Y, 2 = Z) and where its middle is, in local space -
+        // from the CapsuleCollider (see ComputeDimensions).
+        private int m_AxisIndex = 1;
+        private Vector3 m_LocalCenter;
+        private bool m_Computed;
+
+        /// <summary>World-space direction along the pole's climbable axis (the CapsuleCollider's direction; local +Y without one).</summary>
+        public Vector3 Axis
+        {
+            get
+            {
+                if (!m_Computed) ComputeDimensions();
+                return m_AxisIndex == 0 ? transform.right : m_AxisIndex == 2 ? transform.forward : transform.up;
+            }
+        }
+
+        /// <summary>World-space center of the pole (the CapsuleCollider's center; the pivot without one).</summary>
+        public Vector3 Center
+        {
+            get
+            {
+                if (!m_Computed) ComputeDimensions();
+                return transform.TransformPoint(m_LocalCenter);
+            }
+        }
+
+        /// <summary>
+        /// True for a swing pole: its axis is more than <see cref="HorizontalAngle"/> degrees from vertical.
+        /// Taken from the world direction of the axis, so it doesn't matter whether the object was turned or
+        /// modeled lying down.
+        /// </summary>
+        public bool IsHorizontal
+        {
+            get
+            {
+                float fromUp = Vector3.Angle(Axis, Vector3.up);
+                return Mathf.Min(fromUp, 180f - fromUp) > HorizontalAngle;
+            }
+        }
 
         /// <summary>World-space radius, accounting for non-uniform scale on the two non-axis dimensions.</summary>
         public float WorldRadius
         {
             get
             {
-                if (RadiusLocal <= 0f) ComputeDimensions();
+                if (!m_Computed) ComputeDimensions();
                 Vector3 scale = transform.lossyScale;
-                float sideScale = (scale.x + scale.z) * 0.5f;
-                return RadiusLocal * sideScale;
+                float sideScale = m_AxisIndex == 0 ? (scale.y + scale.z) * 0.5f
+                    : m_AxisIndex == 2 ? (scale.x + scale.y) * 0.5f
+                    : (scale.x + scale.z) * 0.5f;
+                return RadiusLocal * Mathf.Abs(sideScale);
             }
         }
 
@@ -65,8 +108,8 @@ namespace Blocks.Gameplay.Core
         {
             get
             {
-                if (HalfHeightLocal <= 0f) ComputeDimensions();
-                return HalfHeightLocal * transform.lossyScale.y;
+                if (!m_Computed) ComputeDimensions();
+                return HalfHeightLocal * Mathf.Abs(transform.lossyScale[m_AxisIndex]);
             }
         }
 
@@ -92,14 +135,20 @@ namespace Blocks.Gameplay.Core
 
         private void ComputeDimensions()
         {
+            m_Computed = true;
             var capsule = GetComponent<CapsuleCollider>();
             if (capsule != null)
             {
-                HalfHeightLocal = capsule.height * 0.5f;
+                m_AxisIndex = Mathf.Clamp(capsule.direction, 0, 2);
+                m_LocalCenter = capsule.center;
+                // A capsule's height includes its rounded ends; never shorter than its own diameter.
+                HalfHeightLocal = Mathf.Max(capsule.height, capsule.radius * 2f) * 0.5f;
                 RadiusLocal = capsule.radius;
                 return;
             }
 
+            m_AxisIndex = 1;
+            m_LocalCenter = Vector3.zero;
             HalfHeightLocal = fallbackHalfHeight;
             RadiusLocal = fallbackRadius;
         }
@@ -112,7 +161,7 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public Vector3 ClosestAxisPoint(Vector3 worldPosition, out float distanceFromAxis, out bool withinHeight)
         {
-            if (RadiusLocal <= 0f) ComputeDimensions();
+            if (!m_Computed) ComputeDimensions();
 
             Vector3 axis = Axis;
             Vector3 toPoint = worldPosition - Center;
@@ -130,7 +179,7 @@ namespace Blocks.Gameplay.Core
 
         private void OnDrawGizmosSelected()
         {
-            if (RadiusLocal <= 0f) ComputeDimensions();
+            ComputeDimensions(); // the collider may have been edited
 
             Gizmos.color = Color.green;
             Vector3 top = Center + Axis * WorldHalfHeight;

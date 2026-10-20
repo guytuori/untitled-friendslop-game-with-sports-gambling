@@ -28,10 +28,12 @@ namespace Blocks.Gameplay.Core
     /// - Ice: the same flat MeshCollider, with the low-friction ice PhysicMaterial assigned.
     /// - Wall Climb: the same flat MeshCollider (still blocks the player normally) plus a
     ///   <see cref="ClimbableWall"/> marker - see WallClimbAbility.
-    /// - Pole: no flat collider - a CapsuleCollider fitted to the object's own mesh bounds along LOCAL
-    ///   +Y, plus a <see cref="Pole"/> component. Pole/PoleGrabAbility hard-assume local +Y is "along the
-    ///   pole" (see Pole's own class summary), so the source object needs to actually be modeled/oriented
-    ///   that way - this tool can't detect or correct that for you.
+    /// - Pole: no flat collider - a CapsuleCollider fitted to the object's own mesh bounds along its
+    ///   LONGEST local axis, plus a <see cref="Pole"/> component, which reads its axis and middle from that
+    ///   capsule. Whether it's a climbing pole or a swing pole comes from which way that axis points in the
+    ///   world (Pole.IsHorizontal), so an upright pole turned on its side and a pole modeled lying down
+    ///   both become swing poles. On a root with the bar on a child (Dan's obstacle_pole), the property goes
+    ///   on the child and the root's own Pole and solid box/capsule are removed.
     /// - Balance Beam: no flat collider - a CapsuleCollider fitted along LOCAL +Z, plus a
     ///   <see cref="BalanceBeam"/> component. Same caveat as Pole, but for local +Z (see BalanceBeam's own
     ///   class summary). To chain several beam objects into one continuous run, hand-assign their Next In
@@ -170,6 +172,7 @@ namespace Blocks.Gameplay.Core
                 if (meshChild != null)
                 {
                     RemoveRootCopies(obj, meshChild.GetComponent<MeshFilter>().sharedMesh);
+                    if (type == MapObjectPropertyType.Pole) RemoveRootPole(obj);
                     Debug.Log($"[Friendslop] '{obj.name}' has its geometry on its '{meshChild.name}' child - setting that to '{type}'.", meshChild);
                     return ApplyProperty(meshChild, type);
                 }
@@ -203,7 +206,10 @@ namespace Blocks.Gameplay.Core
                     break;
 
                 case MapObjectPropertyType.Pole:
-                    BuildFittedCapsule(obj, meshFilter, axis: 1); // Y - matches Pole's "local +Y = along the pole".
+                    // Along the mesh's longest side, whichever local axis that is - Pole reads its axis and
+                    // middle from this capsule, so a pole modeled lying down (a swing pole straight from Total
+                    // Editor) works as well as an upright one turned on its side (Dan's obstacle_pole).
+                    BuildFittedCapsule(obj, meshFilter, LongestAxis(meshFilter.sharedMesh.bounds, obj.transform.lossyScale));
                     Undo.AddComponent<Pole>(obj);
                     break;
 
@@ -294,6 +300,34 @@ namespace Blocks.Gameplay.Core
                 if (collider.sharedMesh == mesh) Undo.DestroyObjectImmediate(collider);
             }
             if (root.TryGetComponent(out MapObjectProperty rootTag)) Undo.DestroyObjectImmediate(rootTag);
+        }
+
+        /// <summary>
+        /// A hand-built pole like Dan's obstacle_pole keeps its Pole (and a solid collider standing in for the
+        /// pole) on an empty root, with the visible bar on a child. When the property goes on that child, the
+        /// root's Pole and its solid Box/Capsule colliders are removed, so there's exactly one pole, sized
+        /// from the bar itself.
+        /// </summary>
+        private static void RemoveRootPole(GameObject root)
+        {
+            if (root.TryGetComponent(out Pole rootPole)) Undo.DestroyObjectImmediate(rootPole);
+            foreach (Collider collider in root.GetComponents<Collider>())
+            {
+                if (collider.isTrigger) continue;
+                if (collider is BoxCollider || collider is CapsuleCollider) Undo.DestroyObjectImmediate(collider);
+            }
+        }
+
+        /// <summary>
+        /// The local axis (0 = X, 1 = Y, 2 = Z) the mesh is longest along once scaled - a unit cube stretched to a
+        /// bar by its scale (Dan's obstacle_pole) counts by its scaled length, ties go to Y.
+        /// </summary>
+        private static int LongestAxis(Bounds bounds, Vector3 scale)
+        {
+            Vector3 size = Vector3.Scale(bounds.size, new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
+            if (size.y >= size.x && size.y >= size.z) return 1;
+            if (size.x >= size.y && size.x >= size.z) return 0;
+            return size.z > size.y ? 2 : 1;
         }
 
         private static void TearDown(GameObject obj, MapObjectProperty tag)
