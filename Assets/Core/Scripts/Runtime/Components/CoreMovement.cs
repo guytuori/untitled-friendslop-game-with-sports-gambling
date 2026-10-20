@@ -646,7 +646,7 @@ namespace Blocks.Gameplay.Core
 
             // Combine horizontal and vertical movement and apply it
             Vector3 movement = finalModifier.ArealVelocity;
-            movement.y = m_VerticalVelocity;
+            movement.y += m_VerticalVelocity;
 
             // Apply extra downward force on slopes when moving
             IsOnSlope = OnSlope();

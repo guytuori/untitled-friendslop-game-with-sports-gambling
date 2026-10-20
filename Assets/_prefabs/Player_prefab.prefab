@@ -431,7 +431,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 08b1147bca1a54974a6f52d1a504f530, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  airControl: 0.3
+  airControl: 1
   airRotationSpeed: 999
   conserveMomentum: 1
   minIceTurnGrip: 0.1
