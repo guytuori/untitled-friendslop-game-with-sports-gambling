@@ -1,6 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
-
+using Blocks.Gameplay.Core;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
@@ -41,8 +41,7 @@ namespace Blocks.Gameplay.Core
         private readonly Collider[] m_ProximityColliders = new Collider[20];
 
         [SerializeField] private Transform carrySpot; //where on the player the carried objects sits
-        [SerializeField] private ModularInteractable carriedObject;
-
+        [SerializeField] private CarryObject carriedObject;
         #endregion
 
         #region Public Methods
@@ -104,11 +103,11 @@ namespace Blocks.Gameplay.Core
             }
         }
 
-        public ModularInteractable CarriedObject()
+        public CarryObject CarriedObject()
         {
             return carriedObject;
         }
-        public void PickUpObject(ModularInteractable _obj)
+        public void PickUpObject(CarryObject _obj)
         {
             
             DropObject();
@@ -116,20 +115,9 @@ namespace Blocks.Gameplay.Core
 
             if (carriedObject == null) { return; }
 
-            carriedObject.PickedUp(); 
+            carriedObject.PickedUp(carrySpot); 
 
-            if (CarriedObject().GetComponent<Collider>() != null) { CarriedObject().GetComponent<Collider>().enabled = false; }
-            if (CarriedObject().GetComponent<Rigidbody>() != null)
-            {
-                CarriedObject().GetComponent<Rigidbody>().isKinematic = true;
-            }
-            if (carrySpot != null)
-            {
-                CarriedObject().transform.parent = carrySpot; 
-                CarriedObject().transform.localPosition = Vector3.zero; 
-                CarriedObject().transform.localRotation = carrySpot.rotation; 
-
-            }
+            
 
         }
         public void DropObject()
@@ -139,16 +127,8 @@ namespace Blocks.Gameplay.Core
             //TODO: refactor and move to the interactable object script
             //only here for intial testing
 
-            CarriedObject().Drop();
-            CarriedObject().transform.parent = null;
-            CarriedObject().transform.position += Vector3.up - transform.forward;
-            if (CarriedObject().GetComponent<Collider>()  != null) { CarriedObject().GetComponent<Collider>().enabled = true; }
-            if (CarriedObject().GetComponent<Rigidbody>()  != null)
-            {
-                CarriedObject().GetComponent<Rigidbody>().isKinematic = false;
-                CarriedObject().GetComponent<Rigidbody>().linearVelocity =  ((Vector3.up - transform.forward) * 5);
-            }
-            
+            CarriedObject().Dropped(carrySpot);
+            carriedObject = null;
         }
 
 
@@ -185,13 +165,22 @@ namespace Blocks.Gameplay.Core
                 {
                     interactable.Interact(gameObject);
                     m_CooldownTimer = interactionCooldown;
-                    if (hit.transform.GetComponent<ModularInteractable>() != null)
-                    {
-                        PickUpObject(hit.transform.GetComponent<ModularInteractable>());
-                    }
                 }
+                return;
             }
+
+            if (hit.gameObject.TryGetComponent<IInteractable>(out var interactable2))
+            {
+                if (interactable.TriggerMode == InteractionTriggerMode.OnCharacterControllerHit && interactable.CanInteract(gameObject))
+                {
+                    interactable.Interact(gameObject);
+                    m_CooldownTimer = interactionCooldown;
+                }
+                return;
+            }
+
         }
+
 
         #endregion
 
@@ -284,6 +273,7 @@ namespace Blocks.Gameplay.Core
                 m_CooldownTimer = interactionCooldown;
 
             }
+ 
         }
 
         #endregion

@@ -92,10 +92,15 @@ namespace Blocks.Gameplay.Core
             
             // Adjust acceleration/deceleration based on grounded state
             float acceleration = m_Motor.speedChangeRate;
-            if (!m_Motor.IsGrounded)
+            if (!m_Motor.IsGrounded )
             {
-                // Reduce control authority in air based on airControl setting
-                acceleration *= airControl;
+                if (UserInputInControl())
+                {
+                    // Reduce control authority in air based on airControl setting
+                    acceleration *= airControl;
+                }
+                else { acceleration = 0; }
+                
             }
             else
             {
@@ -125,22 +130,33 @@ namespace Blocks.Gameplay.Core
 
             // Convert 2D input to 3D direction
             Vector3 inputDirection = new Vector3(m_Motor.MoveInput.x, 0.0f, m_Motor.MoveInput.y).normalized;
-            Vector3 targetDirection = Vector3.forward; // Default to forward if no input
-
+            Vector3 targetMoveDirection = transform.forward; // Default to forward if no input
+            Vector3 targetFacingDirection = transform.forward; // Default to forward if no input
+            if (m_CurrentVelocity.magnitude > 0.1f)
+            {
+                targetMoveDirection = m_CurrentVelocity;
+                targetFacingDirection = m_CurrentVelocity;
+            }
             // Calculate the final movement direction
-            if (inputDirection.sqrMagnitude > 0)
+            if (inputDirection.sqrMagnitude > 0 )
             {
                 switch (m_Motor.directionMode)
                 {
                     case CoreMovement.MovementDirectionMode.CharacterRelative:
-                        targetDirection = m_Motor.transform.rotation * inputDirection;
+                        if (UserInputInControl())
+                        { targetMoveDirection = m_Motor.transform.rotation * inputDirection; }
+                        targetFacingDirection = m_Motor.transform.rotation * inputDirection;
                         break;
                     case CoreMovement.MovementDirectionMode.CameraRelative:
-                        targetDirection = Quaternion.Euler(0.0f, m_Motor.TargetRotationY, 0.0f) * inputDirection;
+                        if (UserInputInControl())
+                        { targetMoveDirection = Quaternion.Euler(0.0f, m_Motor.TargetRotationY, 0.0f) * inputDirection; }
+                        targetFacingDirection = Quaternion.Euler(0.0f, m_Motor.TargetRotationY, 0.0f) * inputDirection;
                         break;
                     case CoreMovement.MovementDirectionMode.World:
                     default:
-                        targetDirection = inputDirection;
+                        if (UserInputInControl())
+                        { targetMoveDirection = inputDirection; }
+                        targetFacingDirection = inputDirection;
                         break;
                 }
                 
@@ -150,17 +166,17 @@ namespace Blocks.Gameplay.Core
             else if (m_CurrentVelocity.sqrMagnitude > 0.1f)
             {
                  // If no input, direction is our current velocity direction
-                 targetDirection = m_CurrentVelocity.normalized;
+                 targetMoveDirection = m_CurrentVelocity.normalized;
             }
 
             // Calculate target velocity
-            Vector3 targetVelocity = targetDirection * m_CurrentSpeed;
+            Vector3 targetVelocity = targetMoveDirection * m_CurrentSpeed;
 
             // Let facing/animation respond to input immediately regardless of how fast the actual
             // translation below eases toward its target. This is what makes turning around on ice
             // look like the character spinning to face the new direction while the body is still
             // sliding the old way, instead of the whole body slowly carving a turn.
-            m_Motor.FacingDirectionOverride = inputDirection.sqrMagnitude > 0 ? targetDirection : (Vector3?)null;
+            m_Motor.FacingDirectionOverride = inputDirection.sqrMagnitude > 0 ? targetFacingDirection : (Vector3?)null;
 
             // Apply smoothing to the velocity vector itself for better air control feel
             // If grounded, we track perfectly (handled by m_CurrentSpeed lerp above efficiently enough, but let's be consistent)
@@ -173,7 +189,7 @@ namespace Blocks.Gameplay.Core
                 {
                     // Normal traction: instant direction changes are usually preferred for
                     // responsiveness. The speed lerp above handles the acceleration.
-                    m_CurrentVelocity = targetDirection.normalized * m_CurrentSpeed;
+                    m_CurrentVelocity = targetMoveDirection.normalized * m_CurrentSpeed;
                 }
                 else
                 {
@@ -183,7 +199,7 @@ namespace Blocks.Gameplay.Core
                     // what lets the character keep sliding in the old direction after facing has already
                     // snapped to the new input via FacingDirectionOverride above.
                     float turnRate = m_Motor.speedChangeRate * Mathf.Clamp(m_Motor.GroundGrip, minIceTurnGrip, 1f);
-                    m_CurrentVelocity = Vector3.MoveTowards(m_CurrentVelocity, targetDirection.normalized * m_CurrentSpeed, turnRate * Time.deltaTime);
+                    m_CurrentVelocity = Vector3.MoveTowards(m_CurrentVelocity, targetMoveDirection.normalized * m_CurrentSpeed, turnRate * Time.deltaTime);
                 }
             }
             else
@@ -193,7 +209,7 @@ namespace Blocks.Gameplay.Core
                 {
                      // Steer towards target direction
                      // We use airRotationSpeed to interpolate the direction
-                     m_CurrentVelocity = Vector3.Lerp(m_CurrentVelocity, targetDirection.normalized * m_CurrentSpeed, Time.deltaTime * airRotationSpeed);
+                     m_CurrentVelocity = Vector3.Lerp(m_CurrentVelocity, targetMoveDirection.normalized * m_CurrentSpeed, Time.deltaTime * airRotationSpeed);
                 }
                 else
                 {
@@ -210,6 +226,29 @@ namespace Blocks.Gameplay.Core
             modifier.ArealVelocity = m_CurrentVelocity;
 
             return modifier;
+        }
+        [SerializeField] private float loseControlThreshold; // the magnitude of velocity where the user input is overriden by the force
+        public bool UserInputInControl()
+        {
+            //allow external effects to override the user input
+            //and for the user to jump and rotate without being forced to alter the direction of the jump
+
+            if (!m_Motor.IsGrounded)
+            {
+                if (m_Motor.IsGrabHeld)
+                {
+                    return true;
+                }
+                else { return false; }
+
+            }
+
+            if (loseControlThreshold != 0 && m_CurrentVelocity.magnitude > loseControlThreshold)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>

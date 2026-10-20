@@ -197,11 +197,17 @@ namespace Blocks.Gameplay.Core
             return this.enabled && IsSpawned && !m_IsInteractionActive && !hasCooldown && !hasBeenInteractedOnce;
         }
 
+        public bool CanInteract()
+        {//to not break claudes version duplicate the function since the original doesnt use the interactor in its logic
+            bool hasCooldown = IsAutomaticPhysicsInteraction() && m_CooldownTimer > 0;
+            bool hasBeenInteractedOnce = interactOnce && m_HasBeenInteracted;
+            return this.enabled && IsSpawned && !m_IsInteractionActive && !hasCooldown && !hasBeenInteractedOnce;
+        }
         /// <summary>
         /// Executes the primary interaction logic by processing all attached <see cref="IInteractionEffect"/> components.
         /// </summary>
         /// <param name="interactor">The GameObject that initiated the interaction.</param>
-        public void Interact(GameObject interactor)
+        public virtual void Interact(GameObject interactor)
         {
             if (interactor == null)
             {
@@ -224,10 +230,15 @@ namespace Blocks.Gameplay.Core
 
             if (IsAutomaticPhysicsInteraction())
             {
-                m_CooldownTimer = autoInteractionCooldown;
+                EnterCooldown();
             }
 
             m_ProcessEffectsCoroutine = StartCoroutine(ProcessInteractionEffects(interactor));
+        }
+
+        public void EnterCooldown()
+        {
+            m_CooldownTimer = autoInteractionCooldown;
         }
 
         public void PickedUp()
