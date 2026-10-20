@@ -3,9 +3,17 @@ using UnityEngine;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// POLE SWING 2 - horizontal poles done the way the 3D Sonic games do them: grab the bar and you spin
-    /// round it, and Jump lets go at whatever point of the swing you're at, flying off the way you were moving
-    /// at that moment:
+    /// POLE SWING 2 - poles done the way the 3D Sonic games do them: grab the pole and you spin round it, and
+    /// Jump lets go at whatever point of the swing you're at, flying off the way you were moving at that moment.
+    ///
+    /// CLIMBING (VERTICAL) POLES (2026-10-20): the same idea turned on its side - you spin round the pole
+    /// level, body out sideways with your hands on it, at a steady speed (no gravity along a level circle):
+    /// your entry speed, between <see cref="minSpinSpeed"/> and <see cref="maxSpinSpeed"/>. Jump flies you off
+    /// along the circle - whichever way you're going at that point - with the usual small boost up.
+    /// Up / Down shimmies you up and down the pole while you spin.
+    ///
+    /// HORIZONTAL POLES (bars): Left / Right shimmies you along the bar while you swing, relative to the
+    /// camera. Releasing at different points of the swing:
     ///   - at the bottom of the swing you're moving forwards, so you fly mostly forwards;
     ///   - on the way up in front you're moving up, so you fly up;
     ///   - over the top you're moving backwards, and on the way down you're moving down.
@@ -14,18 +22,21 @@ namespace Blocks.Gameplay.Core
     /// always make it over the top (<see cref="minTopSpeed"/>). Coming in faster spins you faster, up to
     /// <see cref="maxTopSpeed"/> at the top.
     ///
-    /// A copy of the swing half of Dan's PoleGrabAbility (which is left as it was). While this component is
-    /// on the player and enabled, PoleGrabAbility leaves horizontal poles to it and only does climbing poles;
-    /// disable or remove it to get Dan's swing back. Horizontal = <see cref="Pole.IsHorizontal"/>.
+    /// Started as a copy of the swing half of Dan's PoleGrabAbility (which is left as it was). While this
+    /// component is on the player and enabled, PoleGrabAbility leaves every pole to it; disable or remove it
+    /// to get Dan's climbing and swinging back. Horizontal = <see cref="Pole.IsHorizontal"/>.
     ///
     /// GRABBING: hold Grab while your hands (<see cref="hangDistance"/> above your feet) come within
-    /// <see cref="grabRange"/> of the bar, moving (or facing, if you're standing still) at least
-    /// <see cref="minApproachAngle"/> degrees across it - so running along a bar doesn't catch it.
+    /// <see cref="grabRange"/> of the pole, moving (or facing, if you're standing still) at least
+    /// <see cref="minApproachAngle"/> degrees across it - so running along a bar doesn't catch it. (Any
+    /// level approach is "across" an upright pole.)
     ///
     /// WHILE SWINGING:
-    ///   - the body (CharacterController) waits under the bar, so the camera stays steady;
-    ///   - the character model spins round the bar, head towards it, and the model's NetworkTransform shows
-    ///     the swing to everyone else;
+    ///   - the body (CharacterController) waits under the bar (or beside an upright pole), so the camera stays
+    ///     steady;
+    ///   - the character model spins round the pole, hands on it, and the model's NetworkTransform shows the
+    ///     swing to everyone else;
+    ///   - shimmying moves the hand-hold along the pole, up to its ends (<see cref="shimmySpeed"/>);
     ///   - stamina drains (<see cref="staminaCostPerSecond"/>), and running out lets go.
     ///
     /// LETTING GO:
@@ -62,13 +73,23 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Stamina drained per second while on the bar (0 = none). Running out lets go.")]
         [SerializeField] private float staminaCostPerSecond = 8f;
 
+        [Header("Climbing Poles (upright)")]
+        [Tooltip("Slowest spin (m/s, feet speed) round an upright pole - you spin at your entry speed, but never slower than this.")]
+        [SerializeField] private float minSpinSpeed = 6f;
+        [Tooltip("Fastest spin (m/s) round an upright pole, however fast you came in.")]
+        [SerializeField] private float maxSpinSpeed = 10f;
+
+        [Header("Shimmying")]
+        [Tooltip("How fast (m/s) Up/Down (upright poles) or Left/Right (bars) moves your hands along the pole while you swing.")]
+        [SerializeField] private float shimmySpeed = 2.5f;
+
         [Header("Launch (Jump)")]
         [Tooltip("Multiplier on the swing's up/down speed when you jump off.")]
-        [SerializeField] private float verticalLaunchScale = 1.0f;
+        [SerializeField] private float verticalLaunchScale = 1.12f;
         [Tooltip("Multiplier on the swing's sideways speed when you jump off. It's applied as an impulse that fades quickly (like every push in CoreMovement), so it's higher than 1 to carry you a fair way.")]
         [SerializeField] private float horizontalLaunchScale = 4f;
         [Tooltip("Extra upward speed (m/s) added to every jump off, so a jump at the bottom still lifts you a little.")]
-        [SerializeField] private float launchUpBonus = 3f;
+        [SerializeField] private float launchUpBonus = 3.35f;
 
         [Header("Input Event")]
         [Tooltip("The jump-pressed GameEvent (the same asset CoreInputHandler raises and PoleGrabAbility listens to).")]
@@ -106,6 +127,9 @@ namespace Blocks.Gameplay.Core
         private float m_Radius;
         private float m_Angle;     // radians from the bottom, increasing along the swing
         private float m_TopSpeedSq;
+        private bool m_Upright;    // a climbing pole: spin level round it
+        private float m_PlaneGravity; // gravity along the swing's circle (0 for an upright pole)
+        private Vector3 m_BodyOffset; // where the body waits, from the hand-hold
         private Vector3 m_ModelLocalPosition;
         private Quaternion m_ModelLocalRotation;
         private System.Func<Vector3, Vector3> m_PreviousMoveOverride;
@@ -119,7 +143,7 @@ namespace Blocks.Gameplay.Core
         private Pole m_LastPole;
 
         private bool IsOwner => m_Player != null && m_Player.IsOwner;
-        private float Gravity => Mathf.Abs(m_Motor != null ? m_Motor.gravity : -15f) * Mathf.Max(0.05f, swingGravityScale);
+        private float BaseGravity => Mathf.Abs(m_Motor != null ? m_Motor.gravity : -15f) * Mathf.Max(0.05f, swingGravityScale);
 
         #region IMovementAbility
 
@@ -229,7 +253,7 @@ namespace Blocks.Gameplay.Core
             m_HasLastPosition = true;
         }
 
-        /// <summary>The nearest horizontal bar the hands are within reach of, coming at it square enough.</summary>
+        /// <summary>The nearest pole the hands are within reach of, coming at it square enough.</summary>
         private bool TryFindBar(out Pole found, out Vector3 pivot)
         {
             found = null;
@@ -245,7 +269,7 @@ namespace Blocks.Gameplay.Core
             for (int i = 0; i < poles.Count; i++)
             {
                 Pole pole = poles[i];
-                if (pole == null || !pole.IsHorizontal) continue;
+                if (pole == null) continue;
                 if (pole == m_LastPole && m_RegrabTimer > 0f) continue;
 
                 Vector3 onAxis = pole.ClosestAxisPoint(hands, out float fromAxis, out bool withinLength);
@@ -273,11 +297,20 @@ namespace Blocks.Gameplay.Core
         {
             Vector3 axis = pole.Axis.normalized;
 
-            // The swing's plane: square to the bar. "Down" is gravity in that plane; "forward" is level and
-            // square to the bar, pointing the way the player was going (or facing).
+            // The swing's plane: square to the pole. "Down" is gravity in that plane - or, round an upright pole
+            // where gravity is along the pole, the side the player is on. "Forward" is square to both, pointing
+            // the way the player was going (or facing).
             Vector3 down = Vector3.ProjectOnPlane(Vector3.down, axis);
-            if (down.sqrMagnitude < 0.0001f) return; // a vertical pole - not ours
-            down.Normalize();
+            float tilt = down.magnitude; // 1 for a level bar, 0 for an upright pole
+            if (tilt > 0.05f) down /= tilt;
+            else
+            {
+                down = Vector3.ProjectOnPlane(transform.position - pivot, axis);
+                if (down.sqrMagnitude < 0.0001f) down = Vector3.ProjectOnPlane(-transform.forward, axis);
+                if (down.sqrMagnitude < 0.0001f) return;
+                down.Normalize();
+                tilt = 0f;
+            }
             Vector3 forward = Vector3.Cross(axis, down).normalized;
             Vector3 heading = m_Velocity.sqrMagnitude > 0.25f ? m_Velocity : transform.forward;
             if (Vector3.Dot(Vector3.ProjectOnPlane(heading, Vector3.up), forward) < 0f) forward = -forward;
@@ -287,6 +320,16 @@ namespace Blocks.Gameplay.Core
             m_Down = down;
             m_Forward = forward;
             m_Radius = Mathf.Max(0.5f, hangDistance);
+            m_Upright = !pole.IsHorizontal;
+            m_PlaneGravity = BaseGravity * tilt;
+            float alongNow = Vector3.Dot(m_Pivot - pole.Center, axis);
+            m_Pivot += axis * (ClampAlong(alongNow) - alongNow);
+
+            // Where the body waits: hanging under a bar; beside an upright pole, against it, about where the
+            // player was standing (a little below the hands, so the camera stays near them).
+            m_BodyOffset = m_Upright
+                ? down * (pole.WorldRadius + m_Controller.radius) + Vector3.down * (m_Radius * 0.5f)
+                : down * m_Radius;
 
             // Where the feet are now, as an angle round the bar (nearly always just below it).
             Vector3 fromPivot = Vector3.ProjectOnPlane(transform.position - pivot, axis);
@@ -296,10 +339,13 @@ namespace Blocks.Gameplay.Core
 
             // Swing speed: the speed coming in along the swing, turned into "speed at the top" (energy kept),
             // never less than enough to go all the way round.
+            // (Round an upright pole there's no gravity along the circle, so that's simply the spin speed.)
             Vector3 tangent = Tangent(m_Angle);
             float entrySpeed = Mathf.Max(0f, Vector3.Dot(m_Velocity, tangent));
-            float topSq = entrySpeed * entrySpeed - 2f * Gravity * m_Radius * (1f + Mathf.Cos(m_Angle));
-            m_TopSpeedSq = Mathf.Clamp(topSq, minTopSpeed * minTopSpeed, maxTopSpeed * maxTopSpeed);
+            float topSq = entrySpeed * entrySpeed - 2f * m_PlaneGravity * m_Radius * (1f + Mathf.Cos(m_Angle));
+            m_TopSpeedSq = m_Upright
+                ? Mathf.Clamp(topSq, minSpinSpeed * minSpinSpeed, maxSpinSpeed * maxSpinSpeed)
+                : Mathf.Clamp(topSq, minTopSpeed * minTopSpeed, maxTopSpeed * maxTopSpeed);
 
             if (m_Model != null)
             {
@@ -311,7 +357,10 @@ namespace Blocks.Gameplay.Core
             m_PreviousMoveOverride = m_Motor.FinalMoveCalculationOverride;
             m_Motor.FinalMoveCalculationOverride = _ => Vector3.zero;
             m_Motor.SetVerticalVelocity(0f);
-            Quaternion facing = Quaternion.LookRotation(m_Forward, Vector3.up);
+            // The body faces along the swing under a bar, or the pole beside an upright one.
+            Vector3 face = m_Upright ? Vector3.ProjectOnPlane(-down, Vector3.up) : m_Forward;
+            if (face.sqrMagnitude < 0.0001f) face = transform.forward;
+            Quaternion facing = Quaternion.LookRotation(face.normalized, Vector3.up);
             m_Motor.RotationOverride = () => facing;
 
             if (m_Animator != null)
@@ -334,15 +383,17 @@ namespace Blocks.Gameplay.Core
         private Vector3 FeetAt(float angle) => m_Pivot + m_Radius * (Mathf.Cos(angle) * m_Down + Mathf.Sin(angle) * m_Forward);
 
         /// <summary>Speed along the swing at <paramref name="angle"/>: energy kept, so fastest at the bottom.</summary>
-        private float SpeedAt(float angle) => Mathf.Sqrt(Mathf.Max(0f, m_TopSpeedSq + 2f * Gravity * m_Radius * (1f + Mathf.Cos(angle))));
+        private float SpeedAt(float angle) => Mathf.Sqrt(Mathf.Max(0f, m_TopSpeedSq + 2f * m_PlaneGravity * m_Radius * (1f + Mathf.Cos(angle))));
 
         private void Swing(float deltaTime)
         {
             m_Angle += SpeedAt(m_Angle) / m_Radius * deltaTime;
             if (m_Angle > Mathf.PI * 2f) m_Angle -= Mathf.PI * 2f;
 
-            // The body hangs still under the bar.
-            m_Motor.SetPosition(m_Pivot + m_Down * m_Radius, teleport: false);
+            Shimmy(deltaTime);
+
+            // The body waits under the bar / beside the pole.
+            m_Motor.SetPosition(m_Pivot + m_BodyOffset, teleport: false);
             m_Motor.SetVerticalVelocity(0f);
 
             // The model goes round: feet on the circle, head towards the bar, facing along the swing.
@@ -351,6 +402,48 @@ namespace Blocks.Gameplay.Core
                 Vector3 towardBar = -(Mathf.Cos(m_Angle) * m_Down + Mathf.Sin(m_Angle) * m_Forward);
                 m_Model.SetPositionAndRotation(FeetAt(m_Angle), Quaternion.LookRotation(Tangent(m_Angle), towardBar));
             }
+        }
+
+        /// <summary>
+        /// Moves the hand-hold along the pole: Up/Down on an upright pole (up is up), Left/Right on a bar (as the
+        /// camera sees it). It stops at the pole's ends.
+        /// </summary>
+        private void Shimmy(float deltaTime)
+        {
+            if (m_Pole == null || deltaTime <= 0f || shimmySpeed <= 0f) return;
+
+            Vector3 axis = m_Pole.Axis.normalized;
+            Vector2 input = m_Motor.MoveInput;
+            float along;
+            if (m_Upright)
+            {
+                along = input.y * Mathf.Sign(Vector3.Dot(axis, Vector3.up));
+            }
+            else
+            {
+                Camera camera = Camera.main;
+                Vector3 right = camera != null ? camera.transform.right : Vector3.Cross(Vector3.up, m_Forward);
+                right = Vector3.ProjectOnPlane(right, Vector3.up);
+                float facing = Vector3.Dot(axis, right.sqrMagnitude > 0.0001f ? right.normalized : Vector3.Cross(Vector3.up, m_Forward));
+                along = Mathf.Abs(facing) < 0.2f ? 0f : input.x * Mathf.Sign(facing); // looking straight along the bar: no left/right
+            }
+            if (Mathf.Abs(along) < 0.1f) return;
+
+            float now = Vector3.Dot(m_Pivot - m_Pole.Center, axis);
+            m_Pivot += axis * (ClampAlong(now + along * shimmySpeed * deltaTime) - now);
+        }
+
+        /// <summary>
+        /// Keeps the hand-hold on the pole. On an upright pole the body waits below the hands, so the hands stay
+        /// that far above the bottom end (the body never ends up under the floor the pole stands on).
+        /// </summary>
+        private float ClampAlong(float along)
+        {
+            float half = m_Pole.WorldHalfHeight;
+            if (!m_Upright) return Mathf.Clamp(along, -half, half);
+            float bodyDrop = Mathf.Min(m_Radius * 0.5f, half);
+            bool axisUp = Vector3.Dot(m_Pole.Axis, Vector3.up) >= 0f;
+            return axisUp ? Mathf.Clamp(along, -half + bodyDrop, half) : Mathf.Clamp(along, -half, half - bodyDrop);
         }
 
         #endregion

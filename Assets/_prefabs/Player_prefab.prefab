@@ -191,6 +191,7 @@ GameObject:
   - component: {fileID: 5505897753791863388}
   - component: {fileID: 8341354711323544292}
   - component: {fileID: 7646443965227562787}
+  - component: {fileID: 1684766169788175845}
   m_Layer: 3
   m_Name: Player_prefab
   m_TagString: Player
@@ -262,8 +263,8 @@ MonoBehaviour:
   onLookInput: {fileID: 11400000, guid: 8af931367978e4bc9bae53b88856ff5b, type: 2}
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
   onJumpReleased: {fileID: 11400000, guid: 4c295680fb10f4080ae6688f6a96a009, type: 2}
-  onInteractPressed: {fileID: 0}
-  onInteractReleased: {fileID: 0}
+  onInteractPressed: {fileID: 11400000, guid: d16d793bf0c73f04f9d4f00e01fa14eb, type: 2}
+  onInteractReleased: {fileID: 11400000, guid: 13c5794a2c1524644a2467dac99c665c, type: 2}
   onSprintStateChanged: {fileID: 11400000, guid: c3ec94fe2e7dd47aaadddb5e98e7c375, type: 2}
   onGrabStateChanged: {fileID: 11400000, guid: 8f025844fa794da8b5eab619f5139e5c, type: 2}
   onStatDepleted: {fileID: 11400000, guid: aced99a6f7f354e5c87c8fab171c4c31, type: 2}
@@ -435,6 +436,7 @@ MonoBehaviour:
   airRotationSpeed: 999
   conserveMomentum: 1
   minIceTurnGrip: 0.1
+  loseControlThreshold: 0
 --- !u!114 &1665020148906035432
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -691,6 +693,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.DoubleJumpAddon
   doubleJumpHeight: 5
   staminaCost: 0
+  maxDoubleJumps: -1
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!114 &5505897753791863388
 MonoBehaviour:
@@ -787,6 +790,30 @@ MonoBehaviour:
   StateHashes: 0000000084ca1cc0f9c6230b1c6a54339e2518b671a7e1076b36dbedb1afdc305a6c54cd8a18fce4b9abd9d3fd143d581376f52d0b878ad8e5e542ad2b26b0be9bd70fe062eeef729ff9d70797a04ef32fcbea22fa2254c04249f011d786dc4e73cfd051
   TriggerHashes: 0000000018dd2738c8919f480b878ad8797964ad6661c296
   TotalWords: 7
+--- !u!114 &1684766169788175845
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1637903110319045308}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e9a0334c514f3aa7529a6c8d235519e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.PoleSwing2Ability
+  grabRange: 1
+  hangDistance: 2
+  minApproachAngle: 45
+  regrabCooldown: 0.4
+  swingGravityScale: 0.6
+  minTopSpeed: 3.5
+  maxTopSpeed: 8
+  staminaCostPerSecond: 8
+  verticalLaunchScale: 1
+  horizontalLaunchScale: 4
+  launchUpBonus: 3
+  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!1 &1735581466166165262
 GameObject:
   m_ObjectHideFlags: 0

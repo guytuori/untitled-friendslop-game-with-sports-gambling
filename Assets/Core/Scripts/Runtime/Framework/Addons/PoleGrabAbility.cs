@@ -207,8 +207,8 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Pole Swing 2 (PoleSwing2Ability) on the same player, when it's enabled: it takes over every
-        /// horizontal pole, and this ability then only does climbing poles.
+        /// Pole Swing 2 (PoleSwing2Ability) on the same player, when it's enabled: it takes over every pole -
+        /// bars and (since 2026-10-20) climbing poles - so this ability then does nothing.
         /// </summary>
         private PoleSwing2Ability Swing2
         {
@@ -501,7 +501,7 @@ namespace Blocks.Gameplay.Core
                 Pole pole = poles[i];
                 if (pole == null) continue;
                 if (pole == m_LastPole && m_RegrabTimer > 0f) continue;
-                if (Swing2 != null && pole.IsHorizontal) continue; // Pole Swing 2 does horizontal poles
+                if (Swing2 != null) continue; // Pole Swing 2 does every pole (2026-10-20: upright ones too)
 
                 Vector3 closestOnAxis = pole.ClosestAxisPoint(playerPos, out float distFromAxis, out bool withinHeight);
                 if (!withinHeight) continue;
