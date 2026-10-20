@@ -133,5 +133,31 @@ namespace Blocks.Gameplay.Core
 
             UnityEngine.Object.Destroy(temp, clip.length);
         }
+
+        /// <summary>
+        /// Plays <paramref name="clip"/> once as a sound in the world at <paramref name="position"/>: full volume
+        /// within <paramref name="minDistance"/> meters of the listener, fading out linearly to silence at
+        /// <paramref name="maxDistance"/>.
+        /// </summary>
+        public static void PlayOneShotAt(AudioClip clip, AudioCategory category, Vector3 position, float minDistance, float maxDistance)
+        {
+            if (clip == null) return;
+            if (category == AudioCategory.UISoundEffects && (!Current.UISoundEffectsEnabled || UISoundsMuted)) return;
+
+            var temp = new GameObject($"OneShotAudio3D_{clip.name}");
+            temp.transform.position = position;
+
+            var source = temp.AddComponent<AudioSource>();
+            source.clip = clip;
+            source.volume = GetMultiplier(category);
+            source.spatialBlend = 1f;
+            source.rolloffMode = AudioRolloffMode.Linear;
+            source.minDistance = minDistance;
+            source.maxDistance = maxDistance;
+            source.dopplerLevel = 0f;
+            source.Play();
+
+            UnityEngine.Object.Destroy(temp, clip.length + 0.1f);
+        }
     }
 }

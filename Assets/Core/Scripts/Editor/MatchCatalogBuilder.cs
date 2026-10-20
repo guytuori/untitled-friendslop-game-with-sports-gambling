@@ -21,6 +21,10 @@ namespace Blocks.Gameplay.Core
     ///     Prefabs WITHOUT an underscore in their name (Challenge16, Challenge32) are not challenges: they're
     ///     the plain pieces Practice Map fills the holes with, so they're kept out of the random rotation and
     ///     stored as the catalog's practice pieces instead.
+    ///     Challenge16StartFlag / Challenge16EndFlag / Challenge32StartFlag / Challenge32EndFlag aren't
+    ///     challenges either: they're the see-through checkered flags ChallengeCourse shows over each challenge's
+    ///     start and finish rows, stored in the catalog with the material they're drawn with
+    ///     (<see cref="FlagMaterialPath"/>, made once - 33% opaque - then left alone so it can be tuned).
     /// Each map's sky also goes in the MapCatalog: a Skybox material or image named after the map plus
     /// "_skybox", anywhere under Assets (dinosaur_zoo_skybox.png for DinosaurZoo - case, underscores and
     /// spaces don't matter). For an image, a Skybox/Panoramic material of the same name is made next to it
@@ -47,6 +51,9 @@ namespace Blocks.Gameplay.Core
         private const string MapCatalogPath = ResourcesFolder + "/" + MapCatalog.ResourcePath + ".asset";
         private const string ChallengeCatalogPath = ResourcesFolder + "/" + ChallengeCatalog.ResourcePath + ".asset";
         private const string PreviewRootName = "Challenge Preview (not saved)";
+        public const string FlagMaterialPath = ChallengesFolder + "/ChallengeFlag.mat";
+        private static readonly System.Text.RegularExpressions.Regex FlagPrefabName =
+            new System.Text.RegularExpressions.Regex(@"^Challenge(16|32)(Start|End)Flag$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         private static bool s_Building;
         private static bool s_Scheduled;
@@ -57,7 +64,8 @@ namespace Blocks.Gameplay.Core
             {
                 var challenges = AssetDatabase.LoadAssetAtPath<ChallengeCatalog>(ChallengeCatalogPath);
                 if (AssetDatabase.LoadAssetAtPath<MapCatalog>(MapCatalogPath) == null || challenges == null ||
-                    challenges.Challenges.Any(c => c != null && c.thumbnail == null)) // e.g. thumbnails are new
+                    challenges.Challenges.Any(c => c != null && c.thumbnail == null) || // e.g. thumbnails are new
+                    challenges.FlagMaterial == null) // the start/end flags are new
                 {
                     Rebuild();
                 }
@@ -119,6 +127,9 @@ namespace Blocks.Gameplay.Core
                 challengeCatalog.SetChallenges(challenges);
                 challengeCatalog.SetPracticePieces(practice16, practice32);
                 log.AppendLine($"Practice Map pieces: 16x16 = {(practice16 != null ? practice16.name : "none")}, 32x32 = {(practice32 != null ? practice32.name : "none")}.");
+                FindFlags(out GameObject start16, out GameObject end16, out GameObject start32, out GameObject end32);
+                challengeCatalog.SetFlags(start16, end16, start32, end32, EnsureFlagMaterial(log));
+                log.AppendLine($"Challenge flags: 16x16 = {(start16 != null ? start16.name : "no start")} / {(end16 != null ? end16.name : "no end")}, 32x32 = {(start32 != null ? start32.name : "no start")} / {(end32 != null ? end32.name : "no end")}.");
                 EditorUtility.SetDirty(challengeCatalog);
 
                 AssetDatabase.SaveAssets();
@@ -193,6 +204,7 @@ namespace Blocks.Gameplay.Core
             {
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 if (prefab == null) continue;
+                if (FlagPrefabName.IsMatch(prefab.name)) continue; // a start/end flag (see FindFlags), not a challenge
 
                 if (ChallengeSockets.FindMarker(prefab.transform, out int size) == null)
                 {
@@ -219,6 +231,65 @@ namespace Blocks.Gameplay.Core
                 });
             }
             return entries;
+        }
+
+        /// <summary>The Challenge16StartFlag / Challenge16EndFlag / Challenge32StartFlag / Challenge32EndFlag prefabs (null if missing).</summary>
+        private static void FindFlags(out GameObject start16, out GameObject end16, out GameObject start32, out GameObject end32)
+        {
+            start16 = end16 = start32 = end32 = null;
+            foreach (string path in FindPrefabs(ChallengesFolder))
+            {
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null) continue;
+                System.Text.RegularExpressions.Match match = FlagPrefabName.Match(prefab.name);
+                if (!match.Success) continue;
+                bool big = match.Groups[1].Value == "32";
+                bool start = string.Equals(match.Groups[2].Value, "Start", StringComparison.OrdinalIgnoreCase);
+                if (big) { if (start) start32 ??= prefab; else end32 ??= prefab; }
+                else { if (start) start16 ??= prefab; else end16 ??= prefab; }
+            }
+        }
+
+        /// <summary>
+        /// The flags' see-through material: URP Unlit, transparent, white at 33% opacity, back faces hidden.
+        /// Made the first time only - after that it's left alone, so its Base Color
+        /// alpha (the flags' opacity) can be tuned in the inspector. ChallengeCourse copies it per flag texture.
+        /// </summary>
+        private static Material EnsureFlagMaterial(StringBuilder log)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(FlagMaterialPath);
+            if (existing != null) return existing;
+
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+            {
+                string message = "Couldn't make the challenge flag material: the Universal Render Pipeline/Unlit shader wasn't found. The flags will be drawn with their own (solid) materials.";
+                Debug.LogWarning("[Maps] " + message);
+                log.AppendLine(message);
+                return null;
+            }
+
+            var material = new Material(shader) { name = Path.GetFileNameWithoutExtension(FlagMaterialPath) };
+            material.SetFloat("_Surface", 1f); // Transparent
+            material.SetFloat("_Blend", 0f);   // Alpha
+            material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            material.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+            material.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            material.SetFloat("_ZWrite", 0f);
+            material.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Back);
+            material.SetFloat("_AlphaClip", 0f);
+            material.SetOverrideTag("RenderType", "Transparent");
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            material.DisableKeyword("_ALPHATEST_ON");
+            material.SetColor("_BaseColor", new Color(1f, 1f, 1f, 0.33f));
+            material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            AssetDatabase.CreateAsset(material, FlagMaterialPath);
+
+            string done = $"Made the challenge flag material {FlagMaterialPath} (33% opaque - change its Base Color alpha to tune).";
+            Debug.Log("[Maps] " + done, material);
+            log.AppendLine(done);
+            return material;
         }
 
         /// <summary>Prefab paths directly in or under <paramref name="folder"/>, sorted by file name (a fixed order every client shares).</summary>

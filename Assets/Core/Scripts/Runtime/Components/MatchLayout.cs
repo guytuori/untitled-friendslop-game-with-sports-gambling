@@ -337,9 +337,11 @@ namespace Blocks.Gameplay.Core
                 // The plain practice pieces come straight from a glb, without the collision a real
                 // challenge's set-up gives it - make sure they can be stood on.
                 if (NetPicks[i] == PracticePiecePick) AddMissingColliders(placedInstance);
+                // A real challenge becomes a course: start and end flags, run per player (ChallengeCourse).
+                else ChallengeCourse.SetUp(placedInstance, sockets[i].Size, catalog);
             }
 
-            // Zones are indexed by hierarchy - make ChallengeManager re-scan now that the challenges exist.
+            // Courses are indexed by hierarchy - make ChallengeManager re-scan now that the challenges exist.
             if (ChallengeManager.Instance != null) ChallengeManager.Instance.RefreshZones();
 
             Debug.Log($"[MatchLayout] Built map '{mapId}' with {placed} challenge(s) in {sockets.Count} hole(s).", this);

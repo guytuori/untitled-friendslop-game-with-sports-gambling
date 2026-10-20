@@ -43,6 +43,10 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Sound definition played when the player is eliminated.")]
         [SerializeField] private SoundDef soundDefPlayerEliminated;
 
+        // death.mp3: full volume within this many meters of the camera, silent beyond the second.
+        private const float DeathSoundFullVolumeDistance = 3f;
+        private const float DeathSoundSilentDistance = 30f;
+
         [Header("Ragdoll Settings")]
         [Tooltip("When enabled, the player model will turn into a ragdoll upon elimination.")]
         [SerializeField] private bool useRagdollOnElimination = true;
@@ -253,7 +257,14 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void PlayEliminatedVFX()
         {
-            if (soundDefPlayerEliminated != null)
+            // death.mp3 (GameSounds) replaced the template's elimination sound; the SoundDef is only a fallback
+            // while that isn't built.
+            AudioClip death = GameSounds.Death;
+            if (death != null)
+            {
+                AudioVolumeService.PlayOneShotAt(death, AudioCategory.SoundEffects, transform.position, DeathSoundFullVolumeDistance, DeathSoundSilentDistance);
+            }
+            else if (soundDefPlayerEliminated != null)
             {
                 CoreDirector.RequestAudio(soundDefPlayerEliminated)
                     .WithPosition(transform.position)

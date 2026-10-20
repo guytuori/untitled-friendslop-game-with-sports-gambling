@@ -6,46 +6,34 @@ using Fusion;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// NOTE (2026-10-06): wagers moved to the non-pausing ticker (WagerManager). Claiming a challenge now
-    /// starts the attempt immediately - the betting-window/pause parts described below are no longer
-    /// opened - and tells WagerManager when a challenge starts and ends (for challenge-only wagers).
+    /// The master client's side of the challenges, plus the flat death penalty that applies anywhere.
     ///
-    /// The single, authoritative brain for every <see cref="ChallengeZone"/> in the map, plus the
-    /// flat death penalty that applies regardless of any challenge. Lives on one GameObject placed
-    /// directly in the gameplay scene (see ChallengeSystemSetup), the same way RoundTimer does.
+    /// CHALLENGES (reworked 2026-10-17 - "more points coming into the economy"):
+    ///   - Every player can complete every challenge once per round, and any number of players can be in the
+    ///     same challenge at the same time. Nobody "owns" a challenge any more.
+    ///   - Completing one is worth a flat <see cref="ChallengeDefinition.basePoints"/> - no time or death pars.
+    ///     Going fast just leaves more time for other challenges. Dying still costs the death penalty, as it
+    ///     does anywhere.
+    ///   - A run starts by passing through the challenge's start flag and ends at its end flag - see
+    ///     <see cref="ChallengeCourse"/> (the placed challenges and their flags) and
+    ///     <see cref="LocalChallengeTracker"/> (which watches each player on their own machine and reports here).
+    ///   - The master keeps who is in which challenge (<see cref="IsPlayerInChallenge"/>, for challenge-only
+    ///     wagers) and who has completed what, awards the points, and tells everyone
+    ///     (<see cref="PlayerChallengeStateChanged"/>, <see cref="ChallengeCompleted"/>).
+    ///   - Practice sessions give no points for challenges (the practice score only counts pickups).
     ///
-    /// Networking (Photon Fusion, Shared mode): a scene object owned by the session's master client
-    /// ("Is Master Client Object" on its NetworkObject). The master client makes every decision below;
-    /// other clients report their own zone entries and bets to it through RPCs
-    /// (<see cref="RequestZoneEntry"/>, <see cref="PlaceBet"/>) and read the networked betting-window state.
-    /// ChallengeZones themselves aren't networked objects - they're identified by a stable index (see
-    /// <see cref="GetZoneIndex"/>). If the master client leaves mid-challenge, the next master takes over
-    /// the networked state (pause, betting window), but the departed master's in-progress bookkeeping
-    /// (who owns which challenge, bets placed) is lost.
+    /// Courses are identified over the network by their index in a list sorted by hierarchy path, the same
+    /// on every client (MatchLayout builds every challenge with the same names in the same places). If the
+    /// master client leaves, the next one starts with an empty record of who has completed what.
     ///
-    /// Responsibilities, each easy to re-tune without touching the others:
-    /// - Death penalty: -<see cref="deathPenalty"/> points any time any player's Health depletes, challenge
-    ///   or no challenge (see the death-penalty region).
-    /// - Ownership: the first player to enter a challenge's start volume owns it (see HandleZoneEntry).
-    /// - The betting window: taking ownership pauses every player for <see cref="bettingWindowSeconds"/>
-    ///   while everyone else is offered a bet (see the betting-window region). Only one betting window can
-    ///   run at a time, project-wide - a second claim attempt while one is already running is just ignored.
-    /// - Payout: reaching the finish awards the base points plus either par bonus that was beaten, and
-    ///   resolves every placed bet at <see cref="betPayoutMultiplier"/>x for a correct prediction (see
-    ///   ResolveAttempt).
-    ///
-    /// CoreHUD reads <see cref="IsBettingWindowActive"/>, <see cref="BettingTimeRemaining"/>,
-    /// <see cref="ActiveChallengeName"/>, <see cref="ActiveChallengerClientId"/> and
-    /// <see cref="ActiveBettorClientIds"/> (and their change events) to draw the betting overlay, and calls
-    /// <see cref="PlaceBet"/> when a player picks an option. <see cref="ChallengePauseGate"/> (one per
-    /// player) reads <see cref="IsPaused"/> to freeze/unfreeze that player's own movement input.
+    /// The old betting window (claiming a challenge paused everyone for bets) was replaced by the wager
+    /// ticker (WagerManager) on 2026-10-06. Its read-only properties and events stay for CoreHUD's (now
+    /// never shown) overlay, but nothing opens it any more.
     /// </summary>
     [RequireComponent(typeof(NetworkObject))]
     public class ChallengeManager : CoreNetworkBehaviour, ISceneSingleton
     {
         #region Fields & Properties
-
-        private const int MaxBettors = 32;
 
         [Header("Death Penalty")]
         [Tooltip("Points lost any time any player's Health stat depletes to zero, whether or not they're mid-challenge.")]
@@ -53,80 +41,21 @@ namespace Blocks.Gameplay.Core
         [Tooltip("The shared GameEvent CoreStatsHandler raises when a stat depletes - assign the project's OnStatDepleted asset.")]
         [SerializeField] private StatDepletedEvent onStatDepletedEvent;
 
-        [Header("Betting Window")]
-        [Tooltip("How long, in seconds, the game pauses for everyone after a challenge is claimed.")]
-        [SerializeField] private float bettingWindowSeconds = 5f;
-        [Tooltip("Multiplier applied to a challenge's base points for a correct bet (paid in full, on top of the wager already lost).")]
-        [SerializeField] private int betPayoutMultiplier = 3;
-
         /// <summary>The single ChallengeManager for the current scene. Set in Awake, like RoundTimer/CoreDirector.</summary>
         public static ChallengeManager Instance { get; private set; }
 
-        /// <summary>How long a betting window lasts, for CoreHUD to size its countdown bar correctly.</summary>
-        public float BettingWindowSeconds => bettingWindowSeconds;
+        /// <summary>Raised on every client when a player starts (true) or stops (false) a challenge run.</summary>
+        public static event Action<ulong, bool> PlayerChallengeStateChanged;
 
-        // Networked state - everyone reads, only the master client writes.
-        [Networked] private NetworkBool NetIsPaused { get; set; }
-        [Networked] private NetworkBool NetIsBettingWindowActive { get; set; }
-        [Networked] private float NetBettingTimeRemaining { get; set; }
-        [Networked] private NetworkString<_64> NetActiveChallengeName { get; set; }
-        [Networked] private int NetActiveChallengerId { get; set; }
-        [Networked, Capacity(MaxBettors)] private NetworkArray<int> NetBettorIds => default;
-        [Networked] private int NetBettorCount { get; set; }
+        /// <summary>Raised on every client when a player completes a challenge: (player, course index, points awarded).</summary>
+        public static event Action<ulong, int, int> ChallengeCompleted;
 
-        /// <summary>True while every player should be frozen in place (the betting window).</summary>
-        public bool IsPaused => IsSpawned && NetIsPaused;
+        // Master-client-only bookkeeping.
+        private readonly Dictionary<ulong, int> m_RunningCourseByPlayer = new Dictionary<ulong, int>();
+        private readonly HashSet<long> m_Completed = new HashSet<long>(); // (player << 16) | course index
 
-        /// <summary>True while a betting window is actively counting down.</summary>
-        public bool IsBettingWindowActive => IsSpawned && NetIsBettingWindowActive;
-
-        /// <summary>Seconds left in the current betting window (0 when none is active).</summary>
-        public float BettingTimeRemaining => IsSpawned ? NetBettingTimeRemaining : 0f;
-
-        /// <summary>The name of the challenge currently up for betting (only meaningful while a window is active).</summary>
-        public string ActiveChallengeName => IsSpawned ? NetActiveChallengeName.ToString() : string.Empty;
-
-        /// <summary>The player id of the player who just claimed the active challenge (only meaningful while a window is active).</summary>
-        public ulong ActiveChallengerClientId => IsSpawned ? (ulong)Mathf.Max(0, NetActiveChallengerId) : 0;
-
-        /// <summary>Player ids of everyone who has placed a real wager (not a decline) during the current window.</summary>
-        public IEnumerable<ulong> ActiveBettorClientIds
-        {
-            get
-            {
-                if (!IsSpawned) yield break;
-                int count = Mathf.Clamp(NetBettorCount, 0, MaxBettors);
-                for (int i = 0; i < count; i++)
-                {
-                    yield return (ulong)NetBettorIds[i];
-                }
-            }
-        }
-
-        /// <summary>Raised on every client when <see cref="IsPaused"/> changes (previous, new).</summary>
-        public event Action<bool, bool> PausedChanged;
-
-        /// <summary>Raised on every client when <see cref="IsBettingWindowActive"/> changes (previous, new).</summary>
-        public event Action<bool, bool> BettingWindowActiveChanged;
-
-        /// <summary>Raised on every client when <see cref="BettingTimeRemaining"/> changes (previous, new).</summary>
-        public event Action<float, float> BettingTimeRemainingChanged;
-
-        /// <summary>Raised on every client when the list of bettors changes.</summary>
-        public event Action ActiveBettorsChanged;
-
-        // Last values seen by this client - for the change events above.
-        private bool m_LastIsPaused;
-        private bool m_LastIsBettingWindowActive;
-        private float m_LastBettingTimeRemaining;
-        private int m_LastBettorsKey;
-
-        // Master-client-only bookkeeping - never networked directly, only reflected through the networked state above.
-        private ChallengeZone m_BettingWindowZone;
-        private readonly Dictionary<ulong, ChallengeZone> m_RunningAttemptsByOwner = new Dictionary<ulong, ChallengeZone>();
-
-        // Every ChallengeZone in this scene, in a stable order all clients agree on (see GetZoneIndex).
-        private List<ChallengeZone> m_Zones;
+        // Every ChallengeCourse in this scene, in a stable order all clients agree on (see GetCourseIndex).
+        private List<ChallengeCourse> m_Courses;
 
         #endregion
 
@@ -145,11 +74,6 @@ namespace Blocks.Gameplay.Core
             {
                 onStatDepletedEvent.RegisterListener(HandleAnyStatDepleted);
             }
-
-            m_LastIsPaused = NetIsPaused;
-            m_LastIsBettingWindowActive = NetIsBettingWindowActive;
-            m_LastBettingTimeRemaining = NetBettingTimeRemaining;
-            m_LastBettorsKey = BuildBettorsKey();
         }
 
         public override void OnNetworkDespawn()
@@ -165,36 +89,14 @@ namespace Blocks.Gameplay.Core
             if (Instance == this) Instance = null;
         }
 
-        public override void FixedUpdateNetwork()
-        {
-            if (!IsOwner || !NetIsBettingWindowActive) return;
-
-            float remaining = NetBettingTimeRemaining - Runner.DeltaTime;
-            if (remaining <= 0f)
-            {
-                NetBettingTimeRemaining = 0f;
-                CloseBettingWindow();
-            }
-            else
-            {
-                NetBettingTimeRemaining = remaining;
-            }
-        }
-
-        public override void Render()
-        {
-            DetectChanges();
-        }
-
         #endregion
 
         #region Death Penalty
 
         /// <summary>
         /// Fires for every player's every stat depletion, on every client (see CoreStatsHandler - the stat
-        /// events are raised wherever the change is seen). Only the master client applies the flat penalty
-        /// and, if that player is currently mid-attempt on some challenge, counts the death against their
-        /// death par too.
+        /// events are raised wherever the change is seen). Only the master client applies the flat penalty.
+        /// (Dying in a challenge also abandons it - the dying player's own LocalChallengeTracker reports that.)
         /// </summary>
         private void HandleAnyStatDepleted(StatDepletedPayload payload)
         {
@@ -202,86 +104,85 @@ namespace Blocks.Gameplay.Core
             if (payload.statID != StatKeys.Health) return;
 
             if (!PracticeMode.IsActive) GetPlayerScore(payload.playerId)?.AddScore(-deathPenalty); // no penalty in practice
-
-            if (m_RunningAttemptsByOwner.TryGetValue(payload.playerId, out var zone))
-            {
-                zone.RecordDeath();
-            }
         }
 
         #endregion
 
-        #region Challenge Ownership & Betting Window
+        #region Challenge runs
 
-        /// <summary>
-        /// Called by a ChallengeZone (via its ChallengeZoneTrigger) on the entering player's own machine
-        /// when they walk (or jump) into that challenge's start or finish volume. Forwarded to the master
-        /// client, which decides what happens - claiming the challenge, or resolving it, are both global
-        /// decisions (only one betting window can run at a time), not the zone's alone.
-        /// </summary>
-        public void RequestZoneEntry(ChallengeZone zone, ChallengeZoneKind kind)
+        /// <summary>This machine's player passed through <paramref name="course"/>'s start flag.</summary>
+        public void ReportRunStarted(ChallengeCourse course)
         {
-            if (!IsSpawned || zone == null) return;
+            int index = ResolveIndex(course);
+            if (IsSpawned && index >= 0) RunStartedRpc(index);
+        }
 
-            int index = GetZoneIndex(zone);
-            if (index < 0)
-            {
-                Debug.LogWarning($"[ChallengeManager] '{zone.name}' isn't one of this scene's challenge zones.", zone);
-                return;
-            }
+        /// <summary>This machine's player passed through <paramref name="course"/>'s end flag.</summary>
+        public void ReportRunCompleted(ChallengeCourse course)
+        {
+            int index = ResolveIndex(course);
+            if (IsSpawned && index >= 0) RunCompletedRpc(index);
+        }
 
-            RequestZoneEntryRpc(index, kind);
+        /// <summary>This machine's player left <paramref name="course"/> (or died in it) without finishing.</summary>
+        public void ReportRunAbandoned(ChallengeCourse course)
+        {
+            int index = ResolveIndex(course);
+            if (IsSpawned && index >= 0) RunAbandonedRpc(index);
         }
 
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        private void RequestZoneEntryRpc(int zoneIndex, ChallengeZoneKind kind, RpcInfo info = default)
+        private void RunStartedRpc(int courseIndex, RpcInfo info = default)
         {
-            ChallengeZone zone = GetZone(zoneIndex);
-            if (zone == null) return;
+            ulong player = SenderId(info);
+            if (GetCourse(courseIndex) == null) return;
+            if (!IsRoundOpenFor(player)) return;
+            if (m_Completed.Contains(Key(player, courseIndex))) return; // once per player per round
 
-            HandleZoneEntry(zone, kind, SenderId(info));
-        }
-
-        /// <summary>
-        /// The single decision point (master client only) for both halves of a challenge's lifecycle.
-        /// </summary>
-        public void HandleZoneEntry(ChallengeZone zone, ChallengeZoneKind kind, ulong clientId)
-        {
-            if (!IsOwner) return;
-
-            if (kind == ChallengeZoneKind.Start)
+            if (m_RunningCourseByPlayer.TryGetValue(player, out int previous))
             {
-                TryClaimChallenge(zone, clientId);
+                if (previous == courseIndex) return;
+                EndRun(player); // a missed "left" (shouldn't happen - squares don't overlap)
             }
-            else
-            {
-                if (zone.IsOwnedAndInProgressBy(clientId))
-                {
-                    ResolveAttempt(zone);
-                }
-            }
+
+            m_RunningCourseByPlayer[player] = courseIndex;
+            if (WagerManager.Instance != null) WagerManager.Instance.OnChallengeStarted(player);
+            PlayerChallengeStateRpc((int)player, true);
         }
 
-        private void TryClaimChallenge(ChallengeZone zone, ulong challengerId)
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RunCompletedRpc(int courseIndex, RpcInfo info = default)
         {
-            if (!IsRoundOpenFor(challengerId)) return; // round over, or this player already reached the end point
-            if (zone.HasOwner) return; // first come, first served
-            if (zone.HasCompletedThisRound) return; // once and only once per round - see ChallengeZone.HasCompletedThisRound
-            if (m_RunningAttemptsByOwner.ContainsKey(challengerId)) return; // already mid-attempt elsewhere
+            ulong player = SenderId(info);
+            ChallengeCourse course = GetCourse(courseIndex);
+            bool wasRunning = EndRun(player);
+            if (course == null || !IsRoundOpenFor(player)) return;
 
-            zone.Claim(challengerId);
+            // Forgiving about a start this master never heard of (it may have only just taken over), but never
+            // twice for the same player and challenge.
+            if (!m_Completed.Add(Key(player, courseIndex))) return;
+            if (!wasRunning) Debug.Log($"[ChallengeManager] Player {player} completed challenge {courseIndex} without a recorded start (master change?) - awarding it anyway.", this);
 
-            // Wagers no longer pause the game (2026-10-06): the attempt starts straight away, and the wager
-            // ticker (WagerManager) may now offer challenge-only wagers about this player. The old betting
-            // window below (CloseBettingWindow / PlaceBet) is no longer opened.
-            zone.BeginAttempt();
-            m_RunningAttemptsByOwner[challengerId] = zone;
-            if (WagerManager.Instance != null) WagerManager.Instance.OnChallengeStarted(challengerId);
-            PlayerChallengeStateRpc((int)challengerId, true);
+            int points = PracticeMode.IsActive ? 0 : course.Points; // the practice score only counts pickups
+            if (points != 0) GetPlayerScore(player)?.AddScore(points);
+            ChallengeCompletedRpc((int)player, courseIndex, points);
         }
 
-        /// <summary>Raised on every client when a player starts (true) or finishes (false) a challenge attempt.</summary>
-        public static event Action<ulong, bool> PlayerChallengeStateChanged;
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RunAbandonedRpc(int courseIndex, RpcInfo info = default)
+        {
+            ulong player = SenderId(info);
+            if (m_RunningCourseByPlayer.TryGetValue(player, out int running) && running == courseIndex) EndRun(player);
+        }
+
+        /// <summary>Master: forgets this player's current run, settles their challenge wagers and tells everyone. False if they weren't in one.</summary>
+        private bool EndRun(ulong player)
+        {
+            if (!m_RunningCourseByPlayer.Remove(player)) return false;
+            if (WagerManager.Instance != null) WagerManager.Instance.OnChallengeEnded(player);
+            PlayerChallengeStateRpc((int)player, false);
+            return true;
+        }
 
         [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
         private void PlayerChallengeStateRpc(int playerId, NetworkBool inChallenge)
@@ -289,91 +190,16 @@ namespace Blocks.Gameplay.Core
             PlayerChallengeStateChanged?.Invoke((ulong)playerId, inChallenge);
         }
 
-        /// <summary>Master client only: whether this player is in the middle of a challenge attempt.</summary>
-        public bool IsPlayerInChallenge(ulong playerId) => m_RunningAttemptsByOwner.ContainsKey(playerId);
-
-        private void CloseBettingWindow()
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void ChallengeCompletedRpc(int playerId, int courseIndex, int points)
         {
-            NetIsBettingWindowActive = false;
-            NetIsPaused = false;
-
-            if (m_BettingWindowZone != null)
-            {
-                m_BettingWindowZone.BeginAttempt();
-                m_RunningAttemptsByOwner[m_BettingWindowZone.OwnerId] = m_BettingWindowZone;
-            }
-
-            m_BettingWindowZone = null;
-            DetectChanges();
+            ChallengeCompleted?.Invoke((ulong)playerId, courseIndex, points);
         }
 
-        /// <summary>
-        /// Called by CoreHUD when the local (non-challenger) player picks one of the three betting options.
-        /// Sent to the master client, which records it. Declining is free; Success/Failure immediately
-        /// costs the challenge's base points, win or lose.
-        /// </summary>
-        public void PlaceBet(ChallengeBetChoice choice)
-        {
-            if (!IsSpawned) return;
-            PlaceBetRpc(choice);
-        }
+        /// <summary>Master client only: whether this player is in the middle of a challenge run.</summary>
+        public bool IsPlayerInChallenge(ulong playerId) => m_RunningCourseByPlayer.ContainsKey(playerId);
 
-        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        private void PlaceBetRpc(ChallengeBetChoice choice, RpcInfo info = default)
-        {
-            ulong bettorId = SenderId(info);
-
-            if (!NetIsBettingWindowActive || m_BettingWindowZone == null) return;
-            if (bettorId == ActiveChallengerClientId) return; // can't bet on yourself
-            if (!IsRoundOpenFor(bettorId)) return; // finished players (and everyone, once the round is over) can't wager
-
-            var bettorScore = GetPlayerScore(bettorId);
-            if (bettorScore == null) return;
-
-            bool wagered = m_BettingWindowZone.TryRecordBet(bettorId, choice, bettorScore.Score);
-            if (!wagered) return;
-
-            int cost = m_BettingWindowZone.Definition != null ? m_BettingWindowZone.Definition.basePoints : 0;
-            bettorScore.AddScore(-cost);
-            AddBettor(bettorId);
-            DetectChanges();
-        }
-
-        #endregion
-
-        #region Resolution
-
-        private void ResolveAttempt(ChallengeZone zone)
-        {
-            ulong ownerId = zone.OwnerId;
-            ChallengeDefinition definition = zone.Definition;
-            var bets = new Dictionary<ulong, ChallengeBetChoice>(zone.Bets);
-
-            (bool underDeathPar, bool underTimePar) = zone.CompleteAttempt();
-
-            int reward = definition != null ? definition.basePoints : 0;
-            if (definition != null)
-            {
-                if (underDeathPar) reward += definition.parDeathBonus;
-                if (underTimePar) reward += definition.parTimeBonus;
-            }
-            GetPlayerScore(ownerId)?.AddScore(reward);
-
-            ChallengeBetChoice winningChoice = (underDeathPar && underTimePar) ? ChallengeBetChoice.Success : ChallengeBetChoice.Failure;
-            int payout = definition != null ? definition.basePoints * betPayoutMultiplier : 0;
-            foreach (var bet in bets)
-            {
-                if (bet.Value != winningChoice) continue;
-                GetPlayerScore(bet.Key)?.AddScore(payout);
-            }
-
-            m_RunningAttemptsByOwner.Remove(ownerId);
-            zone.ResetToIdle();
-
-            // Settle this player's challenge-only wagers now that the challenge is over.
-            if (WagerManager.Instance != null) WagerManager.Instance.OnChallengeEnded(ownerId);
-            PlayerChallengeStateRpc((int)ownerId, false);
-        }
+        private static long Key(ulong player, int courseIndex) => ((long)player << 16) | (uint)(courseIndex & 0xFFFF);
 
         #endregion
 
@@ -381,69 +207,86 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>
         /// Practice Challenges' quick Retry (master client - the only player in a practice session): every
-        /// challenge becomes claimable again and any attempt in progress is dropped, as if the run had never
-        /// started. Players mid-attempt are told they've left their challenge.
+        /// challenge can be completed again and any run in progress is dropped, as if it had never started.
         /// </summary>
         public void ResetForPracticeRetry()
         {
             if (!IsOwner) return;
 
-            foreach (ulong playerId in new List<ulong>(m_RunningAttemptsByOwner.Keys))
+            foreach (ulong player in new List<ulong>(m_RunningCourseByPlayer.Keys))
             {
-                PlayerChallengeStateRpc((int)playerId, false);
+                EndRun(player);
             }
-            m_RunningAttemptsByOwner.Clear();
+            m_Completed.Clear();
 
-            EnsureZones();
-            foreach (ChallengeZone zone in m_Zones)
-            {
-                if (zone != null) zone.ResetForNewRound();
-            }
+            if (LocalChallengeTracker.Local != null) LocalChallengeTracker.Local.ResetAll();
+            ResetCoursesRpc();
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void ResetCoursesRpc()
+        {
+            if (LocalChallengeTracker.Local != null) LocalChallengeTracker.Local.ResetAll();
         }
 
         #endregion
 
-        #region Zones
+        #region Courses
 
         /// <summary>
-        /// This zone's index in the scene's ChallengeZones, sorted by hierarchy path so every client
-        /// computes the same index for the same zone (the scene is identical on every client).
-        /// </summary>
-        /// <summary>
-        /// Forgets the cached zone list so it's rebuilt on next use. MatchLayout calls this on every client
-        /// once it has placed the match's challenges (their zones don't exist when the scene first loads).
+        /// Forgets the cached course list so it's rebuilt on next use. MatchLayout calls this on every client
+        /// once it has placed the match's challenges (they don't exist when the scene first loads). On the
+        /// master it also clears the run records (only Practice's Change Challenge rebuilds mid-session).
         /// </summary>
         public void RefreshZones()
         {
-            m_Zones = null;
+            m_Courses = null;
+            m_RunningCourseByPlayer.Clear();
+            m_Completed.Clear();
+            EnsureCourses();
         }
 
-        public int GetZoneIndex(ChallengeZone zone)
+        /// <summary>This course's index (the same on every client), or -1.</summary>
+        public int GetCourseIndex(ChallengeCourse course)
         {
-            EnsureZones();
-            return m_Zones.IndexOf(zone);
+            EnsureCourses();
+            return course != null ? m_Courses.IndexOf(course) : -1;
         }
 
-        private ChallengeZone GetZone(int index)
+        /// <summary>The course at <paramref name="index"/>, or null.</summary>
+        public ChallengeCourse GetCourse(int index)
         {
-            EnsureZones();
-            return index >= 0 && index < m_Zones.Count ? m_Zones[index] : null;
+            EnsureCourses();
+            return index >= 0 && index < m_Courses.Count ? m_Courses[index] : null;
         }
 
-        private void EnsureZones()
+        private int ResolveIndex(ChallengeCourse course)
         {
-            if (m_Zones != null) return;
-
-            m_Zones = new List<ChallengeZone>();
-            foreach (ChallengeZone zone in FindObjectsByType<ChallengeZone>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            int index = GetCourseIndex(course);
+            if (index < 0 && course != null)
             {
-                if (zone.gameObject.scene == gameObject.scene) m_Zones.Add(zone);
+                m_Courses = null; // made after the last refresh - look again
+                index = GetCourseIndex(course);
+            }
+            if (index < 0 && course != null) Debug.LogWarning($"[ChallengeManager] '{course.name}' isn't one of this scene's challenges.", course);
+            return index;
+        }
+
+        private void EnsureCourses()
+        {
+            if (m_Courses != null && !m_Courses.Exists(c => c == null)) return;
+
+            m_Courses = new List<ChallengeCourse>();
+            foreach (ChallengeCourse course in ChallengeCourse.All)
+            {
+                if (course != null && course.gameObject.scene == gameObject.scene) m_Courses.Add(course);
             }
 
-            m_Zones.Sort((a, b) => string.CompareOrdinal(GetHierarchyKey(a.transform), GetHierarchyKey(b.transform)));
+            m_Courses.Sort((a, b) => string.CompareOrdinal(GetHierarchyKey(a.transform), GetHierarchyKey(b.transform)));
+            for (int i = 0; i < m_Courses.Count; i++) m_Courses[i].Index = i;
         }
 
-        /// <summary>Root-to-leaf sibling indices plus names, e.g. "0003:Map/0012:challenge_16_01" - unique and identical on every client.</summary>
+        /// <summary>Root-to-leaf sibling indices plus names, e.g. "0003:MatchLayout/0000:Challenges/0002:002_Challenge_16_05" - unique and identical on every client.</summary>
         private static string GetHierarchyKey(Transform transform)
         {
             var parts = new List<string>();
@@ -454,6 +297,32 @@ namespace Blocks.Gameplay.Core
             parts.Reverse();
             return string.Join("/", parts);
         }
+
+        #endregion
+
+        #region Old betting window (never opened since the wager ticker - kept for CoreHUD)
+
+        /// <summary>Always false: nothing pauses the game for bets any more (ChallengePauseGate reads this).</summary>
+        public bool IsPaused => false;
+
+        /// <summary>Always false (see the region name).</summary>
+        public bool IsBettingWindowActive => false;
+
+        public float BettingTimeRemaining => 0f;
+        public float BettingWindowSeconds => 5f;
+        public string ActiveChallengeName => string.Empty;
+        public ulong ActiveChallengerClientId => 0;
+        public IEnumerable<ulong> ActiveBettorClientIds { get { yield break; } }
+
+#pragma warning disable 0067 // never raised - the overlay they drive is never opened
+        public event Action<bool, bool> PausedChanged;
+        public event Action<bool, bool> BettingWindowActiveChanged;
+        public event Action<float, float> BettingTimeRemainingChanged;
+        public event Action ActiveBettorsChanged;
+#pragma warning restore 0067
+
+        /// <summary>Does nothing (the old betting overlay's buttons).</summary>
+        public void PlaceBet(ChallengeBetChoice choice) { }
 
         #endregion
 
@@ -477,72 +346,6 @@ namespace Blocks.Gameplay.Core
             // An RPC the master client sends to itself runs locally - the sender is then this client.
             ulong id = NetworkPlayers.ToClientId(info.Source);
             return id != 0 ? id : NetworkPlayers.ToClientId(Runner.LocalPlayer);
-        }
-
-        private void AddBettor(ulong bettorId)
-        {
-            int count = Mathf.Clamp(NetBettorCount, 0, MaxBettors);
-            for (int i = 0; i < count; i++)
-            {
-                if ((ulong)NetBettorIds[i] == bettorId) return;
-            }
-            if (count >= MaxBettors) return;
-
-            NetBettorIds.Set(count, (int)bettorId);
-            NetBettorCount = count + 1;
-        }
-
-        /// <summary>A cheap fingerprint of the challenger + bettor list, to notice when it changes without allocating.</summary>
-        private int BuildBettorsKey()
-        {
-            if (!IsSpawned) return 0;
-            unchecked
-            {
-                int count = Mathf.Clamp(NetBettorCount, 0, MaxBettors);
-                int key = NetActiveChallengerId * 397 + count;
-                for (int i = 0; i < count; i++)
-                {
-                    key = key * 31 + NetBettorIds[i];
-                }
-                return key;
-            }
-        }
-
-        /// <summary>Raises the change events for any networked value that changed since this client last looked.</summary>
-        private void DetectChanges()
-        {
-            if (!IsSpawned) return;
-
-            bool isPaused = NetIsPaused;
-            if (isPaused != m_LastIsPaused)
-            {
-                bool previous = m_LastIsPaused;
-                m_LastIsPaused = isPaused;
-                PausedChanged?.Invoke(previous, isPaused);
-            }
-
-            bool isActive = NetIsBettingWindowActive;
-            if (isActive != m_LastIsBettingWindowActive)
-            {
-                bool previous = m_LastIsBettingWindowActive;
-                m_LastIsBettingWindowActive = isActive;
-                BettingWindowActiveChanged?.Invoke(previous, isActive);
-            }
-
-            float timeRemaining = NetBettingTimeRemaining;
-            if (!Mathf.Approximately(timeRemaining, m_LastBettingTimeRemaining))
-            {
-                float previous = m_LastBettingTimeRemaining;
-                m_LastBettingTimeRemaining = timeRemaining;
-                BettingTimeRemainingChanged?.Invoke(previous, timeRemaining);
-            }
-
-            int bettorsKey = BuildBettorsKey();
-            if (bettorsKey != m_LastBettorsKey)
-            {
-                m_LastBettorsKey = bettorsKey;
-                ActiveBettorsChanged?.Invoke();
-            }
         }
 
         #endregion

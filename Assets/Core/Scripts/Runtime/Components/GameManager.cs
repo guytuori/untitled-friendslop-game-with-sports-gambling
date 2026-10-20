@@ -73,6 +73,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private SoundDef respawnTimerSFX;
 
         private bool m_HasSpawnedLocalPlayer;
+        private float m_LocalSpawnYaw = float.NaN; // which way the local avatar was spawned facing, for its camera
         private bool m_ListeningForDeath;
         private bool m_Exiting;
 
@@ -175,6 +176,7 @@ namespace Blocks.Gameplay.Core
             int index = GetRandomSpawnIndex();
             Vector3 position = GetSpawnPositionForIndex(index);
             Quaternion rotation = TryGetSpawnTransform(index, out Transform spawnTransform) ? SpawnRotation(spawnTransform) : Quaternion.identity;
+            m_LocalSpawnYaw = spawnTransform != null ? rotation.eulerAngles.y : float.NaN; // the camera faces the same way (HandleLocalPlayerSpawned)
 
             NetworkObject avatar = runner.Spawn(playerPrefab, position, rotation, runner.LocalPlayer,
                 flags: NetworkSpawnFlags.SharedModeStateAuthLocalPlayer);
@@ -195,6 +197,14 @@ namespace Blocks.Gameplay.Core
         private void HandleLocalPlayerSpawned(CorePlayerManager localPlayer)
         {
             if (localPlayer == null) return;
+
+            // The avatar spawns facing the end point (SpawnRotation), but the camera's look angle was taken from
+            // the prefab's rotation when it was created - point the camera the same way as the player.
+            if (!float.IsNaN(m_LocalSpawnYaw) && localPlayer.CoreCamera != null)
+            {
+                localPlayer.CoreCamera.ResetLook(m_LocalSpawnYaw);
+                m_LocalSpawnYaw = float.NaN;
+            }
             StartCoroutine(SetUpLocalPlayer(localPlayer));
         }
 

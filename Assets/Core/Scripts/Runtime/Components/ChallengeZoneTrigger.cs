@@ -3,14 +3,14 @@ using UnityEngine;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// Sits on one challenge's start (or finish) trigger volume - an invisible BoxCollider covering that
-    /// tile area's full airspace, not just its walkable floor, so "pass overhead while jumping" counts the
-    /// same as walking through it. See MapColliderSetup, which creates one of these alongside the normal
-    /// walkable collider for any submesh whose material is named "start" or "finish".
+    /// The old start / finish trigger volume of a challenge (an invisible BoxCollider over the tagged tile's
+    /// footprint, made by Set Object Property > Challenge Start / Finish - see MapObjectPropertySetup).
     ///
-    /// Only reports the LOCAL player's own entry (checks CorePlayerManager.IsOwner) - every machine simulates
-    /// every player's collider, so without that check this would fire once per observing machine instead
-    /// of once, for the wrong player half the time.
+    /// No longer used to run challenges (2026-10-17): a challenge now starts when the player runs through its
+    /// start flag and ends at its end flag (see <see cref="ChallengeCourse"/>), so entering from the side
+    /// doesn't count. ChallengeCourse switches these trigger colliders off when it sets a challenge up; the
+    /// component stays only so the challenge prefabs keep their data (<see cref="Zone"/> tells which
+    /// ChallengeZone - and so which points - belong to the start).
     /// </summary>
     [RequireComponent(typeof(Collider))]
     public class ChallengeZoneTrigger : MonoBehaviour
@@ -18,20 +18,17 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private ChallengeZone zone;
         [SerializeField] private ChallengeZoneKind kind;
 
-        /// <summary>Wires this trigger to its owning ChallengeZone. Called once by MapColliderSetup.</summary>
+        /// <summary>The ChallengeZone this volume was wired to.</summary>
+        public ChallengeZone Zone => zone;
+
+        /// <summary>Start or Finish.</summary>
+        public ChallengeZoneKind Kind => kind;
+
+        /// <summary>Wires this trigger to its owning ChallengeZone. Called once by MapObjectPropertySetup / MapColliderSetup.</summary>
         public void Configure(ChallengeZone owningZone, ChallengeZoneKind zoneKind)
         {
             zone = owningZone;
             kind = zoneKind;
-        }
-
-        private void OnTriggerEnter(Collider other)
-        {
-            if (zone == null) return;
-            if (!other.TryGetComponent(out CorePlayerManager player)) return;
-            if (!player.IsOwner) return;
-
-            zone.ReportLocalPlayerEntered(kind);
         }
     }
 }

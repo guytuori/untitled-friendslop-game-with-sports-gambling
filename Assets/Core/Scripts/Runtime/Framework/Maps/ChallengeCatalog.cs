@@ -41,6 +41,18 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Practice Map fills every 32x32 hole with this (the Challenge32 prefab).")]
         [SerializeField] private GameObject practice32;
 
+        [Header("Start / end flags (see ChallengeCourse)")]
+        [Tooltip("Challenge16StartFlag: shown over a 16x16 challenge's start row until the local player has completed it.")]
+        [SerializeField] private GameObject startFlag16;
+        [Tooltip("Challenge16EndFlag: shown over a 16x16 challenge's finish row while the local player is in it.")]
+        [SerializeField] private GameObject endFlag16;
+        [Tooltip("Challenge32StartFlag.")]
+        [SerializeField] private GameObject startFlag32;
+        [Tooltip("Challenge32EndFlag.")]
+        [SerializeField] private GameObject endFlag32;
+        [Tooltip("The see-through material the flags are drawn with (its Base Color alpha is the flags' opacity; each flag texture gets a copy). Made once by MatchCatalogBuilder, then left alone so it can be tuned.")]
+        [SerializeField] private Material flagMaterial;
+
         private static ChallengeCatalog s_Loaded;
 
         public IReadOnlyList<Entry> Challenges => challenges;
@@ -57,6 +69,16 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>The plain piece Practice Map puts in a hole of this size (null if there isn't one).</summary>
         public GameObject GetPracticePiece(int size) => size == 16 ? practice16 : size == 32 ? practice32 : null;
+
+        /// <summary>The start and end flag prefabs for a challenge of this size (either may be null).</summary>
+        public void GetFlags(int size, out GameObject startFlag, out GameObject endFlag)
+        {
+            startFlag = size == 32 ? startFlag32 : size == 16 ? startFlag16 : null;
+            endFlag = size == 32 ? endFlag32 : size == 16 ? endFlag16 : null;
+        }
+
+        /// <summary>The see-through material the flags are drawn with (null if the lists haven't been rebuilt since it was added).</summary>
+        public Material FlagMaterial => flagMaterial;
 
         /// <summary>The index of the challenge with this id (its prefab file name), or -1.</summary>
         public int IndexOf(string id)
@@ -117,6 +139,16 @@ namespace Blocks.Gameplay.Core
         {
             practice16 = piece16;
             practice32 = piece32;
+        }
+
+        /// <summary>Editor only - used by MatchCatalogBuilder.</summary>
+        public void SetFlags(GameObject start16, GameObject end16, GameObject start32, GameObject end32, Material material)
+        {
+            startFlag16 = start16;
+            endFlag16 = end16;
+            startFlag32 = start32;
+            endFlag32 = end32;
+            flagMaterial = material;
         }
 #endif
     }

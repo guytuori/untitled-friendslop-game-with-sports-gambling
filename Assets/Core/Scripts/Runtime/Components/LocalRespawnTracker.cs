@@ -11,13 +11,13 @@ namespace Blocks.Gameplay.Core
     ///
     /// DEATH PLANE: falling more than <see cref="DeathPlaneMargin"/> meters below the lowest part of the map
     /// (the map and its challenges, measured once the map is built) kills the player - their health is
-    /// emptied, so it's a normal death (death penalty, death counted for challenge pars and wagers, the usual
-    /// respawn countdown).
+    /// emptied, so it's a normal death (death penalty, death counted for wagers, the usual respawn countdown).
     ///
     /// RESPAWN POINT (GameManager asks <see cref="TryGetRespawnPoint"/> when respawning):
-    ///   - in a challenge: the safe ground closest to where they went into that challenge (the last spot they
-    ///     stood on before walking into its start);
-    ///   - otherwise: the safe ground closest to where they died.
+    ///   - died in a challenge: the last safe spot they stood on before running through its start flag, in
+    ///     front of the flag (dying abandons the run, so they run through the flag again to retry);
+    ///   - otherwise: the safe ground closest to where they died, preferring spots that aren't inside a
+    ///     challenge (so nobody comes back halfway through one they never started).
     /// "Safe ground" = spots this player has actually stood on recently (sampled while grounded and able to
     /// move), so it never picks somewhere unreachable or mid-air. Falls back to a spawn point if there's
     /// nothing yet.
@@ -48,9 +48,9 @@ namespace Blocks.Gameplay.Core
         private float m_NextSampleTime;
         private SafeSpot? m_LastSafe;
 
-        private SafeSpot? m_PendingChallengeEntry;
-        private SafeSpot? m_ChallengeEntry;
+        private SafeSpot? m_ChallengeEntry; // where the current (or just-died-in) challenge run was entered from
         private bool m_InChallenge;
+        private bool m_RespawnAtEntry;      // died in a challenge: come back at its entrance
 
         private Vector3 m_DeathPosition;
         private bool m_HasDeathPosition;
@@ -76,16 +76,16 @@ namespace Blocks.Gameplay.Core
             m_Movement = m_Player != null ? m_Player.CoreMovement : GetComponent<CoreMovement>();
             Local = this;
 
-            ChallengeZone.LocalPlayerEntered += HandleLocalZoneEntered;
-            ChallengeManager.PlayerChallengeStateChanged += HandleChallengeStateChanged;
+            LocalChallengeTracker.RunStarted += HandleRunStarted;
+            LocalChallengeTracker.RunEnded += HandleRunEnded;
             if (m_Player != null && m_Player.PlayerState != null) m_Player.PlayerState.OnLifeStateChanged += HandleLifeStateChanged;
         }
 
         private void OnDestroy()
         {
             if (Local == this) Local = null;
-            ChallengeZone.LocalPlayerEntered -= HandleLocalZoneEntered;
-            ChallengeManager.PlayerChallengeStateChanged -= HandleChallengeStateChanged;
+            LocalChallengeTracker.RunStarted -= HandleRunStarted;
+            LocalChallengeTracker.RunEnded -= HandleRunEnded;
             if (m_Player != null && m_Player.PlayerState != null) m_Player.PlayerState.OnLifeStateChanged -= HandleLifeStateChanged;
         }
 
@@ -161,9 +161,9 @@ namespace Blocks.Gameplay.Core
             m_History.Clear();
             m_HistoryNext = 0;
             m_LastSafe = null;
-            m_PendingChallengeEntry = null;
             m_ChallengeEntry = null;
             m_InChallenge = false;
+            m_RespawnAtEntry = false;
             m_HasDeathPosition = false;
             m_NextSampleTime = 0f;
             m_KillY = float.NaN; // re-measured (the map may have changed - Change Challenge)
@@ -180,22 +180,56 @@ namespace Blocks.Gameplay.Core
             else
             {
                 m_Dying = false;
+                if (m_RespawnAtEntry)
+                {
+                    // Back (at the entrance, by TryGetRespawnPoint) - that run is over.
+                    m_RespawnAtEntry = false;
+                    if (!m_InChallenge) m_ChallengeEntry = null;
+                }
             }
         }
 
-        private void HandleLocalZoneEntered(ChallengeZone zone, ChallengeZoneKind kind)
+        private void HandleRunStarted(ChallengeCourse course)
         {
-            if (kind != ChallengeZoneKind.Start || m_InChallenge) return;
-            // Where they came from - claimed or not is only known once the master client answers.
-            m_PendingChallengeEntry = m_LastSafe ?? new SafeSpot { Position = transform.position, Yaw = transform.eulerAngles.y };
+            // The newest safe spot still in front of the start flag (the latest samples may already be past it).
+            SafeSpot? entry = LatestSafeSpot(course.IsBeforeStart);
+            m_ChallengeEntry = entry ?? m_LastSafe ?? new SafeSpot { Position = transform.position, Yaw = transform.eulerAngles.y };
+            m_InChallenge = true;
+            m_RespawnAtEntry = false;
         }
 
-        private void HandleChallengeStateChanged(ulong playerId, bool inChallenge)
+        private void HandleRunEnded(ChallengeCourse course, LocalChallengeTracker.EndReason reason)
         {
-            if (m_Player == null || playerId != m_Player.OwnerClientId) return;
-            m_InChallenge = inChallenge;
-            m_ChallengeEntry = inChallenge ? (m_PendingChallengeEntry ?? m_LastSafe) : null;
-            if (!inChallenge) m_PendingChallengeEntry = null;
+            m_InChallenge = false;
+            if (reason == LocalChallengeTracker.EndReason.Died) m_RespawnAtEntry = true;
+            else
+            {
+                m_RespawnAtEntry = false;
+                m_ChallengeEntry = null;
+            }
+        }
+
+        /// <summary>The most recently recorded safe spot that <paramref name="accept"/> likes, or null.</summary>
+        private SafeSpot? LatestSafeSpot(System.Func<Vector3, bool> accept)
+        {
+            int count = m_History.Count;
+            for (int i = 0; i < count; i++)
+            {
+                // Newest first: the ring buffer's newest entry is just before m_HistoryNext once it's full.
+                int index = count < HistorySize ? count - 1 - i : (m_HistoryNext - 1 - i + HistorySize) % HistorySize;
+                SafeSpot spot = m_History[index];
+                if (accept(spot.Position)) return spot;
+            }
+            return null;
+        }
+
+        private static bool IsInsideAnyChallenge(Vector3 position)
+        {
+            foreach (ChallengeCourse course in ChallengeCourse.All)
+            {
+                if (course != null && course.Contains(position, 0f)) return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -208,24 +242,29 @@ namespace Blocks.Gameplay.Core
             rotation = Quaternion.identity;
 
             SafeSpot? chosen = null;
-            if (m_InChallenge && m_ChallengeEntry.HasValue)
+            if ((m_InChallenge || m_RespawnAtEntry) && m_ChallengeEntry.HasValue)
             {
                 chosen = m_ChallengeEntry;
             }
             else if (m_History.Count > 0)
             {
                 Vector3 target = m_HasDeathPosition ? m_DeathPosition : transform.position;
-                float best = float.MaxValue;
-                foreach (SafeSpot spot in m_History)
+                // First pass: only spots outside every challenge; if there are none, any spot.
+                for (int pass = 0; pass < 2 && !chosen.HasValue; pass++)
                 {
-                    if (WaterVolume.All.Count > 0 && WaterVolume.IsInWater(spot.Position + Vector3.up * WaterVolume.DeathDepth)) continue;
-                    Vector3 d = spot.Position - target;
-                    // Sideways distance matters most (a fall is straight down); height breaks ties.
-                    float score = d.x * d.x + d.z * d.z + 0.1f * d.y * d.y;
-                    if (score < best)
+                    float best = float.MaxValue;
+                    foreach (SafeSpot spot in m_History)
                     {
-                        best = score;
-                        chosen = spot;
+                        if (WaterVolume.All.Count > 0 && WaterVolume.IsInWater(spot.Position + Vector3.up * WaterVolume.DeathDepth)) continue;
+                        if (pass == 0 && IsInsideAnyChallenge(spot.Position)) continue;
+                        Vector3 d = spot.Position - target;
+                        // Sideways distance matters most (a fall is straight down); height breaks ties.
+                        float score = d.x * d.x + d.z * d.z + 0.1f * d.y * d.y;
+                        if (score < best)
+                        {
+                            best = score;
+                            chosen = spot;
+                        }
                     }
                 }
             }

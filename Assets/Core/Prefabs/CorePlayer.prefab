@@ -681,6 +681,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.DoubleJumpAddon
   doubleJumpHeight: 5
   staminaCost: 0
+  maxDoubleJumps: 0
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!114 &5505897753791863388
 MonoBehaviour:

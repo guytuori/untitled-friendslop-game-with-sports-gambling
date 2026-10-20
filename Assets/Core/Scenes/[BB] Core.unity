@@ -910,8 +910,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.ChallengeManager
   deathPenalty: 50
   onStatDepletedEvent: {fileID: 11400000, guid: aced99a6f7f354e5c87c8fab171c4c31, type: 2}
-  bettingWindowSeconds: 5
-  betPayoutMultiplier: 3
 --- !u!114 &1784796491
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -193,6 +193,9 @@ namespace Blocks.Gameplay.Core
                 m_SubscribedChallengeManager.ActiveBettorsChanged += HandleActiveBettorsChanged;
                 RefreshChallengeOverlay();
             }
+
+            ChallengeManager.ChallengeCompleted -= HandleChallengeCompleted;
+            ChallengeManager.ChallengeCompleted += HandleChallengeCompleted;
         }
 
         /// <summary>
@@ -246,6 +249,7 @@ namespace Blocks.Gameplay.Core
                     m_SubscribedChallengeManager.ActiveBettorsChanged -= HandleActiveBettorsChanged;
                     m_SubscribedChallengeManager = null;
                 }
+                ChallengeManager.ChallengeCompleted -= HandleChallengeCompleted;
 
                 ClearScoreboardRows();
             }
@@ -1041,6 +1045,29 @@ namespace Blocks.Gameplay.Core
                 AddNotification(bonusPoints > 0
                     ? Loc.F("{0} reached the end! +{1}", GetPlayerName(playerId), bonusPoints)
                     : Loc.F("{0} reached the end!", GetPlayerName(playerId)));
+            }
+        }
+
+        /// <summary>Someone completed a challenge (ChallengeManager): a notification, worded for this player or another.</summary>
+        private void HandleChallengeCompleted(ulong playerId, int courseIndex, int points)
+        {
+            if (this == null)
+            {
+                // Destroyed without despawning (a scene unload) - a static event would otherwise keep calling.
+                ChallengeManager.ChallengeCompleted -= HandleChallengeCompleted;
+                return;
+            }
+
+            if (playerId == OwnerClientId)
+            {
+                AddNotification(points > 0 ? Loc.F("Challenge complete! +{0}", points) : Loc.T("Challenge complete!"));
+                AudioVolumeService.PlayOneShot(GameSounds.ChallengeSuccess, AudioCategory.SoundEffects, Vector3.zero);
+            }
+            else
+            {
+                AddNotification(points > 0
+                    ? Loc.F("{0} completed a challenge! +{1}", GetPlayerName(playerId), points)
+                    : Loc.F("{0} completed a challenge!", GetPlayerName(playerId)));
             }
         }
 

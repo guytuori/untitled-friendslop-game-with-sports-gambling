@@ -167,6 +167,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3608899237777853521, guid: ae50dae0b66b0e64ba4f12011afedd5a, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 23.3
+      objectReference: {fileID: 0}
     - target: {fileID: 6427044552598843027, guid: ae50dae0b66b0e64ba4f12011afedd5a, type: 3}
       propertyPath: m_Name
       value: Challenge_16_06

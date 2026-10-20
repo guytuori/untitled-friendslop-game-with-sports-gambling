@@ -15,6 +15,15 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float doubleJumpHeight = 2.0f;
         [Tooltip("Optional stamina cost for the double jump.")]
         [SerializeField] private float staminaCost = 2f;
+        [Tooltip("How many double jumps the player gets before touching the ground again. -1 = unlimited. (Items like double jump boots can raise it at runtime through MaxDoubleJumps.)")]
+        [SerializeField] private int maxDoubleJumps = -1;
+
+        /// <summary>Double jumps allowed per time in the air; -1 = unlimited.</summary>
+        public int MaxDoubleJumps
+        {
+            get => maxDoubleJumps;
+            set => maxDoubleJumps = value;
+        }
 
         [Header("Input Events")]
         [Tooltip("Event raised when the jump button is pressed.")]
@@ -101,6 +110,9 @@ namespace Blocks.Gameplay.Core
             if (!m_IsActive || !IsOwner) return;
 
             if (m_CoreMovement == null) return;
+
+            // Out of double jumps until the player lands (maxDoubleJumps -1 = unlimited).
+            if (maxDoubleJumps >= 0 && m_doubleJumpedCount >= maxDoubleJumps) return;
 
             // Only allow double jump if airborne and haven't jumped yet
             //&& !m_HasDoubleJumped

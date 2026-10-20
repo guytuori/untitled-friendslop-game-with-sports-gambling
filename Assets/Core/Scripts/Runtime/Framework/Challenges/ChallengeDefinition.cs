@@ -3,32 +3,23 @@ using UnityEngine;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// The tunable parameters for one challenge (a "start" area to a "finish" line, like
-    /// test_jump_challenge_1) - its display name, how many points reaching the finish is worth, and its
-    /// two golf-style pars. Every <see cref="ChallengeZone"/> points at one of these, so a new challenge
-    /// map is fully parameterized just by creating a new asset and tweaking its fields - no code changes.
+    /// The tunable parameters for one challenge: its display name and how many points completing it is worth.
+    /// Every <see cref="ChallengeZone"/> points at one of these, so a challenge is parameterized just by
+    /// tweaking its asset - no code changes.
+    ///
+    /// Since 2026-10-17 the reward is flat: run through the start flag, reach the end flag, get
+    /// <see cref="basePoints"/> - once per player per round (see <see cref="ChallengeManager"/>). The old death
+    /// and time pars (and their bonuses) are gone; going fast just leaves more time for other challenges.
     /// </summary>
     [CreateAssetMenu(fileName = "NewChallengeDefinition", menuName = "Game Rules/Challenge Definition")]
     public class ChallengeDefinition : ScriptableObject
     {
         [Header("Identity")]
-        [Tooltip("Shown to players - e.g. in the betting overlay ('PlayerX is attempting <name>').")]
+        [Tooltip("The challenge's name (for logs and anything that wants to show it).")]
         public string challengeName = "New Challenge";
 
         [Header("Reward")]
-        [Tooltip("Points awarded to the challenge's owner just for reaching the finish line.")]
+        [Tooltip("Points every player gets for completing this challenge (each player once per round).")]
         public int basePoints = 100;
-
-        [Header("Death Par")]
-        [Tooltip("Reach the finish with fewer than this many deaths during the attempt to earn the bonus below.")]
-        public int parDeaths = 3;
-        [Tooltip("Bonus points awarded for beating the death par.")]
-        public int parDeathBonus = 25;
-
-        [Header("Time Par")]
-        [Tooltip("Reach the finish in under this many seconds (from when the attempt starts) to earn the bonus below.")]
-        public float parTimeSeconds = 10f;
-        [Tooltip("Bonus points awarded for beating the time par.")]
-        public int parTimeBonus = 25;
     }
 }
