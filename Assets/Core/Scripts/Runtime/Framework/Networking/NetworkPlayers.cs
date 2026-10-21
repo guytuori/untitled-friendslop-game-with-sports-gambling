@@ -143,6 +143,7 @@ namespace Blocks.Gameplay.Core
             LocalActionTracker.Attach(player); // owner only - counts this player's actions for wagers
             LocalRespawnTracker.Attach(player); // owner only - death plane and where to respawn
             LocalChallengeTracker.Attach(player); // owner only - start / end flags, challenge runs
+            LocalItemSlot.Attach(player); // owner only - the item slot (item boxes, shop item, Use Item)
 
             if (player.IsOwner)
             {

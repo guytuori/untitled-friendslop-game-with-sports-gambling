@@ -17,7 +17,8 @@ namespace Blocks.Gameplay.Core
     ///
     /// The starting score is the session's Starting Points rule from the Host Game screen (falling back to
     /// <see cref="gameRulesConfig"/> when the scene is played directly for testing), plus - from round 2 on -
-    /// the share of last round's final score this player keeps (MatchProgress.LocalCarryOverPoints).
+    /// the share of last round's final score this player keeps (MatchProgress.LocalCarryOverPoints), minus
+    /// the price of anything they bought in the between-rounds item shop (MatchProgress.LocalShopSpend).
     /// </summary>
     public class PlayerScore : CoreNetworkBehaviour, IPlayerRequiredComponent
     {
@@ -130,7 +131,8 @@ namespace Blocks.Gameplay.Core
             if (PracticeMode.IsActive) return 0; // practice: the score only counts pickups
 
             int startingPoints = MatchRules.Get(gameRulesConfig).StartingPoints;
-            return startingPoints + MatchProgress.LocalCarryOverPoints;
+            // Minus whatever this player spent in the between-rounds item shop (never below 0).
+            return Mathf.Max(0, startingPoints + MatchProgress.LocalCarryOverPoints - MatchProgress.TakeShopSpend());
         }
 
         private void DetectChanges()

@@ -1,0 +1,229 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2dd695bb3c573a499abc50d86cc07e2, type: 3}
+  m_Name: ItemCatalog
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.ItemCatalog
+  itemBoxModel: {fileID: 8771091787928289351, guid: 5e748517cca513043b4b2d350bbd5791, type: 3}
+  boxRespawnSeconds: 60
+  boxSize: 1.4
+  lowStandingMax: 0.34
+  highStandingMin: 0.67
+  shopOfferCount: 3
+  items:
+  - id: 1
+    displayName: Double Jump Boots
+    description: Double jump for 30 seconds.
+    kind: 1
+    durationSeconds: 30
+    boxChance: 20
+    inShop: 1
+    shopCost: 200
+    shopTier: 1
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.2, g: 0.55, b: 0.95, a: 1}
+  - id: 2
+    displayName: Triple Jump Boots
+    description: Triple jump for 15 seconds.
+    kind: 1
+    durationSeconds: 15
+    boxChance: 5
+    inShop: 1
+    shopCost: 200
+    shopTier: 3
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.1, g: 0.3, b: 0.85, a: 1}
+  - id: 3
+    displayName: Speed Boots
+    description: Run faster for 30 seconds.
+    kind: 1
+    durationSeconds: 30
+    boxChance: 20
+    inShop: 1
+    shopCost: 200
+    shopTier: 1
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.95, g: 0.55, b: 0.1, a: 1}
+  - id: 4
+    displayName: Super Speed Boots
+    description: Run a lot faster for 15 seconds.
+    kind: 1
+    durationSeconds: 15
+    boxChance: 5
+    inShop: 1
+    shopCost: 200
+    shopTier: 3
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.9, g: 0.25, b: 0.05, a: 1}
+  - id: 5
+    displayName: Small Points
+    description: 'Single use: gain 100 points straight away.'
+    kind: 0
+    durationSeconds: 0
+    boxChance: 20
+    inShop: 1
+    shopCost: 200
+    shopTier: 1
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.45, g: 0.75, b: 0.3, a: 1}
+  - id: 6
+    displayName: Medium Points
+    description: 'Single use: gain 300 points straight away.'
+    kind: 0
+    durationSeconds: 0
+    boxChance: 10
+    inShop: 1
+    shopCost: 200
+    shopTier: 2
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.25, g: 0.65, b: 0.2, a: 1}
+  - id: 7
+    displayName: Big Points
+    description: 'Single use: gain 500 points straight away.'
+    kind: 0
+    durationSeconds: 0
+    boxChance: 5
+    inShop: 1
+    shopCost: 200
+    shopTier: 3
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.95, g: 0.78, b: 0.15, a: 1}
+  - id: 8
+    displayName: 1-Up
+    description: 'Single use: gain a life if lives are limited; otherwise your next
+      death costs no points.'
+    kind: 0
+    durationSeconds: 0
+    boxChance: 5
+    inShop: 1
+    shopCost: 200
+    shopTier: 2
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.15, g: 0.7, b: 0.35, a: 1}
+  - id: 9
+    displayName: Teleport
+    description: 'Single use: teleports you to a random challenge you haven''t completed
+      yet, or to the end if you''ve done them all.'
+    kind: 0
+    durationSeconds: 0
+    boxChance: 10
+    inShop: 1
+    shopCost: 200
+    shopTier: 2
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.65, g: 0.25, b: 0.85, a: 1}
+  - id: 10
+    displayName: Jetpack
+    description: You get a jetpack for 15 seconds.
+    kind: 1
+    durationSeconds: 15
+    boxChance: 0
+    inShop: 1
+    shopCost: 200
+    shopTier: 3
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.55, g: 0.55, b: 0.6, a: 1}
+  - id: 11
+    displayName: Spring Shoes
+    description: You get a high jump for 30 seconds.
+    kind: 1
+    durationSeconds: 30
+    boxChance: 0
+    inShop: 1
+    shopCost: 200
+    shopTier: 1
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.3, g: 0.8, b: 0.75, a: 1}
+  - id: 12
+    displayName: Glider
+    description: You can glide after jumping for 30 seconds.
+    kind: 1
+    durationSeconds: 30
+    boxChance: 0
+    inShop: 1
+    shopCost: 200
+    shopTier: 2
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.45, g: 0.75, b: 0.95, a: 1}
+  - id: 13
+    displayName: Magnet Boots
+    description: You ignore slippery floors for 30 seconds.
+    kind: 1
+    durationSeconds: 30
+    boxChance: 0
+    inShop: 1
+    shopCost: 200
+    shopTier: 1
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.75, g: 0.2, b: 0.25, a: 1}
+  - id: 14
+    displayName: Stronger Arms
+    description: More launching power from poles for 30 seconds.
+    kind: 1
+    durationSeconds: 30
+    boxChance: 0
+    inShop: 1
+    shopCost: 200
+    shopTier: 2
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.85, g: 0.45, b: 0.35, a: 1}
+  - id: 15
+    displayName: Quadruple Jump Boots
+    description: Quadruple jump for 15 seconds.
+    kind: 1
+    durationSeconds: 15
+    boxChance: 0
+    inShop: 1
+    shopCost: 200
+    shopTier: 3
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.05, g: 0.15, b: 0.6, a: 1}
+  - id: 16
+    displayName: Slippery Boots
+    description: Every floor is slippery for 30 seconds - but challenges and pickups
+      are worth double.
+    kind: 1
+    durationSeconds: 30
+    boxChance: 0
+    inShop: 1
+    shopCost: 200
+    shopTier: 2
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.6, g: 0.85, b: 1, a: 1}
+  - id: 17
+    displayName: Gravity Boots
+    description: Triple gravity for 30 seconds - but challenges and pickups are worth
+      double.
+    kind: 1
+    durationSeconds: 30
+    boxChance: 0
+    inShop: 1
+    shopCost: 200
+    shopTier: 2
+    shopWeight: 1
+    icon: {fileID: 0}
+    color: {r: 0.35, g: 0.25, b: 0.5, a: 1}

@@ -37,7 +37,7 @@ namespace Blocks.Gameplay.Core
         public const int PracticePiecePick = -2;
 
         [Tooltip("Map prefab (file name in Assets/Core/Prefabs/Maps) used when this scene is played directly instead of through Host Game.")]
-        [SerializeField] private string devMapPrefab = "LastStop";
+        [SerializeField] private string devMapPrefab = "DinosaurZoo";
 
         /// <summary>The MatchLayout in the current gameplay scene, if any.</summary>
         public static MatchLayout Current { get; private set; }

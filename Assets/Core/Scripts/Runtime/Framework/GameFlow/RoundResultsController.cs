@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -18,7 +19,10 @@ namespace Blocks.Gameplay.Core
     /// scene again: same map, freshly randomized challenges, a higher target (Target Score Growth), and
     /// everyone starting from Starting Points plus 5% of their final score (see PlayerScore).
     ///
-    /// Later this is where between-round choices go (upgrades, voting on the next map, ...).
+    /// ITEM SHOP (when items are on): each player is offered three items, by how they placed last round (see
+    /// ItemCatalog.RollShop), paid for out of last round's score and taken off what they start the next round
+    /// with. Choosing an item or NO ITEM is what marks them ready (instead of any key); the item is in their
+    /// slot when the round starts (MatchProgress.LocalShopItem / LocalShopSpend).
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class RoundResultsController : MonoBehaviour
@@ -43,6 +47,8 @@ namespace Blocks.Gameplay.Core
         private bool m_Loading;
         private bool m_Exiting;
         private float m_ShownTime;
+        private bool m_ShopMode;
+        private ItemShopPanel m_Shop;
 
         private static NetworkRunner Runner => FusionSessionService.HasInstance ? FusionSessionService.Instance.GameRunner : null;
 
@@ -76,13 +82,19 @@ namespace Blocks.Gameplay.Core
             root.style.justifyContent = Justify.FlexStart;
             MenuUI.AddSmallLogo(root, titleImage);
 
+            NetworkRunner shopRunner = Runner;
+            m_ShopMode = MatchProgress.HasResults && MatchProgress.LastPassed && ItemManager.ItemsEnabled
+                         && shopRunner != null && shopRunner.IsRunning;
+
             var column = new VisualElement();
             column.style.position = Position.Absolute;
             column.style.top = Length.Percent(26);
             column.style.left = 0;
-            column.style.right = 0;
+            column.style.right = m_ShopMode ? Length.Percent(50) : 0; // the shop takes the right half
             column.style.alignItems = Align.Center;
             root.Add(column);
+
+            if (m_ShopMode) BuildShop(root, shopRunner);
 
             int round = MatchProgress.HasResults ? MatchProgress.LastRoundNumber : MatchProgress.RoundNumber - 1;
             column.Add(MakeLabel(Loc.F("ROUND {0} COMPLETE!", Mathf.Max(1, round)), 40, new Color(0.55f, 0.9f, 0.43f), bold: true));
@@ -107,7 +119,7 @@ namespace Blocks.Gameplay.Core
 
             column.Add(MakeLabel(Loc.F("Next round's target: {0}", MatchProgress.NextTeamTarget), 20, new Color(0.67f, 0.86f, 1f), bold: true));
 
-            m_Prompt = MakeLabel("Press any key to go to the next round", 18, Color.white, bold: false);
+            m_Prompt = MakeLabel(m_ShopMode ? Loc.T("Buy an item, or choose No Item, when you're ready for the next round") : "Press any key to go to the next round", 18, Color.white, bold: false);
             m_Prompt.style.position = Position.Absolute;
             m_Prompt.style.bottom = 90;
             m_Prompt.style.left = 0;
@@ -122,6 +134,42 @@ namespace Blocks.Gameplay.Core
             root.Add(m_ReadyLabel);
 
             RefreshReady();
+        }
+
+        private void BuildShop(VisualElement root, NetworkRunner runner)
+        {
+            float standing = MatchProgress.LocalStanding(runner.LocalPlayer.PlayerId);
+            int budget = Mathf.Max(0, MatchProgress.LastLocalFinalScore);
+            List<ItemDefinition> offer = ItemCatalog.RollShop(standing, new System.Random());
+            Debug.Log($"[ItemShop] Placing {standing:0.##} (1 = first) - offered: {string.Join(", ", offer.ConvertAll(i => $"{i.displayName} ({i.shopCost}, tier {i.shopTier})"))}. Budget {budget}.");
+
+            m_Shop = new ItemShopPanel(budget, offer, selectSound, m_ShownTime + inputDelaySeconds);
+            m_Shop.Chosen += HandleShopChoice;
+
+            var holder = m_Shop.Root;
+            holder.style.position = Position.Absolute;
+            holder.style.top = Length.Percent(22);
+            holder.style.left = Length.Percent(50);
+            holder.style.right = 0;
+            root.Add(holder);
+
+            holder.schedule.Execute(() => m_Shop?.FocusFirst()).ExecuteLater(50);
+        }
+
+        private void HandleShopChoice(ItemDefinition item)
+        {
+            if (m_Ready) return;
+            if (item != null)
+            {
+                MatchProgress.SetShopPurchase(item.id, item.shopCost);
+                Debug.Log($"[ItemShop] Bought {item.displayName} for {item.shopCost} - it'll be ready when the next round starts.");
+            }
+            else
+            {
+                MatchProgress.SetShopPurchase(ItemId.None, 0);
+                Debug.Log("[ItemShop] No item this time.");
+            }
+            BecomeReady(playSound: false);
         }
 
         private static Label MakeLabel(string text, int size, Color color, bool bold)
@@ -170,18 +218,10 @@ namespace Blocks.Gameplay.Core
         {
             NetworkRunner runner = Runner;
 
-            if (!m_Ready && Time.unscaledTime - m_ShownTime >= inputDelaySeconds && AnyInputPressed())
+            // With the shop open, choosing an item (or No Item) is what gets the player ready.
+            if (!m_Ready && !m_ShopMode && Time.unscaledTime - m_ShownTime >= inputDelaySeconds && AnyInputPressed())
             {
-                m_Ready = true;
-                MenuUI.PlaySound(selectSound);
-                if (runner != null && runner.IsRunning)
-                {
-                    MatchProgress.MarkReady(runner.LocalPlayer.PlayerId);
-                    MatchFlowSync.ReadyRpc(runner);
-                }
-                m_Prompt.text = "Ready! Waiting for everyone else...";
-                m_Prompt.style.visibility = Visibility.Visible;
-                RefreshReady();
+                BecomeReady(playSound: true);
             }
 
             // The master client starts the next round once everyone in the session is ready.
@@ -193,6 +233,22 @@ namespace Blocks.Gameplay.Core
                     m_Loading = false;
                 }
             }
+        }
+
+        private void BecomeReady(bool playSound)
+        {
+            if (m_Ready) return;
+            m_Ready = true;
+            if (playSound) MenuUI.PlaySound(selectSound);
+            NetworkRunner runner = Runner;
+            if (runner != null && runner.IsRunning)
+            {
+                MatchProgress.MarkReady(runner.LocalPlayer.PlayerId);
+                MatchFlowSync.ReadyRpc(runner);
+            }
+            m_Prompt.text = "Ready! Waiting for everyone else...";
+            m_Prompt.style.visibility = Visibility.Visible;
+            RefreshReady();
         }
 
         private static bool EveryoneReady(NetworkRunner runner)

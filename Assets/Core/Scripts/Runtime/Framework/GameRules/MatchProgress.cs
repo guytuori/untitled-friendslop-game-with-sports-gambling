@@ -57,10 +57,73 @@ namespace Blocks.Gameplay.Core
         /// <summary>Raised when someone's ready state changes on the Round Results screen.</summary>
         public static event Action ReadyChanged;
 
+        /// <summary>This player's own final score in the last round - their budget in the between-rounds item shop.</summary>
+        public static int LastLocalFinalScore { get; private set; }
+
+        /// <summary>The item this player bought in the between-rounds shop, waiting to be put in their slot (None if none).</summary>
+        public static ItemId LocalShopItem { get; private set; }
+
+        /// <summary>What it cost: taken off the points this player starts the next round with.</summary>
+        public static int LocalShopSpend { get; private set; }
+
+        /// <summary>Between-rounds shop: this player buys <paramref name="item"/> (None = No Item) for <paramref name="cost"/>.</summary>
+        public static void SetShopPurchase(ItemId item, int cost)
+        {
+            LocalShopItem = item;
+            LocalShopSpend = item == ItemId.None ? 0 : Math.Max(0, cost);
+        }
+
+        /// <summary>The bought item, once (LocalItemSlot puts it in the slot when the round starts).</summary>
+        public static ItemId TakeShopItem()
+        {
+            ItemId item = LocalShopItem;
+            LocalShopItem = ItemId.None;
+            return item;
+        }
+
+        /// <summary>The shop spend, once (PlayerScore takes it off the starting points).</summary>
+        public static int TakeShopSpend()
+        {
+            int spend = LocalShopSpend;
+            LocalShopSpend = 0;
+            return spend;
+        }
+
+        /// <summary>
+        /// How this player placed in the last round, 1 = first and 0 = last (players tied on score share the
+        /// better place; 0.5 if they were the only one). Used to pick which shop items they're offered.
+        /// </summary>
+        public static float LocalStanding(int localPlayerId)
+        {
+            int n = s_LastResults.Count;
+            if (n <= 1) return 0.5f;
+
+            int localScore = int.MinValue;
+            bool found = false;
+            foreach (RoundResultEntry entry in s_LastResults)
+            {
+                if (entry.PlayerId != localPlayerId) continue;
+                localScore = entry.Score;
+                found = true;
+                break;
+            }
+            if (!found) return 0.5f;
+
+            int better = 0;
+            foreach (RoundResultEntry entry in s_LastResults)
+            {
+                if (entry.Score > localScore) better++;
+            }
+            return 1f - better / (float)(n - 1);
+        }
+
         public static void Reset()
         {
             RoundNumber = 1;
             LocalCarryOverPoints = 0;
+            LastLocalFinalScore = 0;
+            LocalShopItem = ItemId.None;
+            LocalShopSpend = 0;
             HasResults = false;
             LastRoundNumber = 0;
             LastPassed = false;
@@ -95,6 +158,9 @@ namespace Blocks.Gameplay.Core
             LastTeamTotal = teamTotal;
             LastTeamTarget = teamTarget;
             NextTeamTarget = nextTeamTarget;
+            LastLocalFinalScore = localFinalScore;
+            LocalShopItem = ItemId.None; // a fresh shop for every round
+            LocalShopSpend = 0;
 
             s_LastResults.Clear();
             if (results != null) s_LastResults.AddRange(results);

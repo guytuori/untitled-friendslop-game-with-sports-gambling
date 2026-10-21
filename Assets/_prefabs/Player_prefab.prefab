@@ -810,6 +810,9 @@ MonoBehaviour:
   minTopSpeed: 3.5
   maxTopSpeed: 8
   staminaCostPerSecond: 8
+  minSpinSpeed: 6
+  maxSpinSpeed: 10
+  shimmySpeed: 2.5
   verticalLaunchScale: 1
   horizontalLaunchScale: 4
   launchUpBonus: 3

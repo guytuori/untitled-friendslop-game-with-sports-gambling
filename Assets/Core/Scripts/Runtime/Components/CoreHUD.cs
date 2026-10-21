@@ -54,6 +54,7 @@ namespace Blocks.Gameplay.Core
         private const float k_StaminaFloatHeight = 6f;
         private const float k_StaminaHideDelay = 0.6f;
         private WagerHUD m_WagerHUD;
+        private ItemHUD m_ItemHUD;
         private VisualElement m_ChallengeOverlay;
         private Label m_ChallengeTitleLabel;
         private Label m_ChallengeSubtitleLabel;
@@ -178,6 +179,13 @@ namespace Blocks.Gameplay.Core
                     m_WagerHUD = gameObject.AddComponent<WagerHUD>();
                     m_WagerHUD.Initialize(m_UIDocument.rootVisualElement, AddNotification);
                 }
+
+                // This player's item slot (bottom right, beside the phone) - only when items are on.
+                if (ItemManager.ItemsEnabled)
+                {
+                    m_ItemHUD = gameObject.AddComponent<ItemHUD>();
+                    m_ItemHUD.Initialize(m_UIDocument.rootVisualElement, besidePhone: m_WagerHUD != null);
+                }
             }
 
             if (PracticeMode.IsActive)
@@ -240,6 +248,12 @@ namespace Blocks.Gameplay.Core
                 {
                     Destroy(m_WagerHUD);
                     m_WagerHUD = null;
+                }
+
+                if (m_ItemHUD != null)
+                {
+                    Destroy(m_ItemHUD);
+                    m_ItemHUD = null;
                 }
 
                 if (m_SubscribedChallengeManager != null)

@@ -291,6 +291,16 @@ namespace Blocks.Gameplay.Core
             ["CAMERA ZOOM IN"] = new[] { "ACERCAR CÁMARA", "ZOOM AVANTI", "ZOOM AVANT", "HERANZOOMEN", "APROXIMAR CÂMERA" },
             ["CAMERA ZOOM OUT"] = new[] { "ALEJAR CÁMARA", "ZOOM INDIETRO", "ZOOM ARRIÈRE", "HERAUSZOOMEN", "AFASTAR CÂMERA" },
             ["{0} SECONDS REMAINING"] = new[] { "QUEDAN {0} SEGUNDOS", "{0} SECONDI RIMASTI", "{0} SECONDES RESTANTES", "NOCH {0} SEKUNDEN", "{0} SEGUNDOS RESTANTES" },
+            ["ITEM SHOP"] = new[] { "TIENDA DE OBJETOS", "NEGOZIO OGGETTI", "BOUTIQUE D'OBJETS", "ITEM-SHOP", "LOJA DE ITENS" },
+            ["You can spend up to {0} points (your score last round)."] = new[] { "Puedes gastar hasta {0} puntos (tu puntuación de la última ronda).", "Puoi spendere fino a {0} punti (il tuo punteggio dell'ultimo round).", "Tu peux dépenser jusqu'à {0} points (ton score de la dernière manche).", "Du kannst bis zu {0} Punkte ausgeben (deine Punktzahl der letzten Runde).", "Você pode gastar até {0} pontos (sua pontuação na última rodada)." },
+            ["The price comes off the points you start the next round with."] = new[] { "El precio se resta de los puntos con los que empiezas la siguiente ronda.", "Il prezzo viene tolto dai punti con cui inizi il prossimo round.", "Le prix est retiré des points avec lesquels tu commences la manche suivante.", "Der Preis wird von deinen Startpunkten der nächsten Runde abgezogen.", "O preço é descontado dos pontos com que você começa a próxima rodada." },
+            ["NO ITEM"] = new[] { "NINGÚN OBJETO", "NESSUN OGGETTO", "AUCUN OBJET", "KEIN ITEM", "NENHUM ITEM" },
+            ["{0} points"] = new[] { "{0} puntos", "{0} punti", "{0} points", "{0} Punkte", "{0} pontos" },
+            ["{0} points - not enough"] = new[] { "{0} puntos - no alcanza", "{0} punti - non bastano", "{0} points - pas assez", "{0} Punkte - nicht genug", "{0} pontos - não é suficiente" },
+            ["Lasts {0} s"] = new[] { "Dura {0} s", "Dura {0} s", "Dure {0} s", "Hält {0} s", "Dura {0} s" },
+            ["Single use"] = new[] { "Un solo uso", "Monouso", "Usage unique", "Einmalig", "Uso único" },
+            ["Buy an item, or choose No Item, when you're ready for the next round"] = new[] { "Compra un objeto, o elige Ningún objeto, cuando estés listo para la siguiente ronda", "Compra un oggetto, o scegli Nessun oggetto, quando sei pronto per il prossimo round", "Achète un objet, ou choisis Aucun objet, quand tu es prêt pour la manche suivante", "Kauf ein Item oder wähle Kein Item, wenn du bereit für die nächste Runde bist", "Compre um item, ou escolha Nenhum item, quando estiver pronto para a próxima rodada" },
+            ["Ready: {0}"] = new[] { "Listo: {0}", "Pronto: {0}", "Prêt : {0}", "Bereit: {0}", "Pronto: {0}" },
         };
     }
 }
