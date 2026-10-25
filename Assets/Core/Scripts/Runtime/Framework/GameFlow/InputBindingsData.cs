@@ -8,7 +8,7 @@ namespace Blocks.Gameplay.Core
     /// <summary>
     /// Keyboard+mouse commands that ChangeKeybindingsController stores here in settings.json rather than as
     /// Input System binding overrides, because they don't have an action in GameplayInputSystem_Actions
-    /// (yet): Interact, Use Item, the three Bet buttons, Dismiss Current Bet and Open Wagers Menu. The
+    /// (yet): Interact, Use Item, the three Bet buttons, Dismiss Current Bet and Open Item Menu. The
     /// commands that DO have a real action (Move, Jump, Parkour = Grab, Toggle Walk = Sprint, Open Escape
     /// Menu = Menu) are real binding overrides instead (see <see cref="InputBindingOverridesStore"/> below).
     /// See ChangeKeybindingsController for how each field maps to a row.
@@ -35,7 +35,9 @@ namespace Blocks.Gameplay.Core
         public string BetMultiplier = "3";
         public string DismissBet = "4";
 
-        public string OpenWagersMenu = "5";
+        // Practice modes only: the list of every item, to put one straight into the item slot (PracticeItemMenu).
+        // Was Open Wagers Menu until 2026-10-25 (renamed, so an old save of that key falls back to this default).
+        public string OpenItemMenu = "5";
 
         // The mouse wheel always zooms too (CoreCameraController); these are for holding a key instead.
         public string CameraZoomIn = "equals";
@@ -61,7 +63,7 @@ namespace Blocks.Gameplay.Core
         public string BetMultiplier = "buttonEast"; // right face button (A)
         public string DismissBet = "rightTrigger";  // R2
 
-        public string OpenWagersMenu = "select";    // Select (- on a Switch)
+        public string OpenItemMenu = "select";      // Select (- on a Switch) - practice item menu
 
         // Held to zoom the camera in / out (CoreCameraController). The right stick already aims.
         public string CameraZoomIn = "dpad/up";

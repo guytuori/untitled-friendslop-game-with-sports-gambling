@@ -7,7 +7,8 @@ namespace Blocks.Gameplay.Core
 {
     /// <summary>
     /// Pickups (Mario coins / Sonic rings): every <c>pickup</c> entity in the map and its challenges becomes a
-    /// floating, spinning <see cref="Pickup"/>. Running through one pops it, plays the coin sound and gives
+    /// floating, spinning <see cref="Pickup"/>. Running through one pops it, plays points.mp3 (GameSounds.Points;
+    /// the old Resources/Pickups/Coin.mp3 if that's missing) and gives
     /// <see cref="pointsPerPickup"/> points. Once someone has it, it's gone for everyone for the rest of the
     /// round (the next round reloads the scene, so they're all back).
     ///
@@ -276,7 +277,7 @@ namespace Blocks.Gameplay.Core
 
                 // Feels instant: gone and "ding" now; the master decides the points.
                 pickup.Hide(true);
-                AudioVolumeService.PlayOneShot(m_CoinSound, AudioCategory.SoundEffects, c);
+                AudioVolumeService.PlayOneShot(GameSounds.Points != null ? GameSounds.Points : m_CoinSound, AudioCategory.SoundEffects, c);
                 CollectRpc(pickup.Index);
             }
         }

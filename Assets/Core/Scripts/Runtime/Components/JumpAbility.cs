@@ -79,7 +79,8 @@ namespace Blocks.Gameplay.Core
 
                 // Calculate the required upward velocity to reach the desired jump height
                 // Using the kinematic equation: v^2 = u^2 + 2as, simplified to v = sqrt(-2gs)
-                float jumpVelocity = Mathf.Sqrt(m_Motor.jumpHeight * -2f * m_Motor.gravity);
+                // JumpHeightMultiplier: Spring Shoes (1 = normal).
+                float jumpVelocity = Mathf.Sqrt(m_Motor.jumpHeight * m_Motor.JumpHeightMultiplier * -2f * m_Motor.gravity);
 
                 // Apply the jump velocity
                 m_Motor.SetVerticalVelocity(jumpVelocity);

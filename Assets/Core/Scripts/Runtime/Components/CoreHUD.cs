@@ -40,10 +40,10 @@ namespace Blocks.Gameplay.Core
         private VisualElement m_BonusTimerContainer;
         private VisualElement m_RoundBanner;
         private Label m_RoundBannerTitle;
-        private Label m_RoundBannerSubtitle;
+        private StarLabel m_RoundBannerSubtitle;
         private Coroutine m_BannerHideCoroutine;
-        private Label m_TotalScoreLabel;
-        private Label m_TargetScoreLabel;
+        private StarLabel m_TotalScoreLabel;
+        private StarLabel m_TargetScoreLabel;
         private InGameMenu m_InGameMenu;
 
         // Small stamina bar floating above the player's head (the bottom-left bars are hidden - see BuildStaminaBar).
@@ -55,6 +55,8 @@ namespace Blocks.Gameplay.Core
         private const float k_StaminaHideDelay = 0.6f;
         private WagerHUD m_WagerHUD;
         private ItemHUD m_ItemHUD;
+        private PracticeItemMenu m_PracticeItemMenu;
+        private LivesHUD m_LivesHUD;
         private VisualElement m_ChallengeOverlay;
         private Label m_ChallengeTitleLabel;
         private Label m_ChallengeSubtitleLabel;
@@ -109,7 +111,7 @@ namespace Blocks.Gameplay.Core
         private class ScoreboardRow
         {
             public VisualElement Element;
-            public Label ScoreLabel;
+            public StarLabel ScoreLabel;
             public PlayerScore PlayerScoreComponent;
             public System.Action AnyScoreChanged;
 
@@ -117,7 +119,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (ScoreLabel != null)
                 {
-                    ScoreLabel.text = newValue.ToString();
+                    ScoreLabel.text = StarLabel.Amount(newValue);
                 }
                 AnyScoreChanged?.Invoke();
             }
@@ -158,6 +160,7 @@ namespace Blocks.Gameplay.Core
                 m_SubscribedRoundTimer.FinishedPlayersChanged += HandleFinishedPlayersChanged;
                 m_SubscribedRoundTimer.RoundInfoChanged += HandleRoundInfoChanged;
                 m_SubscribedRoundTimer.PlayerFinished += HandlePlayerFinished;
+                m_SubscribedRoundTimer.PlayerOut += HandlePlayerOut;
                 UpdateTimerLabel(m_SubscribedRoundTimer.TimeRemaining);
                 UpdateBonusTimerLabel(m_SubscribedRoundTimer.BonusTimeRemaining);
                 HandleRoundInfoChanged();
@@ -180,12 +183,22 @@ namespace Blocks.Gameplay.Core
                     m_WagerHUD.Initialize(m_UIDocument.rootVisualElement, AddNotification);
                 }
 
-                // This player's item slot (bottom right, beside the phone) - only when items are on.
-                if (ItemManager.ItemsEnabled)
+                // This player's item slot (bottom right, beside the phone) - when items are on, and always in
+                // practice, where the practice item menu (Open Item Menu key) hands out any item for testing.
+                if (ItemManager.ItemsEnabled || PracticeMode.IsActive)
                 {
                     m_ItemHUD = gameObject.AddComponent<ItemHUD>();
                     m_ItemHUD.Initialize(m_UIDocument.rootVisualElement, besidePhone: m_WagerHUD != null);
                 }
+                if (PracticeMode.IsActive)
+                {
+                    m_PracticeItemMenu = gameObject.AddComponent<PracticeItemMenu>();
+                    m_PracticeItemMenu.Initialize(m_UIDocument.rootVisualElement);
+                }
+
+                // LIVES: n (or infinity) in the bottom-left corner, with the 1-Up's shield glow.
+                m_LivesHUD = gameObject.AddComponent<LivesHUD>();
+                m_LivesHUD.Initialize(m_UIDocument.rootVisualElement);
             }
 
             if (PracticeMode.IsActive)
@@ -235,6 +248,7 @@ namespace Blocks.Gameplay.Core
                     m_SubscribedRoundTimer.FinishedPlayersChanged -= HandleFinishedPlayersChanged;
                     m_SubscribedRoundTimer.RoundInfoChanged -= HandleRoundInfoChanged;
                     m_SubscribedRoundTimer.PlayerFinished -= HandlePlayerFinished;
+                    m_SubscribedRoundTimer.PlayerOut -= HandlePlayerOut;
                     m_SubscribedRoundTimer = null;
                 }
 
@@ -254,6 +268,18 @@ namespace Blocks.Gameplay.Core
                 {
                     Destroy(m_ItemHUD);
                     m_ItemHUD = null;
+                }
+
+                if (m_PracticeItemMenu != null)
+                {
+                    Destroy(m_PracticeItemMenu);
+                    m_PracticeItemMenu = null;
+                }
+
+                if (m_LivesHUD != null)
+                {
+                    Destroy(m_LivesHUD);
+                    m_LivesHUD = null;
                 }
 
                 if (m_SubscribedChallengeManager != null)
@@ -450,7 +476,7 @@ namespace Blocks.Gameplay.Core
             m_BonusTimerContainer = root.Q<VisualElement>("bonus-timer-container");
             m_RoundBanner = root.Q<VisualElement>("round-banner");
             m_RoundBannerTitle = root.Q<Label>("round-banner-title");
-            m_RoundBannerSubtitle = root.Q<Label>("round-banner-subtitle");
+            m_RoundBannerSubtitle = ReplaceWithStarLabel(root.Q<Label>("round-banner-subtitle")); // "+150★ bonus points"
             m_ChallengeOverlay = root.Q<VisualElement>("challenge-overlay");
             m_ChallengeTitleLabel = root.Q<Label>("challenge-title-label");
             m_ChallengeSubtitleLabel = root.Q<Label>("challenge-subtitle-label");
@@ -625,8 +651,17 @@ namespace Blocks.Gameplay.Core
             var notificationElement = new VisualElement();
             notificationElement.AddToClassList("notification-item");
 
-            var label = new Label(message);
-            notificationElement.Add(label);
+            // Text with a star in it ("Challenge complete! +100★") is drawn with the star picture.
+            Label label = null;
+            if (message != null && message.Contains(StarLabel.Token))
+            {
+                notificationElement.Add(new StarLabel(message, Justify.Center));
+            }
+            else
+            {
+                label = new Label(message);
+                notificationElement.Add(label);
+            }
 
             // Create notification data
             var notificationData = new NotificationData
@@ -893,12 +928,13 @@ namespace Blocks.Gameplay.Core
                 row.AddToClassList("scoreboard-row");
 
                 bool finished = RoundTimer.Instance != null && RoundTimer.Instance.IsPlayerFinished(clientId);
-                var nameLabel = new Label(NetworkPlayers.GetPlayerLabel(clientId) + (finished ? " " + Loc.T("(finished)") : ""));
+                bool outOfLives = finished && RoundTimer.Instance.IsPlayerOut(clientId);
+                var nameLabel = new Label(NetworkPlayers.GetPlayerLabel(clientId) + (outOfLives ? " " + Loc.T("(out)") : finished ? " " + Loc.T("(finished)") : ""));
                 nameLabel.AddToClassList("scoreboard-name");
                 if (finished) nameLabel.AddToClassList("scoreboard-name--finished");
                 row.Add(nameLabel);
 
-                var scoreLabel = new Label(playerScore.Score.ToString());
+                var scoreLabel = new StarLabel(StarLabel.Amount(playerScore.Score), Justify.FlexEnd);
                 scoreLabel.AddToClassList("scoreboard-score");
                 row.Add(scoreLabel);
 
@@ -919,7 +955,7 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>One of the TOTAL / TARGET rows at the top of the scoreboard. Returns its value label.</summary>
-        private Label AddTeamRow(string title, string scoreClass)
+        private StarLabel AddTeamRow(string title, string scoreClass)
         {
             var row = new VisualElement();
             row.AddToClassList("scoreboard-row");
@@ -929,7 +965,7 @@ namespace Blocks.Gameplay.Core
             nameLabel.AddToClassList("scoreboard-name");
             row.Add(nameLabel);
 
-            var valueLabel = new Label("0");
+            var valueLabel = new StarLabel(StarLabel.Amount(0), Justify.FlexEnd);
             valueLabel.AddToClassList("scoreboard-score");
             valueLabel.AddToClassList(scoreClass);
             row.Add(valueLabel);
@@ -944,10 +980,10 @@ namespace Blocks.Gameplay.Core
             int total = RoundTimer.ComputeTeamTotal();
             int target = RoundTimer.Instance != null ? RoundTimer.Instance.TeamTarget : 0;
 
-            if (m_TotalScoreLabel != null) m_TotalScoreLabel.text = total.ToString();
+            if (m_TotalScoreLabel != null) m_TotalScoreLabel.text = StarLabel.Amount(total);
             if (m_TargetScoreLabel != null)
             {
-                m_TargetScoreLabel.text = target > 0 ? target.ToString() : "-";
+                m_TargetScoreLabel.text = target > 0 ? StarLabel.Amount(target) : "-";
                 bool met = target > 0 && total >= target;
                 m_TargetScoreLabel.EnableInClassList("scoreboard-target-met", met);
                 m_TotalScoreLabel?.EnableInClassList("scoreboard-target-met", met);
@@ -1052,14 +1088,28 @@ namespace Blocks.Gameplay.Core
         {
             if (playerId == OwnerClientId)
             {
-                ShowBanner("FINISHED!", bonusPoints > 0 ? Loc.F("+{0} bonus points", bonusPoints) : "No time left on the bonus timer", null, 3f);
+                ShowBanner("FINISHED!", bonusPoints > 0 ? Loc.F("+{0} bonus points", StarLabel.Amount(bonusPoints)) : "No time left on the bonus timer", null, 3f);
             }
             else
             {
                 AddNotification(bonusPoints > 0
-                    ? Loc.F("{0} reached the end! +{1}", GetPlayerName(playerId), bonusPoints)
+                    ? Loc.F("{0} reached the end! +{1}", GetPlayerName(playerId), StarLabel.Amount(bonusPoints))
                     : Loc.F("{0} reached the end!", GetPlayerName(playerId)));
             }
+        }
+
+        /// <summary>Someone ran out of lives: a banner for this player, a notification for anyone else.</summary>
+        private void HandlePlayerOut(ulong playerId)
+        {
+            if (playerId == OwnerClientId)
+            {
+                ShowBanner(Loc.T("OUT OF LIVES"), Loc.T("You're out for the rest of the round."), false, 4f);
+            }
+            else
+            {
+                AddNotification(Loc.F("{0} is out of lives!", GetPlayerName(playerId)));
+            }
+            RequestScoreboardRefresh();
         }
 
         /// <summary>Someone completed a challenge (ChallengeManager): a notification, worded for this player or another.</summary>
@@ -1074,13 +1124,13 @@ namespace Blocks.Gameplay.Core
 
             if (playerId == OwnerClientId)
             {
-                AddNotification(points > 0 ? Loc.F("Challenge complete! +{0}", points) : Loc.T("Challenge complete!"));
+                AddNotification(points > 0 ? Loc.F("Challenge complete! +{0}", StarLabel.Amount(points)) : Loc.T("Challenge complete!"));
                 AudioVolumeService.PlayOneShot(GameSounds.ChallengeSuccess, AudioCategory.SoundEffects, Vector3.zero);
             }
             else
             {
                 AddNotification(points > 0
-                    ? Loc.F("{0} completed a challenge! +{1}", GetPlayerName(playerId), points)
+                    ? Loc.F("{0} completed a challenge! +{1}", GetPlayerName(playerId), StarLabel.Amount(points))
                     : Loc.F("{0} completed a challenge!", GetPlayerName(playerId)));
             }
         }
@@ -1106,7 +1156,7 @@ namespace Blocks.Gameplay.Core
 
                 case RoundTimer.RoundPhase.Ended:
                     bool reached = m_SubscribedRoundTimer.TargetReached;
-                    string score = Loc.F("Team scored {0} of {1}", m_SubscribedRoundTimer.FinalTeamTotal, m_SubscribedRoundTimer.TeamTarget);
+                    string score = Loc.F("Team scored {0} of {1}", StarLabel.Amount(m_SubscribedRoundTimer.FinalTeamTotal), StarLabel.Amount(m_SubscribedRoundTimer.TeamTarget));
                     ShowBanner(reached ? "TARGET REACHED!" : "TARGET MISSED", score, reached, 0f);
                     UpdateTeamRows();
                     break;
@@ -1114,6 +1164,19 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>Shows the upper-middle banner; hides it again after <paramref name="hideAfterSeconds"/> (0 = keep it).</summary>
+        /// <summary>Swaps a UXML label for a StarLabel in the same place, with the same name and classes (so its USS still applies).</summary>
+        private static StarLabel ReplaceWithStarLabel(Label label)
+        {
+            if (label == null || label.parent == null) return null;
+            var star = new StarLabel(label.text, Justify.Center) { name = label.name };
+            foreach (string c in label.GetClasses()) star.AddToClassList(c);
+            star.pickingMode = PickingMode.Ignore;
+            VisualElement parent = label.parent;
+            parent.Insert(parent.IndexOf(label), star);
+            label.RemoveFromHierarchy();
+            return star;
+        }
+
         private void ShowBanner(string title, string subtitle, bool? good, float hideAfterSeconds)
         {
             if (m_RoundBanner == null) return;

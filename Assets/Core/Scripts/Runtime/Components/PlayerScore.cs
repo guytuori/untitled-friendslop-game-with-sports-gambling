@@ -19,6 +19,12 @@ namespace Blocks.Gameplay.Core
     /// <see cref="gameRulesConfig"/> when the scene is played directly for testing), plus - from round 2 on -
     /// the share of last round's final score this player keeps (MatchProgress.LocalCarryOverPoints), minus
     /// the price of anything they bought in the between-rounds item shop (MatchProgress.LocalShopSpend).
+    ///
+    /// LIVES (added 2026-10-25): this also holds the player's lives and the 1-Up's death shield, networked so
+    /// everyone can see them. Lives come from the Lives rule (-1 = unlimited; always unlimited in practice) and
+    /// reset every round. The owner handles its own deaths (<see cref="HandleLocalDeath"/>, called by
+    /// GameManager): the shield (if up) is used up instead of the death penalty, a life is lost if lives are
+    /// limited, and running out means sitting out the rest of the round (RoundTimer.ReportLocalPlayerOut).
     /// </summary>
     public class PlayerScore : CoreNetworkBehaviour, IPlayerRequiredComponent
     {
@@ -31,6 +37,8 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private GameRulesConfig gameRulesConfig;
 
         [Networked] private int NetScore { get; set; }
+        [Networked] private int NetLives { get; set; }
+        [Networked] private NetworkBool NetDeathShield { get; set; }
 
         private int m_LastScore;
 
@@ -42,6 +50,20 @@ namespace Blocks.Gameplay.Core
         /// <summary>Raised on every client whenever this player's score changes (previous value, new value).</summary>
         public event Action<int, int> ScoreChanged;
 
+        private int m_LastLives = int.MinValue;
+        private bool m_LastShield;
+
+        /// <summary>Lives left (-1 = unlimited).</summary>
+        public int Lives => IsSpawned ? NetLives : -1;
+
+        public bool UnlimitedLives => Lives < 0;
+
+        /// <summary>The 1-Up's shield (unlimited lives only): the next death costs no points.</summary>
+        public bool HasDeathShield => IsSpawned && NetDeathShield;
+
+        /// <summary>Raised on every client when this player's lives or shield change (old lives, new lives).</summary>
+        public event Action<int, int> LivesChanged;
+
         #endregion
 
         #region Network Lifecycle
@@ -51,8 +73,13 @@ namespace Blocks.Gameplay.Core
             if (IsOwner)
             {
                 NetScore = GetStartingScore();
+                NetLives = PracticeMode.IsActive ? -1 : MatchRules.Get(gameRulesConfig).Lives; // every round starts fresh
+                if (NetLives == 0) NetLives = -1;
+                NetDeathShield = false;
             }
             m_LastScore = NetScore;
+            m_LastLives = NetLives;
+            m_LastShield = NetDeathShield;
         }
 
         public override void Render()
@@ -104,6 +131,55 @@ namespace Blocks.Gameplay.Core
             }
         }
 
+        /// <summary>
+        /// 1-Up (owner only): a life if lives are limited, otherwise the death shield (the next death costs no
+        /// points). Returns true for a life, false for the shield.
+        /// </summary>
+        public bool GrantOneUp()
+        {
+            if (!IsSpawned || !IsOwner) return false;
+            if (NetLives >= 0)
+            {
+                NetLives = NetLives + 1;
+                DetectChanges();
+                return true;
+            }
+            NetDeathShield = true;
+            DetectChanges();
+            return false;
+        }
+
+        /// <summary>
+        /// This player just died (owner only - GameManager calls it): uses up the death shield instead of the
+        /// death penalty, otherwise takes the Death Penalty rule off the score (All = every point; none in
+        /// practice), and loses a life if lives are limited. Returns true if that was the last life.
+        /// </summary>
+        public bool HandleLocalDeath()
+        {
+            if (!IsSpawned || !IsOwner) return false;
+
+            if (NetDeathShield)
+            {
+                NetDeathShield = false;
+                Debug.Log("[Lives] The 1-Up shield took the hit - no points lost for that death.", this);
+            }
+            else if (!PracticeMode.IsActive)
+            {
+                int penalty = MatchRules.Get(gameRulesConfig).DeathPenalty;
+                if (penalty < 0) penalty = Mathf.Max(0, NetScore); // All
+                if (penalty > 0) NetScore -= penalty;
+            }
+
+            bool outOfLives = false;
+            if (NetLives > 0)
+            {
+                NetLives = NetLives - 1;
+                outOfLives = NetLives == 0;
+            }
+            DetectChanges();
+            return outOfLives;
+        }
+
         #endregion
 
         #region RPCs
@@ -138,6 +214,16 @@ namespace Blocks.Gameplay.Core
         private void DetectChanges()
         {
             if (!IsSpawned) return;
+
+            int lives = NetLives;
+            bool shield = NetDeathShield;
+            if (lives != m_LastLives || shield != m_LastShield)
+            {
+                int previousLives = m_LastLives;
+                m_LastLives = lives;
+                m_LastShield = shield;
+                LivesChanged?.Invoke(previousLives, lives);
+            }
 
             int current = NetScore;
             if (current == m_LastScore) return;

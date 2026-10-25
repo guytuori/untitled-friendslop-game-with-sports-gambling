@@ -50,7 +50,7 @@ namespace Blocks.Gameplay.Core
             title.style.unityTextAlign = TextAnchor.MiddleCenter;
             Root.Add(title);
 
-            var budgetLabel = new Label(Loc.F("You can spend up to {0} points (your score last round).", budget));
+            var budgetLabel = new StarLabel(Loc.F("You can spend up to {0} points (your score last round).", StarLabel.Amount(budget)), Justify.Center);
             budgetLabel.style.fontSize = 16;
             budgetLabel.style.color = Color.white;
             budgetLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -136,7 +136,7 @@ namespace Blocks.Gameplay.Core
             name.style.marginTop = 8;
             card.Add(name);
 
-            var cost = new Label(affordable ? Loc.F("{0} points", item.shopCost) : Loc.F("{0} points - not enough", item.shopCost)) { pickingMode = PickingMode.Ignore };
+            var cost = new StarLabel(affordable ? Loc.F("{0} points", StarLabel.Amount(item.shopCost)) : Loc.F("{0} points - not enough", StarLabel.Amount(item.shopCost)), Justify.Center);
             cost.style.fontSize = 16;
             cost.style.color = affordable ? Gold : TooExpensive;
             cost.style.unityTextAlign = TextAnchor.MiddleCenter;

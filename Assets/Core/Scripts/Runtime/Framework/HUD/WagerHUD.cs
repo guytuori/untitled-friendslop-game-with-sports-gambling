@@ -329,8 +329,8 @@ namespace Blocks.Gameplay.Core
                 string yesKey = i == 0 ? KeyHint(m_Bindings.Keyboard.BetYes, m_Bindings.Gamepad.BetYes, gamepadHints) : "";
                 string noKey = i == 0 ? KeyHint(m_Bindings.Keyboard.BetNo, m_Bindings.Gamepad.BetNo, gamepadHints) : "";
                 string dismissKey = i == 0 ? KeyHint(m_Bindings.Keyboard.DismissBet, m_Bindings.Gamepad.DismissBet, gamepadHints) : "";
-                row.Yes.text = Loc.F("YES {0}", view.YesCost) + yesKey;
-                row.No.text = Loc.F("NO {0}", view.NoCost) + noKey;
+                StarLabel.SetButtonText(row.Yes, Loc.F("YES {0}", StarLabel.Amount(view.YesCost)) + yesKey);
+                StarLabel.SetButtonText(row.No, Loc.F("NO {0}", StarLabel.Amount(view.NoCost)) + noKey);
                 row.Dismiss.text = Loc.T("DISMISS") + dismissKey;
             }
         }
@@ -375,16 +375,16 @@ namespace Blocks.Gameplay.Core
 
             if (refunded)
             {
-                m_Notify?.Invoke(Loc.F("Refunded {0}: {1}", entry.Cost, entry.Text));
+                m_Notify?.Invoke(Loc.F("Refunded {0}: {1}", StarLabel.Amount(entry.Cost), entry.Text));
             }
             else if (entry.Yes == yesWon)
             {
                 float multiplier = m_Manager != null ? m_Manager.PayoutMultiplier : 3f;
-                m_Notify?.Invoke(Loc.F("WON +{0}: {1}", Mathf.RoundToInt(entry.Cost * multiplier), entry.Text));
+                m_Notify?.Invoke(Loc.F("WON +{0}: {1}", StarLabel.Amount(Mathf.RoundToInt(entry.Cost * multiplier)), entry.Text));
             }
             else
             {
-                m_Notify?.Invoke(Loc.F("Lost {0}: {1}", entry.Cost, entry.Text));
+                m_Notify?.Invoke(Loc.F("Lost {0}: {1}", StarLabel.Amount(entry.Cost), entry.Text));
             }
         }
 
@@ -428,7 +428,7 @@ namespace Blocks.Gameplay.Core
                 text.style.whiteSpace = WhiteSpace.Normal;
                 item.Add(text);
 
-                var chip = new Label(Loc.F(entry.Yes ? "YES {0}" : "NO {0}", entry.Cost));
+                var chip = new StarLabel(Loc.F(entry.Yes ? "YES {0}" : "NO {0}", StarLabel.Amount(entry.Cost)));
                 chip.style.alignSelf = Align.FlexStart;
                 chip.style.marginTop = 3;
                 chip.style.paddingLeft = 6;

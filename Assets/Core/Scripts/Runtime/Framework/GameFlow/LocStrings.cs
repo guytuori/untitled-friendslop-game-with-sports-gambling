@@ -61,7 +61,7 @@ namespace Blocks.Gameplay.Core
             ["BET MULTIPLIER"] = new[] { "MULTIPLICADOR DE APUESTA", "MOLTIPLICATORE PUNTATA", "MULTIPLICATEUR DE MISE", "WETTMULTIPLIKATOR", "MULTIPLICADOR DE APOSTA" },
             ["DISMISS CURRENT BET"] = new[] { "DESCARTAR APUESTA ACTUAL", "IGNORA SCOMMESSA ATTUALE", "IGNORER LE PARI ACTUEL", "AKTUELLE WETTE VERWERFEN", "DESCARTAR APOSTA ATUAL" },
             ["OPEN ESCAPE MENU"] = new[] { "ABRIR MENÚ DE PAUSA", "APRI MENU DI PAUSA", "OUVRIR LE MENU PAUSE", "PAUSENMENÜ ÖFFNEN", "ABRIR MENU DE PAUSA" },
-            ["OPEN WAGERS MENU"] = new[] { "ABRIR MENÚ DE APUESTAS", "APRI MENU SCOMMESSE", "OUVRIR LE MENU DES PARIS", "WETTMENÜ ÖFFNEN", "ABRIR MENU DE APOSTAS" },
+            ["OPEN ITEM MENU (PRACTICE MODE)"] = new[] { "ABRIR MENÚ DE OBJETOS (MODO PRÁCTICA)", "APRI MENU OGGETTI (MODALITÀ ALLENAMENTO)", "OUVRIR LE MENU DES OBJETS (MODE ENTRAÎNEMENT)", "ITEM-MENÜ ÖFFNEN (TRAININGSMODUS)", "ABRIR MENU DE ITENS (MODO TREINO)" },
             ["ENABLE RUMBLE"] = new[] { "ACTIVAR VIBRACIÓN", "ATTIVA VIBRAZIONE", "ACTIVER LES VIBRATIONS", "VIBRATION AKTIVIEREN", "ATIVAR VIBRAÇÃO" },
             ["Press..."] = new[] { "Pulsa...", "Premi...", "Appuyez...", "Drücken...", "Pressione..." },
             ["Move a stick..."] = new[] { "Mueve un stick...", "Muovi una levetta...", "Bougez un stick...", "Stick bewegen...", "Mova um analógico..." },
@@ -301,6 +301,14 @@ namespace Blocks.Gameplay.Core
             ["Single use"] = new[] { "Un solo uso", "Monouso", "Usage unique", "Einmalig", "Uso único" },
             ["Buy an item, or choose No Item, when you're ready for the next round"] = new[] { "Compra un objeto, o elige Ningún objeto, cuando estés listo para la siguiente ronda", "Compra un oggetto, o scegli Nessun oggetto, quando sei pronto per il prossimo round", "Achète un objet, ou choisis Aucun objet, quand tu es prêt pour la manche suivante", "Kauf ein Item oder wähle Kein Item, wenn du bereit für die nächste Runde bist", "Compre um item, ou escolha Nenhum item, quando estiver pronto para a próxima rodada" },
             ["Ready: {0}"] = new[] { "Listo: {0}", "Pronto: {0}", "Prêt : {0}", "Bereit: {0}", "Pronto: {0}" },
+            ["PRACTICE ITEMS"] = new[] { "OBJETOS DE PRÁCTICA", "OGGETTI DI ALLENAMENTO", "OBJETS D'ENTRAÎNEMENT", "TRAININGS-ITEMS", "ITENS DE TREINO" },
+            ["Pick an item to put it straight into your item slot."] = new[] { "Elige un objeto para ponerlo directamente en tu ranura de objeto.", "Scegli un oggetto da mettere subito nel tuo slot oggetto.", "Choisis un objet pour le mettre directement dans ton emplacement d'objet.", "Wähle ein Item, um es direkt in deinen Item-Platz zu legen.", "Escolha um item para colocá-lo direto no seu espaço de item." },
+            ["Give Item"] = new[] { "Dar objeto", "Dai oggetto", "Donner l'objet", "Item geben", "Dar item" },
+            ["LIVES:"] = new[] { "VIDAS:", "VITE:", "VIES :", "LEBEN:", "VIDAS:" },
+            ["OUT OF LIVES"] = new[] { "SIN VIDAS", "VITE FINITE", "PLUS DE VIES", "KEINE LEBEN MEHR", "SEM VIDAS" },
+            ["You're out for the rest of the round."] = new[] { "Quedas fuera el resto de la ronda.", "Sei fuori per il resto del round.", "Tu es hors jeu pour le reste de la manche.", "Du bist für den Rest der Runde raus.", "Você está fora pelo resto da rodada." },
+            ["{0} is out of lives!"] = new[] { "¡{0} se quedó sin vidas!", "{0} ha finito le vite!", "{0} n'a plus de vies !", "{0} hat keine Leben mehr!", "{0} ficou sem vidas!" },
+            ["(out)"] = new[] { "(fuera)", "(fuori)", "(éliminé)", "(raus)", "(fora)" },
         };
     }
 }

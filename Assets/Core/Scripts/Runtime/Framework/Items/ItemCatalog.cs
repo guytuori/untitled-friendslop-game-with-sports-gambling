@@ -13,21 +13,22 @@ namespace Blocks.Gameplay.Core
         None = 0,
         DoubleJumpBoots = 1,
         TripleJumpBoots = 2,
-        SpeedBoots = 3,
-        SuperSpeedBoots = 4,
+        RocketShoes = 3,        // was Speed Boots
+        SuperRocketShoes = 4,   // was Super Speed Boots
         SmallPoints = 5,
         MediumPoints = 6,
         BigPoints = 7,
         OneUp = 8,
-        Teleport = 9,
+        Teleporter = 9,
         Jetpack = 10,
         SpringShoes = 11,
         Glider = 12,
         MagnetBoots = 13,
-        StrongerArms = 14,
+        BigArms = 14,           // was Stronger Arms
         QuadrupleJumpBoots = 15,
         SlipperyBoots = 16,
         GravityBoots = 17,
+        SuperSpringShoes = 18,
     }
 
     /// <summary>Single use (works straight away, then it's gone) or lasts a while (a timer counts down).</summary>
@@ -62,9 +63,15 @@ namespace Blocks.Gameplay.Core
         [Min(0f)] public float shopWeight = 1f;
 
         [Header("Look")]
-        [Tooltip("Optional. Until there are icons, the item is drawn as a coloured tile with its name.")]
+        [Tooltip("The item's picture (HUD slot, reel, shop). ItemCatalogBuilder fills it from the png named after the item (see ItemCatalog.IconFileName) when it's empty. With none, the item is drawn as a coloured tile with its name.")]
         public Texture2D icon;
         public Color color = Color.gray;
+
+        [Header("Effect")]
+        [Tooltip("Played when the item is used. ItemCatalogBuilder fills it from Assets/Core/Audio/Clips (see ItemCatalog.UseSoundFileName) when it's empty.")]
+        public AudioClip useSound;
+        [Tooltip("Points items: how many points using it gives.")]
+        public int points;
 
         public bool IsTimed => kind == ItemKind.Timed && durationSeconds > 0f;
 
@@ -104,6 +111,10 @@ namespace Blocks.Gameplay.Core
         [SerializeField, Range(1, 5)] private int shopOfferCount = 3;
 
         [SerializeField] private List<ItemDefinition> items = new List<ItemDefinition>();
+
+        /// <summary>Bumped when the defaults change in a way an existing asset should pick up (see EditorTopUp).</summary>
+        public const int CurrentVersion = 4;
+        [SerializeField, HideInInspector] private int version = 1;
 
         private static ItemCatalog s_Loaded;
         private static bool s_Tried;
@@ -159,6 +170,36 @@ namespace Blocks.Gameplay.Core
         }
 
         public static string NameOf(ItemId id) => Get(id)?.displayName ?? id.ToString();
+
+        /// <summary>
+        /// The icon's file name (no extension) for an item - the pngs the user drew (Assets/Core/Scenes/Core for
+        /// now; ItemCatalogBuilder finds them anywhere under Assets by name).
+        /// </summary>
+        public static string IconFileName(ItemId id)
+        {
+            switch (id)
+            {
+                case ItemId.DoubleJumpBoots: return "DoubleJumpBoots";
+                case ItemId.TripleJumpBoots: return "TripleJumpBoots";
+                case ItemId.RocketShoes: return "RocketShoes";
+                case ItemId.SuperRocketShoes: return "SuperRocketShoes";
+                case ItemId.SmallPoints: return "SmallPoints";
+                case ItemId.MediumPoints: return "MediumPoints";
+                case ItemId.BigPoints: return "BigPoints";
+                case ItemId.OneUp: return "1Up";
+                case ItemId.Teleporter: return "Teleporter";
+                case ItemId.Jetpack: return "JetPack";
+                case ItemId.SpringShoes: return "SpringBoots";
+                case ItemId.Glider: return "Glider";
+                case ItemId.MagnetBoots: return "MagnetBoots";
+                case ItemId.BigArms: return "BigArms";
+                case ItemId.QuadrupleJumpBoots: return "QuadrupleJumpBoots";
+                case ItemId.SlipperyBoots: return "SlipperyBoots";
+                case ItemId.GravityBoots: return "GravityBoots";
+                case ItemId.SuperSpringShoes: return "SuperSpringBoots";
+                default: return null;
+            }
+        }
 
         /// <summary>A random item from an item box, by the box chances.</summary>
         public static ItemId RollBox(System.Random rng)
@@ -249,35 +290,112 @@ namespace Blocks.Gameplay.Core
             {
                 Timed(ItemId.DoubleJumpBoots, "Double Jump Boots", "Double jump for 30 seconds.", 30f, 20f, 1, new Color(0.20f, 0.55f, 0.95f)),
                 Timed(ItemId.TripleJumpBoots, "Triple Jump Boots", "Triple jump for 15 seconds.", 15f, 5f, 3, new Color(0.10f, 0.30f, 0.85f)),
-                Timed(ItemId.SpeedBoots, "Speed Boots", "Run faster for 30 seconds.", 30f, 20f, 1, new Color(0.95f, 0.55f, 0.10f)),
-                Timed(ItemId.SuperSpeedBoots, "Super Speed Boots", "Run a lot faster for 15 seconds.", 15f, 5f, 3, new Color(0.90f, 0.25f, 0.05f)),
-                Instant(ItemId.SmallPoints, "Small Points", "Single use: gain 100 points straight away.", 20f, 1, new Color(0.45f, 0.75f, 0.30f)),
-                Instant(ItemId.MediumPoints, "Medium Points", "Single use: gain 300 points straight away.", 10f, 2, new Color(0.25f, 0.65f, 0.20f)),
-                Instant(ItemId.BigPoints, "Big Points", "Single use: gain 500 points straight away.", 5f, 3, new Color(0.95f, 0.78f, 0.15f)),
+                Timed(ItemId.RocketShoes, "Rocket Shoes", "Run faster for 30 seconds.", 30f, 20f, 1, new Color(0.95f, 0.55f, 0.10f)),
+                Timed(ItemId.SuperRocketShoes, "Super Rocket Shoes", "Run a lot faster for 15 seconds.", 15f, 5f, 3, new Color(0.90f, 0.25f, 0.05f)),
+                WithPoints(Instant(ItemId.SmallPoints, "Small Points", "Single use: gain 100 points straight away.", 20f, 1, new Color(0.45f, 0.75f, 0.30f)), 100),
+                WithPoints(Instant(ItemId.MediumPoints, "Medium Points", "Single use: gain 300 points straight away.", 10f, 2, new Color(0.25f, 0.65f, 0.20f)), 300),
+                WithPoints(Instant(ItemId.BigPoints, "Big Points", "Single use: gain 500 points straight away.", 5f, 3, new Color(0.95f, 0.78f, 0.15f)), 500),
                 Instant(ItemId.OneUp, "1-Up", "Single use: gain a life if lives are limited; otherwise your next death costs no points.", 5f, 2, new Color(0.15f, 0.70f, 0.35f)),
-                Instant(ItemId.Teleport, "Teleport", "Single use: teleports you to a random challenge you haven't completed yet, or to the end if you've done them all.", 10f, 2, new Color(0.65f, 0.25f, 0.85f)),
-                Timed(ItemId.Jetpack, "Jetpack", "You get a jetpack for 15 seconds.", 15f, 0f, 3, new Color(0.55f, 0.55f, 0.60f)),
+                Instant(ItemId.Teleporter, "Teleporter", "Single use: teleports you to a random challenge you haven't completed yet, or to the end if you've done them all.", 10f, 2, new Color(0.65f, 0.25f, 0.85f)),
+                Timed(ItemId.Jetpack, "Jetpack", "You get a jetpack for 30 seconds.", 30f, 0f, 3, new Color(0.55f, 0.55f, 0.60f)),
                 Timed(ItemId.SpringShoes, "Spring Shoes", "You get a high jump for 30 seconds.", 30f, 0f, 1, new Color(0.30f, 0.80f, 0.75f)),
                 Timed(ItemId.Glider, "Glider", "You can glide after jumping for 30 seconds.", 30f, 0f, 2, new Color(0.45f, 0.75f, 0.95f)),
                 Timed(ItemId.MagnetBoots, "Magnet Boots", "You ignore slippery floors for 30 seconds.", 30f, 0f, 1, new Color(0.75f, 0.20f, 0.25f)),
-                Timed(ItemId.StrongerArms, "Stronger Arms", "More launching power from poles for 30 seconds.", 30f, 0f, 2, new Color(0.85f, 0.45f, 0.35f)),
+                Timed(ItemId.BigArms, "Big Arms", "More launching power from poles for 30 seconds.", 30f, 0f, 2, new Color(0.85f, 0.45f, 0.35f)),
                 Timed(ItemId.QuadrupleJumpBoots, "Quadruple Jump Boots", "Quadruple jump for 15 seconds.", 15f, 0f, 3, new Color(0.05f, 0.15f, 0.60f)),
                 Timed(ItemId.SlipperyBoots, "Slippery Boots", "Every floor is slippery for 30 seconds - but challenges and pickups are worth double.", 30f, 0f, 2, new Color(0.60f, 0.85f, 1.00f)),
                 Timed(ItemId.GravityBoots, "Gravity Boots", "Triple gravity for 30 seconds - but challenges and pickups are worth double.", 30f, 0f, 2, new Color(0.35f, 0.25f, 0.50f)),
+                Timed(ItemId.SuperSpringShoes, "Super Spring Shoes", "An even higher jump for 15 seconds.", 15f, 0f, 3, new Color(0.15f, 0.65f, 0.60f)),
             };
         }
 
         private static ItemDefinition Timed(ItemId id, string name, string description, float seconds, float boxChance, int tier, Color color) =>
             new ItemDefinition { id = id, displayName = name, description = description, kind = ItemKind.Timed, durationSeconds = seconds, boxChance = boxChance, inShop = true, shopCost = 200, shopTier = tier, shopWeight = 1f, color = color };
 
+        private static ItemDefinition WithPoints(ItemDefinition item, int points)
+        {
+            item.points = points;
+            return item;
+        }
+
+        /// <summary>The use sound's file name (no extension) in Assets/Core/Audio/Clips, or null.</summary>
+        public static string UseSoundFileName(ItemId id)
+        {
+            switch (id)
+            {
+                case ItemId.SmallPoints:
+                case ItemId.MediumPoints:
+                case ItemId.BigPoints: return "points";
+                case ItemId.OneUp: return "item_1up";
+                case ItemId.BigArms: return "item_bigarm";
+                case ItemId.DoubleJumpBoots: return "item_doublejump";
+                case ItemId.TripleJumpBoots: return "item_triplejump";
+                case ItemId.QuadrupleJumpBoots: return "item_quadruplejump";
+                case ItemId.Glider: return "item_glider";
+                case ItemId.GravityBoots: return "item_gravityboot";
+                case ItemId.Jetpack: return "item_jetpack";
+                case ItemId.MagnetBoots: return "item_magnetboots";
+                case ItemId.RocketShoes: return "item_rocketboot";
+                case ItemId.SuperRocketShoes: return "item_superrocketboot";
+                case ItemId.SlipperyBoots: return "item_slippery";
+                case ItemId.SpringShoes: return "item_springboot";
+                case ItemId.SuperSpringShoes: return "item_superspringboot";
+                case ItemId.Teleporter: return "item_teleporter";
+                default: return null;
+            }
+        }
+
         private static ItemDefinition Instant(ItemId id, string name, string description, float boxChance, int tier, Color color) =>
             new ItemDefinition { id = id, displayName = name, description = description, kind = ItemKind.Instant, durationSeconds = 0f, boxChance = boxChance, inShop = true, shopCost = 200, shopTier = tier, shopWeight = 1f, color = color };
 
 #if UNITY_EDITOR
-        /// <summary>Editor only (ItemCatalogBuilder): adds any item the asset doesn't have yet and fills a missing box model. True if anything changed.</summary>
-        public bool EditorTopUp(GameObject boxModel)
+        /// <summary>
+        /// Editor only (ItemCatalogBuilder): adds any item the asset doesn't have yet, fills a missing box model
+        /// and missing icons (<paramref name="findIcon"/> looks a file name up), and applies the renames of
+        /// version 2 (Speed Boots -> Rocket Shoes, Super Speed Boots -> Super Rocket Shoes, Stronger Arms -> Big
+        /// Arms, Teleport -> Teleporter) to names still at their old default. True if anything changed.
+        /// </summary>
+        public bool EditorTopUp(GameObject boxModel, Func<string, Texture2D> findIcon, Func<string, AudioClip> findSound = null)
         {
             bool changed = false;
+
+            if (version < 4)
+            {
+                // Version 4: the Jetpack lasts 30 s (was 15) - only if it's still at the old default.
+                ItemDefinition jetpack = items.Find(i => i != null && i.id == ItemId.Jetpack);
+                if (jetpack != null && Mathf.Approximately(jetpack.durationSeconds, 15f)) jetpack.durationSeconds = 30f;
+                if (jetpack != null && jetpack.description == "You get a jetpack for 15 seconds.") jetpack.description = "You get a jetpack for 30 seconds.";
+            }
+
+            if (version < 3)
+            {
+                // Version 3 added the points field: give the points items their default amounts.
+                foreach (ItemDefinition def in Defaults)
+                {
+                    ItemDefinition item = items.Find(i => i != null && i.id == def.id);
+                    if (item != null && item.points == 0 && def.points != 0) item.points = def.points;
+                }
+            }
+
+            if (version < 2)
+            {
+                Rename(ItemId.RocketShoes, "Speed Boots", "Rocket Shoes");
+                Rename(ItemId.SuperRocketShoes, "Super Speed Boots", "Super Rocket Shoes");
+                Rename(ItemId.BigArms, "Stronger Arms", "Big Arms");
+                Rename(ItemId.Teleporter, "Teleport", "Teleporter");
+            }
+            if (version != CurrentVersion)
+            {
+                version = CurrentVersion;
+                changed = true;
+            }
+
+            void Rename(ItemId id, string oldName, string newName)
+            {
+                ItemDefinition item = items.Find(i => i != null && i.id == id);
+                if (item != null && item.displayName == oldName) item.displayName = newName;
+            }
+
             foreach (ItemDefinition def in Defaults)
             {
                 if (items.Exists(i => i != null && i.id == def.id)) continue;
@@ -288,6 +406,30 @@ namespace Blocks.Gameplay.Core
             {
                 itemBoxModel = boxModel;
                 changed = true;
+            }
+            if (findIcon != null)
+            {
+                foreach (ItemDefinition item in items)
+                {
+                    if (item == null || item.icon != null) continue;
+                    string file = IconFileName(item.id);
+                    Texture2D icon = string.IsNullOrEmpty(file) ? null : findIcon(file);
+                    if (icon == null) continue;
+                    item.icon = icon;
+                    changed = true;
+                }
+            }
+            if (findSound != null)
+            {
+                foreach (ItemDefinition item in items)
+                {
+                    if (item == null || item.useSound != null) continue;
+                    string file = UseSoundFileName(item.id);
+                    AudioClip clip = string.IsNullOrEmpty(file) ? null : findSound(file);
+                    if (clip == null) continue;
+                    item.useSound = clip;
+                    changed = true;
+                }
             }
             return changed;
         }

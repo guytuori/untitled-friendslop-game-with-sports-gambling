@@ -29,8 +29,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 1
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 38ca2d473c6dd28419509763ee96f04a, type: 3}
     color: {r: 0.2, g: 0.55, b: 0.95, a: 1}
+    useSound: {fileID: 8300000, guid: db1e380b72b8f604ea9c056bf22249b3, type: 3}
+    points: 0
   - id: 2
     displayName: Triple Jump Boots
     description: Triple jump for 15 seconds.
@@ -41,10 +43,12 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 3
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 73668785dd762064792c8c1b4a3e2a8d, type: 3}
     color: {r: 0.1, g: 0.3, b: 0.85, a: 1}
+    useSound: {fileID: 8300000, guid: 834017a80adba5f4e977327912b6f5c2, type: 3}
+    points: 0
   - id: 3
-    displayName: Speed Boots
+    displayName: Rocket Shoes
     description: Run faster for 30 seconds.
     kind: 1
     durationSeconds: 30
@@ -53,10 +57,12 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 1
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: dcff032ee6c23f64c9ebf2055381586d, type: 3}
     color: {r: 0.95, g: 0.55, b: 0.1, a: 1}
+    useSound: {fileID: 8300000, guid: 1dc4cfaf64e46cb4fb9a770be331419f, type: 3}
+    points: 0
   - id: 4
-    displayName: Super Speed Boots
+    displayName: Super Rocket Shoes
     description: Run a lot faster for 15 seconds.
     kind: 1
     durationSeconds: 15
@@ -65,8 +71,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 3
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 95191fb71ffc9af49a284ced057ddda2, type: 3}
     color: {r: 0.9, g: 0.25, b: 0.05, a: 1}
+    useSound: {fileID: 8300000, guid: 109ce6f5bd1815e4783f1bee24a91ca7, type: 3}
+    points: 0
   - id: 5
     displayName: Small Points
     description: 'Single use: gain 100 points straight away.'
@@ -77,8 +85,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 1
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: bb55ecea1ad9c08449da32c6863feb63, type: 3}
     color: {r: 0.45, g: 0.75, b: 0.3, a: 1}
+    useSound: {fileID: 8300000, guid: 2b9551580b1c98240b23059d1c3edb51, type: 3}
+    points: 100
   - id: 6
     displayName: Medium Points
     description: 'Single use: gain 300 points straight away.'
@@ -89,8 +99,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 2
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 000ab98f80e1cae41b1a41be9d65ac70, type: 3}
     color: {r: 0.25, g: 0.65, b: 0.2, a: 1}
+    useSound: {fileID: 8300000, guid: 2b9551580b1c98240b23059d1c3edb51, type: 3}
+    points: 300
   - id: 7
     displayName: Big Points
     description: 'Single use: gain 500 points straight away.'
@@ -101,8 +113,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 3
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 3a0db21354e285e45811765371efdf55, type: 3}
     color: {r: 0.95, g: 0.78, b: 0.15, a: 1}
+    useSound: {fileID: 8300000, guid: 2b9551580b1c98240b23059d1c3edb51, type: 3}
+    points: 500
   - id: 8
     displayName: 1-Up
     description: 'Single use: gain a life if lives are limited; otherwise your next
@@ -114,10 +128,12 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 2
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 9475d6a2ae014b549b16b6d6cbff441d, type: 3}
     color: {r: 0.15, g: 0.7, b: 0.35, a: 1}
+    useSound: {fileID: 8300000, guid: 8f8ac5c539a22564ca58285178f9f20d, type: 3}
+    points: 0
   - id: 9
-    displayName: Teleport
+    displayName: Teleporter
     description: 'Single use: teleports you to a random challenge you haven''t completed
       yet, or to the end if you''ve done them all.'
     kind: 0
@@ -127,20 +143,24 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 2
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 2eb588141b1bf164b950a37616079045, type: 3}
     color: {r: 0.65, g: 0.25, b: 0.85, a: 1}
+    useSound: {fileID: 8300000, guid: 0f9702981abc4d645aaf868432143d7d, type: 3}
+    points: 0
   - id: 10
     displayName: Jetpack
-    description: You get a jetpack for 15 seconds.
+    description: You get a jetpack for 30 seconds.
     kind: 1
-    durationSeconds: 15
+    durationSeconds: 30
     boxChance: 0
     inShop: 1
     shopCost: 200
     shopTier: 3
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 5a98c4ec49ed58b43a8d84a92d2f8502, type: 3}
     color: {r: 0.55, g: 0.55, b: 0.6, a: 1}
+    useSound: {fileID: 8300000, guid: 98989f1c9d3ee584da9848f430b5c034, type: 3}
+    points: 0
   - id: 11
     displayName: Spring Shoes
     description: You get a high jump for 30 seconds.
@@ -151,8 +171,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 1
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 443125c0a0ba4f14693b3e880e1487d7, type: 3}
     color: {r: 0.3, g: 0.8, b: 0.75, a: 1}
+    useSound: {fileID: 8300000, guid: 65a6d0b05aa659f4da7435132e88fecb, type: 3}
+    points: 0
   - id: 12
     displayName: Glider
     description: You can glide after jumping for 30 seconds.
@@ -163,8 +185,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 2
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 62739c43f05b78e48b2ea2485343fd31, type: 3}
     color: {r: 0.45, g: 0.75, b: 0.95, a: 1}
+    useSound: {fileID: 8300000, guid: 65985133ddb374441a807eeb807545af, type: 3}
+    points: 0
   - id: 13
     displayName: Magnet Boots
     description: You ignore slippery floors for 30 seconds.
@@ -175,10 +199,12 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 1
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 698fdaa2f1e3e6e46a4ca582cd41894e, type: 3}
     color: {r: 0.75, g: 0.2, b: 0.25, a: 1}
+    useSound: {fileID: 8300000, guid: 87b6e1b73f5331e4c8cdcc8e42b41d79, type: 3}
+    points: 0
   - id: 14
-    displayName: Stronger Arms
+    displayName: Big Arms
     description: More launching power from poles for 30 seconds.
     kind: 1
     durationSeconds: 30
@@ -187,8 +213,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 2
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 7317971ef2346f44c8715c1b9de96a14, type: 3}
     color: {r: 0.85, g: 0.45, b: 0.35, a: 1}
+    useSound: {fileID: 8300000, guid: a82df78aeae1b994fa8364a3e35d58f5, type: 3}
+    points: 0
   - id: 15
     displayName: Quadruple Jump Boots
     description: Quadruple jump for 15 seconds.
@@ -199,8 +227,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 3
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 78e70707f4f28104296c021a31f94535, type: 3}
     color: {r: 0.05, g: 0.15, b: 0.6, a: 1}
+    useSound: {fileID: 8300000, guid: e5c3f1a1f42368a4f93e11f66ed6e6f0, type: 3}
+    points: 0
   - id: 16
     displayName: Slippery Boots
     description: Every floor is slippery for 30 seconds - but challenges and pickups
@@ -212,8 +242,10 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 2
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 7a5c323d43444a546b6d9dd0efe9deb2, type: 3}
     color: {r: 0.6, g: 0.85, b: 1, a: 1}
+    useSound: {fileID: 8300000, guid: 748472b374685f449b02ce262f0498cb, type: 3}
+    points: 0
   - id: 17
     displayName: Gravity Boots
     description: Triple gravity for 30 seconds - but challenges and pickups are worth
@@ -225,5 +257,22 @@ MonoBehaviour:
     shopCost: 200
     shopTier: 2
     shopWeight: 1
-    icon: {fileID: 0}
+    icon: {fileID: 2800000, guid: 699589b7fc2b38142a26503e403a915b, type: 3}
     color: {r: 0.35, g: 0.25, b: 0.5, a: 1}
+    useSound: {fileID: 8300000, guid: ebf0d3a0960624e4f9f8fd1e59282317, type: 3}
+    points: 0
+  - id: 18
+    displayName: Super Spring Shoes
+    description: An even higher jump for 15 seconds.
+    kind: 1
+    durationSeconds: 15
+    boxChance: 0
+    inShop: 1
+    shopCost: 200
+    shopTier: 3
+    shopWeight: 1
+    icon: {fileID: 2800000, guid: ff22f192bd351654bb6d2bccc6c65da2, type: 3}
+    color: {r: 0.15, g: 0.65, b: 0.6, a: 1}
+    useSound: {fileID: 8300000, guid: d0b3ff1a82d4e2c4c8af3e1ec69659f3, type: 3}
+    points: 0
+  version: 4

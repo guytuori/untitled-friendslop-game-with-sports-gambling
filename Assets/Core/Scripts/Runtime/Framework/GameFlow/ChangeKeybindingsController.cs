@@ -249,7 +249,7 @@ namespace Blocks.Gameplay.Core
             AddRow(list, "BET MULTIPLIER", "BetMultiplier");
             AddRow(list, "DISMISS CURRENT BET", "DismissBet");
             AddRow(list, "OPEN ESCAPE MENU", "OpenEscapeMenu");
-            AddRow(list, "OPEN WAGERS MENU", "OpenWagersMenu");
+            AddRow(list, "OPEN ITEM MENU (PRACTICE MODE)", "OpenItemMenu");
             AddRow(list, "CAMERA ZOOM IN", "CameraZoomIn");
             AddRow(list, "CAMERA ZOOM OUT", "CameraZoomOut");
             if (m_UseGamepad) AddRumbleRow(list);
@@ -765,7 +765,7 @@ namespace Blocks.Gameplay.Core
                     "BetNo" => pad.BetNo,
                     "BetMultiplier" => pad.BetMultiplier,
                     "DismissBet" => pad.DismissBet,
-                    "OpenWagersMenu" => pad.OpenWagersMenu,
+                    "OpenItemMenu" => pad.OpenItemMenu,
                     "CameraZoomIn" => pad.CameraZoomIn,
                     "CameraZoomOut" => pad.CameraZoomOut,
                     _ => "?"
@@ -781,7 +781,7 @@ namespace Blocks.Gameplay.Core
                 "BetNo" => keys.BetNo,
                 "BetMultiplier" => keys.BetMultiplier,
                 "DismissBet" => keys.DismissBet,
-                "OpenWagersMenu" => keys.OpenWagersMenu,
+                "OpenItemMenu" => keys.OpenItemMenu,
                 "CameraZoomIn" => keys.CameraZoomIn,
                 "CameraZoomOut" => keys.CameraZoomOut,
                 _ => "?"
@@ -801,7 +801,7 @@ namespace Blocks.Gameplay.Core
                     case "BetNo": pad.BetNo = rawValue; break;
                     case "BetMultiplier": pad.BetMultiplier = rawValue; break;
                     case "DismissBet": pad.DismissBet = rawValue; break;
-                    case "OpenWagersMenu": pad.OpenWagersMenu = rawValue; break;
+                    case "OpenItemMenu": pad.OpenItemMenu = rawValue; break;
                     case "CameraZoomIn": pad.CameraZoomIn = rawValue; break;
                     case "CameraZoomOut": pad.CameraZoomOut = rawValue; break;
                 }
@@ -817,7 +817,7 @@ namespace Blocks.Gameplay.Core
                 case "BetNo": keys.BetNo = rawValue; break;
                 case "BetMultiplier": keys.BetMultiplier = rawValue; break;
                 case "DismissBet": keys.DismissBet = rawValue; break;
-                case "OpenWagersMenu": keys.OpenWagersMenu = rawValue; break;
+                case "OpenItemMenu": keys.OpenItemMenu = rawValue; break;
                 case "CameraZoomIn": keys.CameraZoomIn = rawValue; break;
                 case "CameraZoomOut": keys.CameraZoomOut = rawValue; break;
             }

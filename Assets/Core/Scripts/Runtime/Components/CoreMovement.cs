@@ -84,6 +84,18 @@ namespace Blocks.Gameplay.Core
         [Tooltip("The height the character can jump.")]
         public float jumpHeight = 1.2f;
 
+        /// <summary>
+        /// Multiplies walk and sprint speed (WalkAbility) - 1 = normal. Rocket Shoes set it for their duration
+        /// (ItemEffects). Rails, climbing and poles, which also scale off moveSpeed, aren't affected.
+        /// </summary>
+        public float RunSpeedMultiplier { get; set; } = 1f;
+
+        /// <summary>
+        /// Multiplies the height of the jump off the ground (JumpAbility) - 1 = normal. Spring Shoes set it for
+        /// their duration (ItemEffects). Rail, pole and double jumps aren't affected.
+        /// </summary>
+        public float JumpHeightMultiplier { get; set; } = 1f;
+
         [Header("Ground Check")]
         [Tooltip("Vertical offset for the ground check sphere.")]
         [SerializeField] private float groundedOffset = -0.14f;
@@ -170,6 +182,9 @@ namespace Blocks.Gameplay.Core
         /// Gets the character's current horizontal speed.
         /// </summary>
         public float CurrentSpeed => new Vector3(m_ArealVelocity.x, 0.0f, m_ArealVelocity.z).magnitude;
+
+        /// <summary>Last frame's velocity across the ground (the Jetpack reads it).</summary>
+        public Vector3 HorizontalVelocity => new Vector3(m_ArealVelocity.x, 0.0f, m_ArealVelocity.z);
 
         /// <summary>
         /// Gets the magnitude of the movement input (0 for no input, 1 for full input).

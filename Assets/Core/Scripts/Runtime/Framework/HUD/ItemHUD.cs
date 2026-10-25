@@ -58,6 +58,7 @@ namespace Blocks.Gameplay.Core
         private Label m_KeyLabel;
         private VisualElement m_SparkleLayer;
         private Label m_Banner;
+        private VisualElement m_BannerHolder;
 
         private readonly List<ItemDefinition> m_ReelItems = new List<ItemDefinition>();
         private readonly List<Sparkle> m_Sparkles = new List<Sparkle>();
@@ -92,7 +93,7 @@ namespace Blocks.Gameplay.Core
         {
             InputBindingsStore.Saved -= ReloadBindings;
             m_Root?.RemoveFromHierarchy();
-            m_Banner?.RemoveFromHierarchy();
+            m_BannerHolder?.RemoveFromHierarchy();
         }
 
         // =====================================================================================
@@ -198,11 +199,17 @@ namespace Blocks.Gameplay.Core
             m_KeyBadge.Add(m_KeyLabel);
             m_Root.Add(m_KeyBadge);
 
+            // The "Ready: X" / "X!" toast sits in the middle of the screen (a full-screen holder centres it), so long
+            // item names have room and never clip off the edge.
+            m_BannerHolder = new VisualElement { pickingMode = PickingMode.Ignore };
+            m_BannerHolder.style.position = Position.Absolute;
+            m_BannerHolder.style.left = m_BannerHolder.style.right = m_BannerHolder.style.top = m_BannerHolder.style.bottom = 0;
+            m_BannerHolder.style.alignItems = Align.Center;
+            m_BannerHolder.style.justifyContent = Justify.Center;
+            parent.Add(m_BannerHolder);
+
             m_Banner = new Label { pickingMode = PickingMode.Ignore };
-            m_Banner.style.position = Position.Absolute;
-            m_Banner.style.right = right - 60f;
-            m_Banner.style.width = SlotWidth + 120f;
-            m_Banner.style.bottom = Bottom + SlotHeight + 14f;
+            m_Banner.style.maxWidth = Length.Percent(90);
             m_Banner.style.fontSize = 24;
             m_Banner.style.unityFontStyleAndWeight = FontStyle.Bold;
             m_Banner.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -212,7 +219,7 @@ namespace Blocks.Gameplay.Core
             m_Banner.style.unityTextOutlineColor = Color.black;
             m_Banner.style.transformOrigin = new TransformOrigin(Length.Percent(50), Length.Percent(100));
             m_Banner.style.display = DisplayStyle.None;
-            parent.Add(m_Banner);
+            m_BannerHolder.Add(m_Banner);
 
             GameFont.Apply(m_Root);
             GameFont.Apply(m_Banner);

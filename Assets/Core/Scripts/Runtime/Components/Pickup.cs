@@ -23,8 +23,8 @@ namespace Blocks.Gameplay.Core
     {
         public const string TexturePath = "Pickups/Pickup";
 
-        /// <summary>Sprite width in meters (height follows the image's shape).</summary>
-        public const float Width = 2f;
+        /// <summary>Sprite width in meters (height follows the image's shape). 1.25 since the round pickup3 art (was 2 for the wide dollar bill).</summary>
+        public const float Width = 1.25f;
 
         /// <summary>Center of the sprite above the ground under it (waist height).</summary>
         public const float HeightAboveGround = 1f;

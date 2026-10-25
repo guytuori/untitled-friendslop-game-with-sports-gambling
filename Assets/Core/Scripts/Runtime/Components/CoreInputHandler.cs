@@ -60,6 +60,52 @@ namespace Blocks.Gameplay.Core
         private GameplayInputSystem_Actions m_InputActions;
 
         /// <summary>
+        /// Jump is held down right now (this player's own input; the Jetpack reads it). Read straight from the
+        /// Jump action every time rather than tracked from press/release callbacks, so a missed release (or press)
+        /// can't leave it wrong.
+        /// </summary>
+        public bool JumpHeld
+        {
+            get
+            {
+                if (GameplayInputBlocked || m_InputActions == null) return false;
+                InputAction jump = m_InputActions.Player.Jump;
+                if (!jump.enabled) return false;
+                if (jump.IsPressed()) return true;
+
+                // Belt and braces: any button bound to Jump that's physically down right now, read from the
+                // device itself rather than the action's state.
+                var controls = jump.controls;
+                for (int i = 0; i < controls.Count; i++)
+                {
+                    if (controls[i] is UnityEngine.InputSystem.Controls.ButtonControl button && button.isPressed) return true;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>The Jump action's state, for the Jetpack's log: phase, IsPressed, and which bound buttons are down.</summary>
+        public string JumpDebugState
+        {
+            get
+            {
+                if (m_InputActions == null) return "no actions";
+                InputAction jump = m_InputActions.Player.Jump;
+                var down = new System.Text.StringBuilder();
+                var controls = jump.controls;
+                for (int i = 0; i < controls.Count; i++)
+                {
+                    if (controls[i] is UnityEngine.InputSystem.Controls.ButtonControl button && button.isPressed)
+                        down.Append(down.Length > 0 ? ", " : "").Append(button.path);
+                }
+                return $"enabled {jump.enabled}, phase {jump.phase}, IsPressed {jump.IsPressed()}, blocked {GameplayInputBlocked}, {controls.Count} bound, down [{down}]";
+            }
+        }
+
+        /// <summary>Counts Jump presses, so something that polls (the Jetpack) can't miss a quick tap.</summary>
+        public int JumpPressCount { get; private set; }
+
+        /// <summary>
         /// Raised (with the control that was pressed) when the local player presses the Menu action - Esc /
         /// gamepad Start by default. InGameMenu opens and closes the Escape menu with it. Still raised while
         /// gameplay input is blocked.
@@ -267,8 +313,17 @@ namespace Blocks.Gameplay.Core
 
             onLookInput?.Raise(context.ReadValue<Vector2>()); // mouse: a per-frame delta
         }
-        private void HandleJumpPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onJumpPressed?.Raise(); }
-        private void HandleJumpReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onJumpReleased?.Raise(); }
+        private void HandleJumpPressed(InputAction.CallbackContext context)
+        {
+            if (ShouldIgnore(context)) return;
+            JumpPressCount++;
+            onJumpPressed?.Raise();
+        }
+        private void HandleJumpReleased(InputAction.CallbackContext context)
+        {
+            if (ShouldIgnore(context)) return;
+            onJumpReleased?.Raise();
+        }
         private void HandleSprintState(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onSprintStateChanged?.Raise(context.ReadValueAsButton()); }
         private void HandleGrabState(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabStateChanged?.Raise(context.ReadValueAsButton()); }
         private void HandleGrabPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabPressed?.Raise(); }

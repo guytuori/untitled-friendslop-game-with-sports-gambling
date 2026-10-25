@@ -100,10 +100,9 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private void HandleAnyStatDepleted(StatDepletedPayload payload)
         {
-            if (!IsOwner) return;
-            if (payload.statID != StatKeys.Health) return;
-
-            if (!PracticeMode.IsActive) GetPlayerScore(payload.playerId)?.AddScore(-deathPenalty); // no penalty in practice
+            // Since 2026-10-25 the dying player's own machine applies the penalty (PlayerScore.HandleLocalDeath,
+            // from GameManager), so the 1-Up's shield can waive it and the Death Penalty rule is used. Nothing to
+            // do here any more; the serialized deathPenalty value is no longer read.
         }
 
         #endregion

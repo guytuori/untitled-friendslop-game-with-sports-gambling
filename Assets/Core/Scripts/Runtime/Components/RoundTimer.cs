@@ -87,6 +87,8 @@ namespace Blocks.Gameplay.Core
         [Networked] private TickTimer NetPhaseTimer { get; set; }
         [Networked, Capacity(MaxPlayers)] private NetworkArray<int> NetFinishedIds => default;
         [Networked] private int NetFinishedCount { get; set; }
+        [Networked, Capacity(MaxPlayers)] private NetworkArray<int> NetOutIds => default; // out of lives (also in NetFinishedIds)
+        [Networked] private int NetOutCount { get; set; }
         [Networked, Capacity(MaxPlayers)] private NetworkArray<int> NetIntroReadyIds => default;
         [Networked] private int NetIntroReadyCount { get; set; }
 
@@ -159,6 +161,9 @@ namespace Blocks.Gameplay.Core
         /// <summary>Raised on every client when a player reaches the end point (player id, bonus points earned).</summary>
         public event Action<ulong, int> PlayerFinished;
 
+        /// <summary>Raised on every client when a player runs out of lives and sits out the rest of the round.</summary>
+        public event Action<ulong> PlayerOut;
+
         #endregion
 
         #region Unity & Network Lifecycle
@@ -188,6 +193,7 @@ namespace Blocks.Gameplay.Core
                 NetPhase = (int)start;
                 if (start == RoundPhase.Countdown) NetPhaseTimer = TickTimer.CreateFromSeconds(Runner, CountdownSeconds);
                 NetFinishedCount = 0;
+                NetOutCount = 0;
                 NetIntroReadyCount = 0;
                 NetInitialized = true;
             }
@@ -327,6 +333,58 @@ namespace Blocks.Gameplay.Core
         private void PlayerFinishedRpc(int playerId, int bonusPoints)
         {
             PlayerFinished?.Invoke((ulong)playerId, bonusPoints);
+        }
+
+        /// <summary>Whether this player has run out of lives this round (they also count as finished).</summary>
+        public bool IsPlayerOut(ulong playerId)
+        {
+            if (!IsSpawned || playerId == 0) return false;
+            int count = Mathf.Clamp(NetOutCount, 0, MaxPlayers);
+            for (int i = 0; i < count; i++)
+            {
+                if ((ulong)NetOutIds[i] == playerId) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// This machine's player lost their last life (GameManager): they sit out the rest of the round. They're
+        /// added to the finished players - no bonus points - so they can't score, wager or take items any more, and
+        /// the round ends once everyone has finished or is out. Their points still count for the team.
+        /// </summary>
+        public void ReportLocalPlayerOut()
+        {
+            if (PracticeMode.IsActive || !IsPlaying || LocalPlayerFinished) return;
+            ReportOutRpc();
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void ReportOutRpc(RpcInfo info = default)
+        {
+            ulong playerId = NetworkPlayers.ToClientId(info.Source);
+            if (playerId == 0) playerId = NetworkPlayers.ToClientId(Runner.LocalPlayer);
+            if (playerId == 0 || NetPhase != (int)RoundPhase.Playing || IsPlayerFinished(playerId)) return;
+
+            int count = Mathf.Clamp(NetFinishedCount, 0, MaxPlayers);
+            if (count >= MaxPlayers) return;
+            NetFinishedIds.Set(count, (int)playerId);
+            NetFinishedCount = count + 1;
+
+            int outCount = Mathf.Clamp(NetOutCount, 0, MaxPlayers);
+            if (outCount < MaxPlayers)
+            {
+                NetOutIds.Set(outCount, (int)playerId);
+                NetOutCount = outCount + 1;
+            }
+
+            PlayerOutRpc((int)playerId);
+            DetectChanges();
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void PlayerOutRpc(int playerId)
+        {
+            PlayerOut?.Invoke((ulong)playerId);
         }
 
         private bool EveryoneFinished()

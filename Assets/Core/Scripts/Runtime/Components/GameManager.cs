@@ -294,6 +294,19 @@ namespace Blocks.Gameplay.Core
                 playerState.SetLifeState(PlayerLifeState.Eliminated);
             }
 
+            // The death penalty (or the 1-Up shield instead) and losing a life (PlayerScore). Out of lives: no
+            // respawn - sit out the rest of the round.
+            var score = localPlayer.GetComponent<PlayerScore>();
+            if (score != null && score.HandleLocalDeath())
+            {
+                if (onRespawnStatus != null)
+                {
+                    onRespawnStatus.Raise(new RespawnStatusPayload { playerId = localPlayer.OwnerClientId, message = Loc.T("OUT OF LIVES"), subtext = "", showSubtext = false });
+                }
+                if (RoundTimer.Instance != null) RoundTimer.Instance.ReportLocalPlayerOut();
+                return;
+            }
+
             // Start respawn countdown if auto-respawn is enabled
             if (autoRespawn)
             {

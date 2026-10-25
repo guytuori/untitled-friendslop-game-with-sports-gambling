@@ -74,7 +74,7 @@ namespace Blocks.Gameplay.Core
             bool useSprintSpeed = m_Motor.IsGrounded ? m_Motor.IsSprinting : (conserveMomentum && m_WasSprinting);
             
             // Determine the target speed based on whether the player is sprinting
-            float targetSpeed = useSprintSpeed ? m_Motor.sprintSpeed : m_Motor.moveSpeed;
+            float targetSpeed = (useSprintSpeed ? m_Motor.sprintSpeed : m_Motor.moveSpeed) * m_Motor.RunSpeedMultiplier; // Rocket Shoes
 
             // If grounded, update our sprint state memory
             if (m_Motor.IsGrounded)

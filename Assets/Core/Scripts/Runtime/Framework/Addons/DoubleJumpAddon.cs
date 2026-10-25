@@ -37,6 +37,11 @@ namespace Blocks.Gameplay.Core
         private bool m_HasDoubleJumped;
         private bool m_IsActive = true;
 
+        // The last frame a movement ability (rail, wall climb, pole) was running. A Jump press that ends one of
+        // those (jumping off a rail, wall or pole) arrives in the same or the next frame, after the ability has
+        // let go - without this it would also fire a double jump that overwrites the jump-off's own launch.
+        private int m_LastAbilityFrame = -10;
+
         #endregion
 
         #region IPlayerAddon Implementation
@@ -79,6 +84,11 @@ namespace Blocks.Gameplay.Core
 
         #region Private Methods
 
+        private void Update()
+        {
+            if (m_CoreMovement != null && m_CoreMovement.MovementAbilityActive()) m_LastAbilityFrame = Time.frameCount;
+        }
+
         private void RegisterEventListeners()
         {
             if (onJumpPressed != null)
@@ -113,6 +123,9 @@ namespace Blocks.Gameplay.Core
 
             // Out of double jumps until the player lands (maxDoubleJumps -1 = unlimited).
             if (maxDoubleJumps >= 0 && m_doubleJumpedCount >= maxDoubleJumps) return;
+
+            // This press is jumping off a rail, wall or pole, not a double jump.
+            if (Time.frameCount - m_LastAbilityFrame <= 1) return;
 
             // Only allow double jump if airborne and haven't jumped yet
             //&& !m_HasDoubleJumped

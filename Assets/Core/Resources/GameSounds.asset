@@ -14,3 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GameSounds
   death: {fileID: 8300000, guid: 0b5182615b115b844831553a43464de8, type: 3}
   challengeSuccess: {fileID: 8300000, guid: 346ffc1cc22f7b346aac257a9a822188, type: 3}
+  points: {fileID: 8300000, guid: 2b9551580b1c98240b23059d1c3edb51, type: 3}

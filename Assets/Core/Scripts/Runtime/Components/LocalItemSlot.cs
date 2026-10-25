@@ -141,6 +141,22 @@ namespace Blocks.Gameplay.Core
             StateChanged?.Invoke(this);
         }
 
+        /// <summary>
+        /// Practice item menu: puts <paramref name="item"/> straight into the slot, ready to use (no spin). Whatever
+        /// was there is dropped - a timed item still running is ended first.
+        /// </summary>
+        public void GiveNow(ItemId item)
+        {
+            if (item == ItemId.None || ItemCatalog.Get(item) == null) return;
+            if (State == SlotState.Active) ItemEffects.Expired(Definition, m_Player);
+
+            FromShop = true; // the HUD's "Ready: X" pop-in rather than a spin
+            Item = item;
+            ItemKnownTime = Time.time;
+            SetState(SlotState.Holding);
+            Debug.Log($"[Items] Practice item menu: {ItemCatalog.NameOf(item)} put in the slot.", this);
+        }
+
         /// <summary>When the spin lands: at least <see cref="MinRollSeconds"/> after the touch, and a settle after the item is known.</summary>
         public float RollLandTime => ItemKnownTime < 0f ? float.MaxValue : Mathf.Max(StateStartTime + MinRollSeconds, ItemKnownTime + SettleSeconds);
 

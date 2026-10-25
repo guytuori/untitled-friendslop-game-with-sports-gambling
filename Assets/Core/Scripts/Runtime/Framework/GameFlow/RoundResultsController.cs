@@ -98,7 +98,7 @@ namespace Blocks.Gameplay.Core
 
             int round = MatchProgress.HasResults ? MatchProgress.LastRoundNumber : MatchProgress.RoundNumber - 1;
             column.Add(MakeLabel(Loc.F("ROUND {0} COMPLETE!", Mathf.Max(1, round)), 40, new Color(0.55f, 0.9f, 0.43f), bold: true));
-            column.Add(MakeLabel(Loc.F("Team scored {0} of {1}", MatchProgress.LastTeamTotal, MatchProgress.LastTeamTarget), 20, Color.white, bold: false));
+            column.Add(MakeStarLabel(Loc.F("Team scored {0} of {1}", StarLabel.Amount(MatchProgress.LastTeamTotal), StarLabel.Amount(MatchProgress.LastTeamTarget)), 20, Color.white));
 
             var table = new VisualElement();
             table.style.marginTop = 24;
@@ -113,11 +113,11 @@ namespace Blocks.Gameplay.Core
 
             foreach (RoundResultEntry entry in MatchProgress.LastResults)
             {
-                table.Add(MakeRow(entry.Name, entry.Score.ToString(), Color.white, new Color(0.57f, 0.84f, 0.38f)));
+                table.Add(MakeRow(entry.Name, StarLabel.Amount(entry.Score), Color.white, new Color(0.57f, 0.84f, 0.38f)));
             }
-            table.Add(MakeRow("TOTAL", MatchProgress.LastTeamTotal.ToString(), Color.white, new Color(1f, 0.84f, 0.35f)));
+            table.Add(MakeRow("TOTAL", StarLabel.Amount(MatchProgress.LastTeamTotal), Color.white, new Color(1f, 0.84f, 0.35f)));
 
-            column.Add(MakeLabel(Loc.F("Next round's target: {0}", MatchProgress.NextTeamTarget), 20, new Color(0.67f, 0.86f, 1f), bold: true));
+            column.Add(MakeStarLabel(Loc.F("Next round's target: {0}", StarLabel.Amount(MatchProgress.NextTeamTarget)), 20, new Color(0.67f, 0.86f, 1f)));
 
             m_Prompt = MakeLabel(m_ShopMode ? Loc.T("Buy an item, or choose No Item, when you're ready for the next round") : "Press any key to go to the next round", 18, Color.white, bold: false);
             m_Prompt.style.position = Position.Absolute;
@@ -181,6 +181,16 @@ namespace Blocks.Gameplay.Core
             return label;
         }
 
+        /// <summary>A centred line of text whose ★s are drawn as stars.</summary>
+        private static StarLabel MakeStarLabel(string text, int size, Color color)
+        {
+            var label = new StarLabel(text, Justify.Center);
+            label.style.fontSize = size;
+            label.style.color = color;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            return label;
+        }
+
         private static VisualElement MakeRow(string name, string value, Color nameColor, Color valueColor)
         {
             var row = new VisualElement();
@@ -194,7 +204,7 @@ namespace Blocks.Gameplay.Core
             nameLabel.style.color = nameColor;
             row.Add(nameLabel);
 
-            var valueLabel = new Label(value);
+            var valueLabel = new StarLabel(value, Justify.FlexEnd);
             valueLabel.style.fontSize = 18;
             valueLabel.style.color = valueColor;
             row.Add(valueLabel);

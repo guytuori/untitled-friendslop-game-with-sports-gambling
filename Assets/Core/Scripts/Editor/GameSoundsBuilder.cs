@@ -14,6 +14,7 @@ namespace Blocks.Gameplay.Core
     {
         public const string DeathPath = "Assets/Core/Audio/Clips/death.mp3";
         public const string ChallengeSuccessPath = "Assets/Core/Audio/Clips/challenge_success.mp3";
+        public const string PointsPath = "Assets/Core/Audio/Clips/points.mp3";
         private const string ResourcesFolder = "Assets/Core/Resources";
         private const string AssetPath = ResourcesFolder + "/" + GameSounds.ResourcePath + ".asset";
 
@@ -24,13 +25,14 @@ namespace Blocks.Gameplay.Core
             EditorApplication.delayCall += () =>
             {
                 var sounds = AssetDatabase.LoadAssetAtPath<GameSounds>(AssetPath);
-                if (sounds == null || sounds.DeathClip == null || sounds.ChallengeSuccessClip == null) Rebuild();
+                if (sounds == null || sounds.DeathClip == null || sounds.ChallengeSuccessClip == null || sounds.PointsClip == null) Rebuild();
             };
         }
 
         internal static bool IsWatchedPath(string path) =>
             string.Equals(path, DeathPath, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(path, ChallengeSuccessPath, StringComparison.OrdinalIgnoreCase);
+            string.Equals(path, ChallengeSuccessPath, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(path, PointsPath, StringComparison.OrdinalIgnoreCase);
 
         internal static void Schedule()
         {
@@ -58,12 +60,13 @@ namespace Blocks.Gameplay.Core
 
             var death = AssetDatabase.LoadAssetAtPath<AudioClip>(DeathPath);
             var success = AssetDatabase.LoadAssetAtPath<AudioClip>(ChallengeSuccessPath);
-            if (sounds.DeathClip == death && sounds.ChallengeSuccessClip == success) return;
+            var points = AssetDatabase.LoadAssetAtPath<AudioClip>(PointsPath);
+            if (sounds.DeathClip == death && sounds.ChallengeSuccessClip == success && sounds.PointsClip == points) return;
 
-            sounds.Set(death, success);
+            sounds.Set(death, success, points);
             EditorUtility.SetDirty(sounds);
             AssetDatabase.SaveAssets();
-            Debug.Log($"[GameSounds] Death = {(death != null ? death.name : "missing (" + DeathPath + ")")}, challenge success = {(success != null ? success.name : "missing (" + ChallengeSuccessPath + ")")}.", sounds);
+            Debug.Log($"[GameSounds] Death = {(death != null ? death.name : "missing (" + DeathPath + ")")}, challenge success = {(success != null ? success.name : "missing (" + ChallengeSuccessPath + ")")}, points = {(points != null ? points.name : "missing (" + PointsPath + ")")}.", sounds);
         }
     }
 
