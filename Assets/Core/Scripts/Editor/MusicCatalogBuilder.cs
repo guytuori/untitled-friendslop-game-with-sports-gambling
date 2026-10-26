@@ -14,8 +14,10 @@ namespace Blocks.Gameplay.Core
     /// Keeps <see cref="MusicCatalog"/> (Resources/MusicCatalog) in step with the songs: every audio file in
     /// <see cref="MusicFolder"/>, by file name, with its loop point from <see cref="InfoFile"/> and, for MP3s, the
     /// encoder delay / padding from the file's LAME header (see MusicCatalog for why). Rebuilt automatically when
-    /// a song or music_info.txt is added, changed, moved or deleted, once when the editor loads if the catalog
-    /// doesn't exist yet, and via Friendslop > Audio > Rebuild Music.
+    /// a song or music_info.txt is added, changed, moved or deleted; when the editor loads (or scripts reload) if
+    /// the catalog is missing or the folder changed since it was built (sizes / modified times - catches songs
+    /// swapped while Unity was closed); when play mode ends if something changed during it (rebuilding is skipped
+    /// in play mode); and via Friendslop > Audio > Rebuild Music.
     ///
     /// music_info.txt: one block per song, separated by blank lines -
     ///     01 - Parkour Predictions!                    (display title; "NN - " is the track number)
@@ -44,8 +46,63 @@ namespace Blocks.Gameplay.Core
             {
                 // Missing, or built before the Sound Test list existed (2026-10-17): build it now.
                 var existing = AssetDatabase.LoadAssetAtPath<MusicCatalog>(CatalogPath);
-                if (existing == null || existing.SoundTest.Count == 0) Rebuild();
+                if (existing == null || existing.SoundTest.Count == 0 || existing.SourceStamp != FolderStamp()) Rebuild();
             };
+            EditorApplication.playModeStateChanged += state =>
+            {
+                if (state != PlayModeStateChange.EnteredEditMode || !s_ChangedInPlayMode) return;
+                s_ChangedInPlayMode = false;
+                ScheduleRebuild();
+            };
+        }
+
+        private static bool s_ChangedInPlayMode;
+
+        private static string QuickHash(FileInfo file)
+        {
+            const int Chunk = 64 * 1024;
+            using (var md5 = System.Security.Cryptography.MD5.Create())
+            using (FileStream stream = file.OpenRead())
+            {
+                byte[] data;
+                if (stream.Length <= Chunk * 2)
+                {
+                    data = new byte[stream.Length];
+                    stream.Read(data, 0, data.Length);
+                }
+                else
+                {
+                    data = new byte[Chunk * 2];
+                    stream.Read(data, 0, Chunk);
+                    stream.Seek(-Chunk, SeekOrigin.End);
+                    stream.Read(data, Chunk, Chunk);
+                }
+                return BitConverter.ToString(md5.ComputeHash(data)).Replace("-", "").Substring(0, 12);
+            }
+        }
+
+        /// <summary>
+        /// The songs and music_info.txt in the folder - names, sizes and a hash of the contents (all of
+        /// music_info.txt; the first and last 64 KB of a song) - so a catalog built from different files can be
+        /// spotted. No file times, so it's the same on every machine and a fresh clone doesn't rebuild.
+        /// </summary>
+        private static string FolderStamp()
+        {
+            try
+            {
+                string folder = Path.Combine(Path.GetDirectoryName(Application.dataPath) ?? "", MusicFolder);
+                if (!Directory.Exists(folder)) return "";
+                var parts = Directory.GetFiles(folder)
+                    .Select(f => new FileInfo(f))
+                    .Where(f => IsAudio(f.Name) || string.Equals(MusicFolder + "/" + f.Name, InfoFile, StringComparison.Ordinal))
+                    .OrderBy(f => f.Name, StringComparer.Ordinal)
+                    .Select(f => $"{f.Name}|{f.Length}|{QuickHash(f)}");
+                return string.Join(";", parts);
+            }
+            catch (Exception)
+            {
+                return "";
+            }
         }
 
         [MenuItem("Friendslop/Audio/Rebuild Music")]
@@ -78,7 +135,11 @@ namespace Blocks.Gameplay.Core
         public static string Rebuild()
         {
             if (s_Building) return "Already rebuilding.";
-            if (EditorApplication.isPlayingOrWillChangePlaymode) return "Not rebuilt in play mode.";
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                s_ChangedInPlayMode = true; // rebuilt as soon as play mode ends
+                return "Not rebuilt in play mode - it will be when play mode ends.";
+            }
 
             s_Building = true;
             try
@@ -174,7 +235,7 @@ namespace Blocks.Gameplay.Core
                     catalog = ScriptableObject.CreateInstance<MusicCatalog>();
                     AssetDatabase.CreateAsset(catalog, CatalogPath);
                 }
-                catalog.SetTracks(entries, listing);
+                catalog.SetTracks(entries, listing, FolderStamp());
                 EditorUtility.SetDirty(catalog);
                 AssetDatabase.SaveAssets();
 

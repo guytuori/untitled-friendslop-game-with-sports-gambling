@@ -3,8 +3,8 @@ Parkour_Predictions.mp3
 loop point: N/A
 
 02 - Parkour Parley
-Parkour_Parkley.mp3 //not implemented yet
-loop point: N/A
+Parkour_Parley.mp3
+loop point: 13.911s
 
 03 - Ready to Run
 Ready_to_Run.mp3
@@ -16,7 +16,7 @@ loop point: N/A
 
 05 - Dinosaur Country
 Dinosaur_Country.mp3
-loop point: 16.403s
+loop point: 16.889s
 
 06 - Of Ninjas and Pirates
 Of_Ninjas_and_Pirates.mp3
@@ -27,8 +27,8 @@ Airship_Descent.mp3 //not implemented yet
 loop point: N/A
 
 08 - Twenty Thousand Inches Over the Sea
-Twenty_Thousand_Inches_Over_the_Sea.mp3 //not implemented yet
-loop point: N/A
+Twenty_Thousand_Inches_Over_the_Sea.mp3
+loop point: 25.826s
 
 09 - Red Rock Rock
 Red_Rock_Rock.mp3 //not implemented yet

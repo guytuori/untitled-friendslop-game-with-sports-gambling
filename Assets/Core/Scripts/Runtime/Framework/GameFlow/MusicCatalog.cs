@@ -93,6 +93,10 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private List<Entry> tracks = new List<Entry>();
         [SerializeField] private List<Listing> soundTest = new List<Listing>();
 
+        // Editor only (MusicCatalogBuilder): the music folder's files (names, sizes, content hashes) this was built from,
+        // so a change made while the editor was closed or in play mode is caught on the next editor load.
+        [SerializeField, HideInInspector] private string sourceStamp = "";
+
         /// <summary>The Sound Test's song list (Single Player > Sound Test).</summary>
         public IReadOnlyList<Listing> SoundTest => soundTest;
 
@@ -144,12 +148,16 @@ namespace Blocks.Gameplay.Core
         }
 
 #if UNITY_EDITOR
-        public void SetTracks(List<Entry> entries, List<Listing> listing)
+        public void SetTracks(List<Entry> entries, List<Listing> listing, string stamp = null)
         {
             tracks = entries ?? new List<Entry>();
             soundTest = listing ?? new List<Listing>();
+            if (stamp != null) sourceStamp = stamp;
             m_ById = null;
         }
+
+        /// <summary>Editor only: the folder stamp the catalog was last built from (see MusicCatalogBuilder).</summary>
+        public string SourceStamp => sourceStamp;
 #endif
     }
 }

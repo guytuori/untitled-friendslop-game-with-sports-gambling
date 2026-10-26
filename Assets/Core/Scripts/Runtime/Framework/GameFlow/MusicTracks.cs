@@ -6,9 +6,9 @@ namespace Blocks.Gameplay.Core
     /// Which song plays where - the names are the file names in Assets/Core/Audio/Music without the extension.
     /// null = silence there for now. <see cref="MusicPlayer"/> does the playing.
     ///
-    ///   - Title screen: Parkour_Predictions, once (no loop). It keeps going into the menus until it ends,
-    ///     unless <see cref="Menu"/> is set.
-    ///   - Menus: <see cref="Menu"/> (not written yet).
+    ///   - Title screen: Parkour_Predictions, once (no loop).
+    ///   - Menus: <see cref="Menu"/>, Parkour_Parley (it takes over from the title song on the first menu).
+    ///     Moving between menus doesn't restart it.
     ///   - Course flyover (the intro, every map): Ready_to_Run.
     ///   - The round itself, from PARKOUR!: the map's song (<see cref="ForMap"/>). Fades out at the end of the
     ///     round, under TIME!.
@@ -21,8 +21,8 @@ namespace Blocks.Gameplay.Core
         public const string Flyover = "Ready_to_Run";
         public const string RoundWon = "Banking_on_Victory";
 
-        /// <summary>Main menu and the other menu screens. Not written yet.</summary>
-        public const string Menu = null;
+        /// <summary>Main menu and the other menu screens.</summary>
+        public const string Menu = "Parkour_Parley";
 
         /// <summary>The Final Score screen after missing the target. Not written yet.</summary>
         public const string RoundLost = null;
@@ -38,6 +38,7 @@ namespace Blocks.Gameplay.Core
                 case "DinosaurZoo": return "Dinosaur_Country";
                 case "NinjaPirateTower": return "Of_Ninjas_and_Pirates";
                 case "LastStop": return "Last_Stop";
+                case "SeaBase": return "Twenty_Thousand_Inches_Over_the_Sea"; // the map isn't built yet
                 default: return null;
             }
         }
