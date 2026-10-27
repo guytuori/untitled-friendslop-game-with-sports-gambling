@@ -52,7 +52,7 @@ namespace Blocks.Gameplay.Core
     /// PreventDefault always runs for them (see OnDropdownNavigationMove), the same "don't trust the
     /// automatic navigation, override it explicitly" lesson every GameFlow settings screen in this project
     /// already established. While NOT editing, Up/Down move focus explicitly to the previous/next dropdown
-    /// in <see cref="m_RowsInOrder"/> (Resolution/Frame Rate/VSync/Windowed Mode/Field of View, clamped at each end -
+    /// in <see cref="m_RowsInOrder"/> (Resolution/Frame Rate/VSync/Windowed Mode/Field of View/Default Zoom, clamped at each end -
     /// no wraparound), rather than whatever the automatic navigation would have picked.
     ///
     /// Outside edit mode, Right on a focused dropdown is the only thing that leaves the dropdown column -
@@ -86,6 +86,13 @@ namespace Blocks.Gameplay.Core
     /// Submit commits, Cancel reverts; Up/Down do nothing while editing. Not editing, it's just the last row
     /// of the Up/Down order (<see cref="m_RowsInOrder"/>) and Right goes to Save Changes like the dropdowns.
     /// A mouse drag sets it to any whole degree. Applied live in-game by CoreCameraController.
+    ///
+    /// DEFAULT ZOOM (added 2026-10-27): a second slider row under Field of View, 0-100% of the camera's zoom
+    /// range (0 = closest, 100 = furthest; default 80 = the camera's own default distance), shown as e.g. "80%",
+    /// stepping 5% while editing. It's where the zoom starts each launch, so a player's preferred zoom sticks;
+    /// the mouse wheel / zoom buttons still change it during play (kept between rounds, not saved). Changing it
+    /// here mid-game moves the camera there right away. Both sliders share the same edit-mode handling
+    /// (<see cref="m_SliderRows"/>).
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class GraphicsSettingsController : MonoBehaviour
@@ -126,6 +133,9 @@ namespace Blocks.Gameplay.Core
         /// <summary>Degrees per Left/Right press while the Field of View slider is being edited.</summary>
         private const int FieldOfViewStep = 5;
 
+        /// <summary>Percent per Left/Right press while the Default Zoom slider is being edited.</summary>
+        private const int DefaultZoomStep = 5;
+
         private GraphicsSettingsData m_Settings;
 
         private DropdownField m_ResolutionDropdown;
@@ -136,7 +146,18 @@ namespace Blocks.Gameplay.Core
         private readonly Dictionary<DropdownField, System.Action<int>> m_DropdownOnChanged = new Dictionary<DropdownField, System.Action<int>>();
 
         private SliderInt m_FieldOfViewSlider;
-        private Label m_FieldOfViewValueLabel;
+        private SliderInt m_DefaultZoomSlider;
+
+        /// <summary>Each slider row's value label, how it shows a value, what a value sets, and its Left/Right step.</summary>
+        private sealed class SliderRow
+        {
+            public Label ValueLabel;
+            public System.Func<int, string> Format;
+            public System.Action<int> Apply;
+            public int Step;
+        }
+
+        private readonly Dictionary<SliderInt, SliderRow> m_SliderRows = new Dictionary<SliderInt, SliderRow>();
 
         /// <summary>Fixed Up/Down order of the settings rows while not editing: the four dropdowns, then the Field of View slider. Populated at the end of BuildUI.</summary>
         private VisualElement[] m_RowsInOrder;
@@ -190,7 +211,8 @@ namespace Blocks.Gameplay.Core
                 FrameRate = source.FrameRate,
                 VSyncEnabled = source.VSyncEnabled,
                 Fullscreen = source.Fullscreen,
-                FieldOfView = source.ClampedFieldOfView
+                FieldOfView = source.ClampedFieldOfView,
+                DefaultZoom = source.ClampedDefaultZoom
             };
         }
 
@@ -307,8 +329,13 @@ namespace Blocks.Gameplay.Core
                 m_Settings.Fullscreen = (idx == 0);
                 LiveApply();
             });
-            m_FieldOfViewSlider = AddFieldOfViewRow(dropdownColumn);
-            m_RowsInOrder = new VisualElement[] { m_ResolutionDropdown, m_FrameRateDropdown, m_VSyncDropdown, m_WindowedDropdown, m_FieldOfViewSlider };
+            m_FieldOfViewSlider = AddSliderRow(dropdownColumn, "FIELD OF VIEW",
+                GraphicsSettingsData.MinFieldOfView, GraphicsSettingsData.MaxFieldOfView, m_Settings.ClampedFieldOfView,
+                DegreesText, value => m_Settings.FieldOfView = value, FieldOfViewStep);
+            m_DefaultZoomSlider = AddSliderRow(dropdownColumn, "DEFAULT ZOOM",
+                GraphicsSettingsData.MinDefaultZoom, GraphicsSettingsData.MaxDefaultZoom, m_Settings.ClampedDefaultZoom,
+                PercentText, value => m_Settings.DefaultZoom = value, DefaultZoomStep);
+            m_RowsInOrder = new VisualElement[] { m_ResolutionDropdown, m_FrameRateDropdown, m_VSyncDropdown, m_WindowedDropdown, m_FieldOfViewSlider, m_DefaultZoomSlider };
 
             // Same absolutely-positioned bottom-right column as every other GameFlow settings screen, with
             // Restore Defaults and Save Changes above Back.
@@ -555,29 +582,31 @@ namespace Blocks.Gameplay.Core
 
         private static string DegreesText(int degrees) => $"{degrees}\u00B0";
 
+        private static string PercentText(int percent) => $"{percent}%";
+
         /// <summary>
-        /// Label + SliderInt (60-120) + "80°" value label, laid out to line up with the dropdown rows above.
-        /// Handlers are closures over this slider, never evt.target (see the class summary). Submit/Cancel
-        /// are bubble phase and Move is TrickleDown, same as AudioSettingsController.AddSliderRow.
+        /// Label + SliderInt + value label (e.g. "80°" or "80%"), laid out to line up with the dropdown rows
+        /// above. Handlers are closures over this slider, never evt.target (see the class summary).
+        /// Submit/Cancel are bubble phase and Move is TrickleDown, same as AudioSettingsController.AddSliderRow.
         /// </summary>
-        private SliderInt AddFieldOfViewRow(VisualElement parent)
+        private SliderInt AddSliderRow(VisualElement parent, string title, int low, int high, int initial,
+            System.Func<int, string> format, System.Action<int> apply, int step)
         {
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
             row.style.marginBottom = 14;
 
-            var nameLabel = new Label("FIELD OF VIEW");
+            var nameLabel = new Label(title);
             nameLabel.style.color = Color.white;
             nameLabel.style.fontSize = 16;
             nameLabel.style.width = 160;
             row.Add(nameLabel);
 
-            int initial = m_Settings.ClampedFieldOfView;
             var slider = new SliderInt
             {
-                lowValue = GraphicsSettingsData.MinFieldOfView,
-                highValue = GraphicsSettingsData.MaxFieldOfView,
+                lowValue = low,
+                highValue = high,
                 value = initial
             };
             slider.style.width = 180;
@@ -589,19 +618,19 @@ namespace Blocks.Gameplay.Core
             slider.RegisterCallback<NavigationMoveEvent>(evt => OnSliderNavigationMove(slider, evt), TrickleDown.TrickleDown);
             row.Add(slider);
 
-            var valueLabel = new Label(DegreesText(initial));
+            var valueLabel = new Label(format(initial));
             valueLabel.style.color = Color.white;
             valueLabel.style.fontSize = 16;
             valueLabel.style.width = 50;
             valueLabel.style.marginLeft = 10;
             row.Add(valueLabel);
-            m_FieldOfViewValueLabel = valueLabel;
+            m_SliderRows[slider] = new SliderRow { ValueLabel = valueLabel, Format = format, Apply = apply, Step = step };
 
             slider.RegisterValueChangedCallback(evt =>
             {
                 if (evt.newValue == evt.previousValue) return;
-                valueLabel.text = DegreesText(evt.newValue);
-                m_Settings.FieldOfView = evt.newValue;
+                valueLabel.text = format(evt.newValue);
+                apply(evt.newValue);
                 LiveApply();
             });
 
@@ -652,8 +681,9 @@ namespace Blocks.Gameplay.Core
             if (!commit)
             {
                 slider.SetValueWithoutNotify(m_ValueBeforeEdit);
-                m_FieldOfViewValueLabel.text = DegreesText(m_ValueBeforeEdit);
-                m_Settings.FieldOfView = m_ValueBeforeEdit;
+                SliderRow sliderRow = m_SliderRows[slider];
+                sliderRow.ValueLabel.text = sliderRow.Format(m_ValueBeforeEdit);
+                sliderRow.Apply(m_ValueBeforeEdit);
                 LiveApply();
 
                 if (cancelSound != null)
@@ -668,13 +698,14 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
-        /// Editing: Left/Right step the value by FieldOfViewStep (clamped), Up/Down do nothing. Not editing:
+        /// Editing: Left/Right step the value by the row's step (clamped), Up/Down do nothing. Not editing:
         /// Up/Down move along m_RowsInOrder, Right goes to Save Changes, Left is inert. Every direction is
         /// suppressed so SliderInt's own scrub and UI Toolkit's automatic navigation never run.
         /// </summary>
         private void OnSliderNavigationMove(SliderInt slider, NavigationMoveEvent evt)
         {
             bool isEditing = m_EditingSlider == slider;
+            int step = m_SliderRows.TryGetValue(slider, out SliderRow row) ? row.Step : 1;
 
             switch (evt.direction)
             {
@@ -687,12 +718,12 @@ namespace Blocks.Gameplay.Core
                     break;
 
                 case NavigationMoveEvent.Direction.Right:
-                    if (isEditing) slider.value = Mathf.Min(slider.highValue, slider.value + FieldOfViewStep);
+                    if (isEditing) slider.value = Mathf.Min(slider.highValue, slider.value + step);
                     else m_SaveButton.Focus();
                     break;
 
                 case NavigationMoveEvent.Direction.Left:
-                    if (isEditing) slider.value = Mathf.Max(slider.lowValue, slider.value - FieldOfViewStep);
+                    if (isEditing) slider.value = Mathf.Max(slider.lowValue, slider.value - step);
                     break;
             }
             SuppressDefaultNavigation(evt);
@@ -827,8 +858,14 @@ namespace Blocks.Gameplay.Core
             m_FrameRateDropdown.SetValueWithoutNotify(m_FrameRateDropdown.choices[FrameRateIndexFromSettings(m_Settings)]);
             m_VSyncDropdown.SetValueWithoutNotify(m_VSyncDropdown.choices[VSyncIndexFromSettings(m_Settings)]);
             m_WindowedDropdown.SetValueWithoutNotify(m_WindowedDropdown.choices[WindowedIndexFromSettings(m_Settings)]);
-            m_FieldOfViewSlider.SetValueWithoutNotify(m_Settings.ClampedFieldOfView);
-            m_FieldOfViewValueLabel.text = DegreesText(m_Settings.ClampedFieldOfView);
+            SetSliderWithoutNotify(m_FieldOfViewSlider, m_Settings.ClampedFieldOfView);
+            SetSliderWithoutNotify(m_DefaultZoomSlider, m_Settings.ClampedDefaultZoom);
+        }
+
+        private void SetSliderWithoutNotify(SliderInt slider, int value)
+        {
+            slider.SetValueWithoutNotify(value);
+            if (m_SliderRows.TryGetValue(slider, out SliderRow row)) row.ValueLabel.text = row.Format(value);
         }
 
         private void OnSaveChangesClicked()

@@ -16,8 +16,10 @@ namespace Blocks.Gameplay.Core
     /// wherever puts the camera mode's own Camera Distance (12 m in [BB] FreeLook) at
     /// <see cref="defaultZoomOut"/> (80%) of the way out - 14.25 m with the current numbers - and the camera
     /// starts at that default. Each wheel notch is a fixed fraction of the current distance, so it feels the
-    /// same close in and far out. The zoom is kept between rounds (not saved between game launches). It
-    /// sets the CinemachineThirdPersonFollow's Camera Distance; the deoccluder still pulls in past walls.
+    /// same close in and far out. Each launch it starts at Settings > Graphics > Default Zoom
+    /// (GraphicsSettingsData.DefaultZoom, % of the range; 80 = the default above), and changing that setting
+    /// mid-game moves it there; zooming during play is kept between rounds but not saved. It sets the
+    /// CinemachineThirdPersonFollow's Camera Distance; the deoccluder still pulls in past walls.
     /// </summary>
     public class CoreCameraController : CoreNetworkBehaviour
     {
@@ -94,6 +96,8 @@ namespace Blocks.Gameplay.Core
 
         // Zoom: 0 = closest .. 1 = furthest, kept for the next round's player (-1 = not set yet).
         private static float s_ZoomOut = -1f;
+        // The Default Zoom setting last applied (-1 = not yet this launch): a new value moves the zoom there.
+        private static int s_AppliedDefaultZoom = -1;
         private float m_ZoomTarget = -1f, m_ZoomDistance;
         private CinemachineThirdPersonFollow m_ZoomFollow;
         private readonly Dictionary<CinemachineThirdPersonFollow, float> m_FollowDefaults = new Dictionary<CinemachineThirdPersonFollow, float>();
@@ -528,11 +532,26 @@ namespace Blocks.Gameplay.Core
             float min = Mathf.Min(zoomMinDistance, standard);
             float max = min + (standard - min) / Mathf.Max(0.01f, defaultZoomOut);
 
+            // Settings > Graphics > Default Zoom: where the zoom starts each launch, and a change to it (from
+            // Esc > Settings mid-game) moves the zoom there.
+            GraphicsSettingsData graphics = GraphicsSettingsService.Current;
+            int defaultZoom = graphics != null ? graphics.ClampedDefaultZoom : GraphicsSettingsData.StandardDefaultZoom;
+            bool defaultChanged = defaultZoom != s_AppliedDefaultZoom;
+            if (defaultChanged)
+            {
+                s_AppliedDefaultZoom = defaultZoom;
+                s_ZoomOut = defaultZoom / 100f;
+            }
+
             if (follow != m_ZoomFollow || m_ZoomTarget < 0f)
             {
                 m_ZoomFollow = follow;
                 m_ZoomTarget = s_ZoomOut >= 0f ? Mathf.Lerp(min, max, s_ZoomOut) : standard;
                 m_ZoomDistance = m_ZoomTarget;
+            }
+            else if (defaultChanged)
+            {
+                m_ZoomTarget = Mathf.Lerp(min, max, s_ZoomOut); // glides there
             }
 
             if (CanZoom())

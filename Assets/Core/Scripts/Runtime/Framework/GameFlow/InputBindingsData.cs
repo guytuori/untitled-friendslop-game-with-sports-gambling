@@ -127,7 +127,20 @@ namespace Blocks.Gameplay.Core
         public bool Fullscreen = true;
         public int FieldOfView = DefaultFieldOfView;
 
+        /// <summary>
+        /// Default Zoom (added 2026-10-27): where the camera zoom starts each time the game is launched, as a
+        /// percentage of CoreCameraController's zoom range - 0 = closest (3 m), 100 = furthest. 80 is the camera's
+        /// own default (the camera mode's Camera Distance, 12 m in [BB] FreeLook).
+        /// </summary>
+        public const int MinDefaultZoom = 0;
+        public const int MaxDefaultZoom = 100;
+        public const int StandardDefaultZoom = 80;
+
+        public int DefaultZoom = StandardDefaultZoom;
+
         public int ClampedFieldOfView => FieldOfView <= 0 ? DefaultFieldOfView : Mathf.Clamp(FieldOfView, MinFieldOfView, MaxFieldOfView);
+
+        public int ClampedDefaultZoom => Mathf.Clamp(DefaultZoom, MinDefaultZoom, MaxDefaultZoom);
     }
 
     /// <summary>

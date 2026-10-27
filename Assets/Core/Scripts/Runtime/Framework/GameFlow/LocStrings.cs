@@ -86,6 +86,7 @@ namespace Blocks.Gameplay.Core
             ["VSYNC"] = new[] { "VSYNC", "VSYNC", "VSYNC", "VSYNC", "VSYNC" },
             ["WINDOWED MODE"] = new[] { "MODO VENTANA", "MODALITÀ FINESTRA", "MODE FENÊTRÉ", "FENSTERMODUS", "MODO JANELA" },
             ["FIELD OF VIEW"] = new[] { "CAMPO DE VISIÓN", "CAMPO VISIVO", "CHAMP DE VISION", "SICHTFELD", "CAMPO DE VISÃO" },
+            ["DEFAULT ZOOM"] = new[] { "ZOOM PREDETERMINADO", "ZOOM PREDEFINITO", "ZOOM PAR DÉFAUT", "STANDARD-ZOOM", "ZOOM PADRÃO" },
             ["VSync On"] = new[] { "VSync activado", "VSync attivo", "VSync activée", "VSync an", "VSync ligado" },
             ["VSync Off"] = new[] { "VSync desactivado", "VSync disattivo", "VSync désactivée", "VSync aus", "VSync desligado" },
             ["Full Screen"] = new[] { "Pantalla completa", "Schermo intero", "Plein écran", "Vollbild", "Tela cheia" },
