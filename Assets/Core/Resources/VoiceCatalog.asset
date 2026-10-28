@@ -19,10 +19,14 @@ MonoBehaviour:
     clip: {fileID: 8300000, guid: 27f4c5142dfea6d499200c815c203834, type: 3}
   - id: 321
     clip: {fileID: 8300000, guid: 2b7932289b540134881ce4253b5ea842, type: 3}
+  - id: complete
+    clip: {fileID: 8300000, guid: cb05020914223e34794470d6c6f79329, type: 3}
   - id: five
     clip: {fileID: 8300000, guid: 70fddf9a213e6b1469acea9ffab4d3a8, type: 3}
   - id: four
     clip: {fileID: 8300000, guid: bd415f1a591c1854582b93ab6cd733fd, type: 3}
+  - id: new_record
+    clip: {fileID: 8300000, guid: 47fb51c8ca2b4bf47978917694dfafc6, type: 3}
   - id: one
     clip: {fileID: 8300000, guid: 52325fd944d585541bd723c4d21bf65c, type: 3}
   - id: three

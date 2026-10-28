@@ -144,6 +144,7 @@ namespace Blocks.Gameplay.Core
             LocalRespawnTracker.Attach(player); // owner only - death plane and where to respawn
             LocalChallengeTracker.Attach(player); // owner only - start / end flags, challenge runs
             LocalItemSlot.Attach(player); // owner only - the item slot (item boxes, shop item, Use Item)
+            JumpShadow.Attach(player); // every player - the round shadow below them while they're in the air
 
             if (player.IsOwner)
             {

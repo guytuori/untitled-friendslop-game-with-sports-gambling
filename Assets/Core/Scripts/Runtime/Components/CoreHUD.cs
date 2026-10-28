@@ -1056,15 +1056,16 @@ namespace Blocks.Gameplay.Core
             PracticeMode.StartRun();
             if (m_RoundTimerLabel == null) return;
 
-            // Practice Challenges times runs to the tenth (and stops at the end point); Practice Map to the second.
-            bool tenths = PracticeMode.IsChallenge;
-            m_RoundTimerLabel.text = tenths ? "0:00.0" : "0:00";
+            // Practice Challenges times runs to the hundredth, from the start flag to Challenge Complete (see
+            // PracticeMode); Practice Map counts whole seconds from arrival.
+            bool hundredths = PracticeMode.IsChallenge;
+            m_RoundTimerLabel.text = hundredths ? "0:00.00" : "0:00";
             m_RoundTimerLabel.schedule.Execute(() =>
             {
                 float elapsed = PracticeMode.RunSeconds;
                 int seconds = Mathf.FloorToInt(elapsed);
-                m_RoundTimerLabel.text = tenths ? PracticeMode.FormatRunTime(elapsed) : $"{seconds / 60}:{seconds % 60:00}";
-            }).Every(tenths ? 100 : 250);
+                m_RoundTimerLabel.text = hundredths ? PracticeMode.FormatRunTime(elapsed) : $"{seconds / 60}:{seconds % 60:00}";
+            }).Every(hundredths ? 30 : 250);
         }
 
         private void HandleRoundInfoChanged()
@@ -1126,6 +1127,13 @@ namespace Blocks.Gameplay.Core
             {
                 AddNotification(points > 0 ? Loc.F("Challenge complete! +{0}", StarLabel.Amount(points)) : Loc.T("Challenge complete!"));
                 AudioVolumeService.PlayOneShot(GameSounds.ChallengeSuccess, AudioCategory.SoundEffects, Vector3.zero);
+
+                // Practice Challenges: the run's time (PracticeMode stopped the stopwatch and checked the record).
+                if (PracticeMode.IsChallenge && PracticeMode.RunCompleted)
+                {
+                    string time = PracticeMode.FormatRunTime(PracticeMode.RunSeconds);
+                    AddNotification(PracticeMode.LastRunWasRecord ? Loc.F("New record! {0}", time) : Loc.F("Time: {0}", time));
+                }
             }
             else
             {

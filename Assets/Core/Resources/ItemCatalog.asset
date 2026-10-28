@@ -149,9 +149,9 @@ MonoBehaviour:
     points: 0
   - id: 10
     displayName: Jetpack
-    description: You get a jetpack for 30 seconds.
+    description: You get a jetpack for 20 seconds.
     kind: 1
-    durationSeconds: 30
+    durationSeconds: 20
     boxChance: 0
     inShop: 1
     shopCost: 200
@@ -275,4 +275,4 @@ MonoBehaviour:
     color: {r: 0.15, g: 0.65, b: 0.6, a: 1}
     useSound: {fileID: 8300000, guid: d0b3ff1a82d4e2c4c8af3e1ec69659f3, type: 3}
     points: 0
-  version: 4
+  version: 5

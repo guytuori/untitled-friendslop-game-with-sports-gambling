@@ -77,6 +77,10 @@ MonoBehaviour:
     size: 32
     prefab: {fileID: 7645274965823072044, guid: c5c0cae1ab41d4a40a37521d3424bad6, type: 3}
     thumbnail: {fileID: 2800000, guid: 1b4560bc9494074429d22786443d8bff, type: 3}
+  - id: Challenge_32_07
+    size: 32
+    prefab: {fileID: 9080478054057663580, guid: e20e124ec95faf346b2b8446c6d8a928, type: 3}
+    thumbnail: {fileID: 2800000, guid: 6ff8f271955f87844a4af16d6715f510, type: 3}
   practice16: {fileID: 7995870167889056463, guid: 69a3b2a870c642f4b8a5a12d17563556, type: 3}
   practice32: {fileID: 915372512405286612, guid: d87f519ff8386404e86f17c21c89662b, type: 3}
   startFlag16: {fileID: 4288283407821777295, guid: 946ca866a4852be419b54ede9c8ac0de, type: 3}

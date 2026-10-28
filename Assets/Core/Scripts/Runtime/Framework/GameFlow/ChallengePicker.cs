@@ -52,6 +52,7 @@ namespace Blocks.Gameplay.Core
         private VisualElement m_Grid;
         private ScrollView m_Scroll;
         private Label m_NameLabel;
+        private Label m_BestLabel;
         private Label m_StatusLabel;
         private Button m_StartButton;
         private Button m_BackButton;
@@ -212,6 +213,14 @@ namespace Blocks.Gameplay.Core
             m_NameLabel.style.color = Color.white;
             m_NameLabel.style.marginTop = 10;
             panel.Add(m_NameLabel);
+
+            // The selected challenge's best time on this computer (9:59.99 until one is set - PracticeMode).
+            m_BestLabel = new Label("");
+            m_BestLabel.style.fontSize = 16;
+            m_BestLabel.style.color = new Color(1f, 0.85f, 0.35f);
+            m_BestLabel.style.marginTop = 2;
+            m_BestLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            panel.Add(m_BestLabel);
 
             m_StatusLabel = new Label("");
             m_StatusLabel.style.fontSize = 15;
@@ -397,12 +406,14 @@ namespace Blocks.Gameplay.Core
             {
                 m_Selected = -1;
                 m_NameLabel.text = "";
+                m_BestLabel.text = "";
                 m_StartButton.SetEnabled(false);
                 return;
             }
 
             m_Selected = Mathf.Clamp(index, 0, m_Entries.Count - 1);
             m_NameLabel.text = m_Catalog != null ? m_Catalog.DisplayName(m_Entries[m_Selected]) : m_Entries[m_Selected].id;
+            m_BestLabel.text = Loc.F("Best Time: {0}", PracticeMode.BestTimeText(m_Entries[m_Selected].id));
             m_StatusLabel.text = "";
             RefreshCells();
             ScrollToSelected();

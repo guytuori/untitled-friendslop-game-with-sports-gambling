@@ -26,6 +26,12 @@ namespace Blocks.Gameplay.Core
     /// Assets/Core/Scenes/Challenges, and rebuilds the challenge lists.
     ///
     /// Friendslop > Challenges > Build Example Challenges. Safe to run again (it asks before overwriting).
+    ///
+    /// Challenge_32_07 "Shuttle Run" (2026-10-28, the first moving-platform challenge) is built on its own by
+    /// Friendslop > Challenges > Build Challenge_32_07 (Moving Platforms), so building it never touches the
+    /// other three. Its four platforms are MovingPlatform prefab instances (MovingPlatformBuilder), each with its
+    /// own node positions, speed, pause and phase.
+    ///
     /// Once you're happy with them this file can be deleted - the prefabs and scenes don't need it.
     /// </summary>
     public static class ExampleChallengeBuilder
@@ -50,6 +56,17 @@ namespace Blocks.Gameplay.Core
             public PoleLine(string name, Vector3 from, Vector3 to) { Name = name; From = from; To = to; }
         }
 
+        private sealed class PlatformPath
+        {
+            public string Name;
+            public Vector3 A, B; // top centre at each end, Total Editor metres (x, y, z)
+            public float Speed, Pause, Phase;
+            public PlatformPath(string name, Vector3 a, Vector3 b, float speed, float pause, float phase)
+            {
+                Name = name; A = a; B = b; Speed = speed; Pause = pause; Phase = phase;
+            }
+        }
+
         private sealed class Spec
         {
             public string Name;
@@ -58,7 +75,35 @@ namespace Blocks.Gameplay.Core
             public int Points;
             public Piece[] Pieces;
             public PoleLine[] Poles;
+            public PlatformPath[] Platforms = new PlatformPath[0];
         }
+
+        /// <summary>
+        /// Challenge_32_07 "Shuttle Run": a 42 m gap (z 10..52) between the start apron and the landing, crossed
+        /// on four moving platforms (4 x 4 m, top at y 2 = rim level):
+        ///   1. a ferry from the apron's edge out over the gap (z 50 -> 40);
+        ///   2. a sweeper going side to side (x 22 <-> 42) at z 34 - hop on as it passes the middle;
+        ///   3. another sweeper at z 26, going the other way;
+        ///   4. a ferry (z 20 -> 12) that docks against the landing (z 0..10).
+        /// The jumps between them are 2-4 m, so the challenge is the timing, not the distance. Platforms 1 and 4
+        /// dock flush with the apron / landing edge, so you can walk on and off.
+        /// </summary>
+        private static readonly Spec MovingPlatformChallenge = new Spec
+        {
+            Name = "Challenge_32_07", Size = 32, Title = "Shuttle Run", Points = 150,
+            Pieces = new[]
+            {
+                new Piece("challenge_32_07", MapObjectPropertyType.Regular),
+            },
+            Poles = new PoleLine[0],
+            Platforms = new[]
+            {
+                new PlatformPath("platform 1 (ferry)", new Vector3(32f, 2f, 50f), new Vector3(32f, 2f, 40f), 2.5f, 1f, 0f),
+                new PlatformPath("platform 2 (sweeper)", new Vector3(22f, 2f, 34f), new Vector3(42f, 2f, 34f), 3.5f, 0.5f, 0f),
+                new PlatformPath("platform 3 (sweeper)", new Vector3(42f, 2f, 26f), new Vector3(22f, 2f, 26f), 3.5f, 0.5f, 0.25f),
+                new PlatformPath("platform 4 (ferry)", new Vector3(32f, 2f, 20f), new Vector3(32f, 2f, 12f), 2.5f, 1f, 0.5f),
+            },
+        };
 
         private static readonly Spec[] Specs =
         {
@@ -106,13 +151,19 @@ namespace Blocks.Gameplay.Core
         };
 
         [MenuItem("Friendslop/Challenges/Build Example Challenges")]
-        private static void BuildAll()
+        private static void BuildAll() => BuildSpecs(Specs, "Build Example Challenges");
+
+        [MenuItem("Friendslop/Challenges/Build Challenge_32_07 (Moving Platforms)")]
+        private static void BuildMovingPlatformChallenge() =>
+            BuildSpecs(new[] { MovingPlatformChallenge }, "Build Challenge_32_07");
+
+        private static void BuildSpecs(Spec[] specs, string title)
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
 
             AssetDatabase.Refresh();
             var missing = new List<string>();
-            foreach (Spec spec in Specs)
+            foreach (Spec spec in specs)
             {
                 foreach (string glb in GlbsFor(spec))
                 {
@@ -121,24 +172,24 @@ namespace Blocks.Gameplay.Core
             }
             if (missing.Count > 0)
             {
-                EditorUtility.DisplayDialog("Build Example Challenges",
+                EditorUtility.DisplayDialog(title,
                     $"These glbs aren't in {GlbFolder} (or haven't imported yet):\n\n{string.Join("\n", missing)}", "OK");
                 return;
             }
 
             var existing = new List<string>();
-            foreach (Spec spec in Specs)
+            foreach (Spec spec in specs)
             {
                 if (File.Exists(PrefabPath(spec)) || File.Exists(ScenePath(spec))) existing.Add(spec.Name);
             }
-            if (existing.Count > 0 && !EditorUtility.DisplayDialog("Build Example Challenges",
+            if (existing.Count > 0 && !EditorUtility.DisplayDialog(title,
                     $"This replaces the prefab and scene of:\n\n{string.Join("\n", existing)}\n\nTheir ChallengeDefinition assets are kept.", "Rebuild", "Cancel"))
             {
                 return;
             }
 
             var report = new StringBuilder();
-            foreach (Spec spec in Specs)
+            foreach (Spec spec in specs)
             {
                 try
                 {
@@ -154,8 +205,8 @@ namespace Blocks.Gameplay.Core
             AssetDatabase.SaveAssets();
             report.AppendLine();
             report.AppendLine(MatchCatalogBuilder.Rebuild());
-            Debug.Log("[Friendslop] Build Example Challenges:\n" + report);
-            EditorUtility.DisplayDialog("Build Example Challenges", report.ToString(), "OK");
+            Debug.Log($"[Friendslop] {title}:\n" + report);
+            EditorUtility.DisplayDialog(title, report.ToString(), "OK");
         }
 
         private static IEnumerable<string> GlbsFor(Spec spec)
@@ -164,6 +215,7 @@ namespace Blocks.Gameplay.Core
             yield return $"challenge_{spec.Size}_end";
             foreach (Piece piece in spec.Pieces) yield return piece.Glb;
             if (spec.Poles.Length > 0) yield return PoleGlb;
+            if (spec.Platforms.Length > 0) yield return "moving_platform";
         }
 
         private static string GlbPath(string glb) => $"{GlbFolder}/{glb}.glb";
@@ -193,13 +245,21 @@ namespace Blocks.Gameplay.Core
                 if (!MapObjectPropertySetup.ApplyProperty(pole, MapObjectPropertyType.Pole)) problems++;
             }
 
+            foreach (PlatformPath path in spec.Platforms)
+            {
+                // Total Editor metres -> challenge space (the glb import mirrors x).
+                Vector3 a = new Vector3(-path.A.x, path.A.y, path.A.z);
+                Vector3 b = new Vector3(-path.B.x, path.B.y, path.B.z);
+                if (MovingPlatformBuilder.Place(root.transform, path.Name, a, b, path.Speed, path.Pause, path.Phase) == null) problems++;
+            }
+
             AddZone(root, spec);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAssetAndConnect(root, PrefabPath(spec), InteractionMode.AutomatedAction, out bool saved);
             if (!saved || prefab == null) return $"{spec.Name}: couldn't save {PrefabPath(spec)}";
 
             EditorSceneManager.SaveScene(scene, ScenePath(spec));
-            return $"{spec.Name} \"{spec.Title}\": built ({spec.Pieces.Length} pieces, {spec.Poles.Length} poles)" +
+            return $"{spec.Name} \"{spec.Title}\": built ({spec.Pieces.Length} pieces, {spec.Poles.Length} poles, {spec.Platforms.Length} moving platforms)" +
                    (problems > 0 ? $" - {problems} piece(s) couldn't be set up, see the Console" : "");
         }
 

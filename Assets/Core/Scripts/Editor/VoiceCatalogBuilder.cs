@@ -27,8 +27,39 @@ namespace Blocks.Gameplay.Core
         {
             EditorApplication.delayCall += () =>
             {
-                if (AssetDatabase.LoadAssetAtPath<VoiceCatalog>(CatalogPath) == null) Rebuild();
+                // Missing, or out of step with the folder (a clip added while in play mode or with Unity closed).
+                var existing = AssetDatabase.LoadAssetAtPath<VoiceCatalog>(CatalogPath);
+                if (existing == null || !MatchesFolder(existing)) Rebuild();
             };
+            EditorApplication.playModeStateChanged += state =>
+            {
+                if (state != PlayModeStateChange.EnteredEditMode || !s_ChangedInPlayMode) return;
+                s_ChangedInPlayMode = false;
+                ScheduleRebuild();
+            };
+        }
+
+        private static bool s_ChangedInPlayMode;
+
+        /// <summary>True if the catalog lists exactly the clips in the Voice folder (by name), all still there.</summary>
+        private static bool MatchesFolder(VoiceCatalog catalog)
+        {
+            var inFolder = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (AssetDatabase.IsValidFolder(VoiceFolder))
+            {
+                foreach (string guid in AssetDatabase.FindAssets("t:AudioClip", new[] { VoiceFolder }))
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (IsAudio(path)) inFolder.Add(Path.GetFileNameWithoutExtension(path));
+                }
+            }
+            var inCatalog = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (VoiceCatalog.Entry entry in catalog.Clips)
+            {
+                if (entry == null || entry.clip == null) return false;
+                inCatalog.Add(entry.id);
+            }
+            return inFolder.SetEquals(inCatalog);
         }
 
         [MenuItem("Friendslop/Audio/Rebuild Voice Clips")]
@@ -61,7 +92,11 @@ namespace Blocks.Gameplay.Core
         public static string Rebuild()
         {
             if (s_Building) return "Already rebuilding.";
-            if (EditorApplication.isPlayingOrWillChangePlaymode) return "Not rebuilt in play mode.";
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                s_ChangedInPlayMode = true; // rebuilt as soon as play mode ends
+                return "Not rebuilt in play mode - it will be when play mode ends.";
+            }
 
             s_Building = true;
             try

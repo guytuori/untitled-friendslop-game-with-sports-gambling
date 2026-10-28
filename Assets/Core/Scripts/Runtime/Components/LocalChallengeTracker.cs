@@ -123,6 +123,7 @@ namespace Blocks.Gameplay.Core
             m_Current = course;
             m_HasCurrent = true;
             course.SetLocalState(ChallengeCourse.LocalState.Running);
+            PracticeMode.OnRunStarted(); // Practice Challenges: the stopwatch starts here
             RunStarted?.Invoke(course);
             if (ChallengeManager.Instance != null) ChallengeManager.Instance.ReportRunStarted(course);
         }
@@ -135,6 +136,7 @@ namespace Blocks.Gameplay.Core
             if (course == null) return;
 
             course.SetLocalState(reason == EndReason.Completed ? ChallengeCourse.LocalState.Done : ChallengeCourse.LocalState.Open);
+            if (reason != EndReason.Reset) PracticeMode.OnRunEnded(reason == EndReason.Completed); // stops (or zeroes) the stopwatch
             RunEnded?.Invoke(course, reason);
 
             if (ChallengeManager.Instance == null || reason == EndReason.Reset) return;

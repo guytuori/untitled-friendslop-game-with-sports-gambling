@@ -55,5 +55,5 @@ Crash_Out.mp3 //not implemented yet
 loop point: N/A
 
 15 - Credits
-Credits.mp3 //not implemented yet
+Credits.mp3
 loop point: N/A

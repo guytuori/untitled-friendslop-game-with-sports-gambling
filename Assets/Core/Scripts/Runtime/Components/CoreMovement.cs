@@ -148,6 +148,12 @@ namespace Blocks.Gameplay.Core
         public float GroundGrip { get; private set; } = 1f;
 
         /// <summary>
+        /// The <see cref="MovingPlatform"/> the character is standing on, or null. While grounded on one, the
+        /// character is moved along with it every frame (<see cref="CarryWithPlatform"/>).
+        /// </summary>
+        public MovingPlatform GroundPlatform { get; private set; }
+
+        /// <summary>
         /// When set to a non-trivial horizontal direction, ApplyRotation will turn the character to
         /// face this direction instead of deriving facing from the actual horizontal velocity. This
         /// lets facing/animation respond instantly to input even while translation is still easing
@@ -309,6 +315,7 @@ namespace Blocks.Gameplay.Core
             {
                 // If movement is disabled, we still want to apply gravity and ground checks to prevent floating.
                 GroundedCheck();
+                CarryWithPlatform();
                 if (m_VerticalVelocity < m_TerminalVelocity)
                 {
                     m_VerticalVelocity += gravity * Time.deltaTime;
@@ -325,7 +332,22 @@ namespace Blocks.Gameplay.Core
             }
 
             GroundedCheck();
+            CarryWithPlatform();
             ProcessAbilities();
+        }
+
+        /// <summary>
+        /// Standing on a moving platform: move with it. The platforms have already moved this frame
+        /// (MovingPlatformRunner runs first), so this is exactly how far the floor under the feet went.
+        /// </summary>
+        private void CarryWithPlatform()
+        {
+            if (!IsGrounded || GroundPlatform == null || MovementAbilityActive()) return;
+            if (m_CharacterController == null || !m_CharacterController.enabled) return;
+
+            Vector3 delta = GroundPlatform.FrameDelta;
+            if (delta.sqrMagnitude < 1e-10f || float.IsNaN(delta.x) || float.IsNaN(delta.y) || float.IsNaN(delta.z)) return;
+            m_CharacterController.Move(delta);
         }
 
         private void LateUpdate()
@@ -745,6 +767,16 @@ namespace Blocks.Gameplay.Core
 
             int hitCount = Physics.OverlapSphereNonAlloc(spherePosition, groundedRadius, s_GroundedHits, groundLayers, QueryTriggerInteraction.Ignore);
             IsGrounded = hitCount > 0;
+
+            // On a moving platform? (Any of the ground colliders under the feet belonging to one counts.)
+            GroundPlatform = null;
+            if (MovingPlatform.Active.Count > 0)
+            {
+                for (int i = 0; i < hitCount && GroundPlatform == null; i++)
+                {
+                    if (s_GroundedHits[i] != null) GroundPlatform = s_GroundedHits[i].GetComponentInParent<MovingPlatform>();
+                }
+            }
 
             // Read grip from whatever we're standing on. Defaults to 1 (normal) if ungrounded or the
             // ground collider has no PhysicMaterial - so surfaces that were never set up keep behaving

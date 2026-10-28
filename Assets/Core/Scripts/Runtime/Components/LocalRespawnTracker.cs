@@ -96,7 +96,9 @@ namespace Blocks.Gameplay.Core
             bool alive = m_Player.PlayerState == null || m_Player.PlayerState.LifeState != PlayerLifeState.Eliminated;
 
             // Remember where the player has safely stood.
-            if (alive && Time.time >= m_NextSampleTime && m_Movement != null && m_Movement.IsGrounded && m_Movement.IsMovementEnabled)
+            // (Not on a moving platform: it won't be there later.)
+            if (alive && Time.time >= m_NextSampleTime && m_Movement != null && m_Movement.IsGrounded && m_Movement.IsMovementEnabled
+                && m_Movement.GroundPlatform == null)
             {
                 m_NextSampleTime = Time.time + SampleInterval;
                 RecordSafeSpot(transform.position, transform.eulerAngles.y);

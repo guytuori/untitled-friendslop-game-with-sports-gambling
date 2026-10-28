@@ -113,7 +113,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private List<ItemDefinition> items = new List<ItemDefinition>();
 
         /// <summary>Bumped when the defaults change in a way an existing asset should pick up (see EditorTopUp).</summary>
-        public const int CurrentVersion = 4;
+        public const int CurrentVersion = 5;
         [SerializeField, HideInInspector] private int version = 1;
 
         private static ItemCatalog s_Loaded;
@@ -297,7 +297,7 @@ namespace Blocks.Gameplay.Core
                 WithPoints(Instant(ItemId.BigPoints, "Big Points", "Single use: gain 500 points straight away.", 5f, 3, new Color(0.95f, 0.78f, 0.15f)), 500),
                 Instant(ItemId.OneUp, "1-Up", "Single use: gain a life if lives are limited; otherwise your next death costs no points.", 5f, 2, new Color(0.15f, 0.70f, 0.35f)),
                 Instant(ItemId.Teleporter, "Teleporter", "Single use: teleports you to a random challenge you haven't completed yet, or to the end if you've done them all.", 10f, 2, new Color(0.65f, 0.25f, 0.85f)),
-                Timed(ItemId.Jetpack, "Jetpack", "You get a jetpack for 30 seconds.", 30f, 0f, 3, new Color(0.55f, 0.55f, 0.60f)),
+                Timed(ItemId.Jetpack, "Jetpack", "You get a jetpack for 20 seconds.", 20f, 0f, 3, new Color(0.55f, 0.55f, 0.60f)),
                 Timed(ItemId.SpringShoes, "Spring Shoes", "You get a high jump for 30 seconds.", 30f, 0f, 1, new Color(0.30f, 0.80f, 0.75f)),
                 Timed(ItemId.Glider, "Glider", "You can glide after jumping for 30 seconds.", 30f, 0f, 2, new Color(0.45f, 0.75f, 0.95f)),
                 Timed(ItemId.MagnetBoots, "Magnet Boots", "You ignore slippery floors for 30 seconds.", 30f, 0f, 1, new Color(0.75f, 0.20f, 0.25f)),
@@ -358,6 +358,16 @@ namespace Blocks.Gameplay.Core
         public bool EditorTopUp(GameObject boxModel, Func<string, Texture2D> findIcon, Func<string, AudioClip> findSound = null)
         {
             bool changed = false;
+
+            if (version < 5)
+            {
+                // Version 5: the Jetpack lasts 20 s (was 30, and 15 before that) - only if it's still at an old default.
+                ItemDefinition jetpack = items.Find(i => i != null && i.id == ItemId.Jetpack);
+                if (jetpack != null && (Mathf.Approximately(jetpack.durationSeconds, 30f) || Mathf.Approximately(jetpack.durationSeconds, 15f)))
+                    jetpack.durationSeconds = 20f;
+                if (jetpack != null && (jetpack.description == "You get a jetpack for 30 seconds." || jetpack.description == "You get a jetpack for 15 seconds."))
+                    jetpack.description = "You get a jetpack for 20 seconds.";
+            }
 
             if (version < 4)
             {

@@ -214,6 +214,8 @@ namespace Blocks.Gameplay.Core
             ["{0} reached the end! +{1}"] = new[] { "¡{0} llegó al final! +{1}", "{0} ha raggiunto la fine! +{1}", "{0} a atteint l'arrivée ! +{1}", "{0} hat das Ziel erreicht! +{1}", "{0} chegou ao fim! +{1}" },
             ["{0} reached the end!"] = new[] { "¡{0} llegó al final!", "{0} ha raggiunto la fine!", "{0} a atteint l'arrivée !", "{0} hat das Ziel erreicht!", "{0} chegou ao fim!" },
             ["Challenge complete! +{0}"] = new[] { "¡Desafío completado! +{0}", "Sfida completata! +{0}", "Défi réussi ! +{0}", "Herausforderung geschafft! +{0}", "Desafio concluído! +{0}" },
+            ["New record! {0}"] = new[] { "¡Nuevo récord! {0}", "Nuovo record! {0}", "Nouveau record ! {0}", "Neuer Rekord! {0}", "Novo recorde! {0}" },
+            ["Best Time: {0}"] = new[] { "Mejor tiempo: {0}", "Miglior tempo: {0}", "Meilleur temps : {0}", "Bestzeit: {0}", "Melhor tempo: {0}" },
             ["Challenge complete!"] = new[] { "¡Desafío completado!", "Sfida completata!", "Défi réussi !", "Herausforderung geschafft!", "Desafio concluído!" },
             ["{0} completed a challenge! +{1}"] = new[] { "¡{0} completó un desafío! +{1}", "{0} ha completato una sfida! +{1}", "{0} a réussi un défi ! +{1}", "{0} hat eine Herausforderung geschafft! +{1}", "{0} concluiu um desafio! +{1}" },
             ["{0} completed a challenge!"] = new[] { "¡{0} completó un desafío!", "{0} ha completato una sfida!", "{0} a réussi un défi !", "{0} hat eine Herausforderung geschafft!", "{0} concluiu um desafio!" },
