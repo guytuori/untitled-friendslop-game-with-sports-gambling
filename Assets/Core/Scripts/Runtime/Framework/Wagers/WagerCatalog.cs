@@ -10,12 +10,20 @@ namespace Blocks.Gameplay.Core
         /// <summary>"No particular trigger" - offered every so often about a random player.</summary>
         None = 0,
         Jump = 1,
+        /// <summary>Started running on the ground (no wagers use it since the walk button ones replaced them).</summary>
         Run = 2,
         GrindRail = 3,
         WallRun = 4,
+        /// <summary>Got on any pole (sections that just say "pole").</summary>
         PoleClimb = 5,
         /// <summary>Not a section in the text file: fired when a player claims a challenge, so any challenge-only wager can follow.</summary>
-        ChallengeStart = 6
+        ChallengeStart = 6,
+        /// <summary>Got on an upright (climbing) pole.</summary>
+        VerticalPole = 7,
+        /// <summary>Got on a horizontal pole (a bar).</summary>
+        HorizontalPole = 8,
+        /// <summary>Started walking on the ground (the walk button held / on while moving).</summary>
+        Walk = 9
     }
 
     /// <summary>The hidden per-player number a wager is about. Seconds stats are tracked in tenths of a second.</summary>
@@ -37,15 +45,34 @@ namespace Blocks.Gameplay.Core
         FinalScore = 11,
         /// <summary>Pickups collected this round (PickupManager). Only offered on maps that have pickups left.</summary>
         Pickups = 12,
-        /// <summary>Not tracked yet (no items in the game) - wagers about it are imported but never offered.</summary>
-        Items = 13
+        /// <summary>Items received from item boxes this round. Only offered when items are on and the map has boxes.</summary>
+        Items = 13,
+        /// <summary>Seconds walking on the ground (the walk button) - added 2026-10-30 with the per-wager spans.</summary>
+        WalkSeconds = 14,
+        VerticalPoleSeconds = 15,
+        VerticalPoleJumps = 16,
+        /// <summary>Complete turns round an upright pole (Pole Swing 2).</summary>
+        VerticalPoleRotations = 17,
+        HorizontalPoleSeconds = 18,
+        HorizontalPoleJumps = 19,
+        /// <summary>Complete turns round a bar (Pole Swing 2).</summary>
+        HorizontalPoleRotations = 20,
+        /// <summary>Complete turns round any pole.</summary>
+        PoleRotations = 21
     }
 
-    /// <summary>Whether a wager runs to the end of the round, or only to the end of the subject's current challenge.</summary>
+    /// <summary>How long a wager runs.</summary>
     public enum WagerScope
     {
+        /// <summary>To the end of the round ("before the end of the game").</summary>
         Round = 0,
-        Challenge = 1
+        /// <summary>To the end of the subject's current challenge (!CHALLENGE! in the text file).</summary>
+        Challenge = 1,
+        /// <summary>
+        /// For a rolled number of seconds from when it's offered ("in the next [40-90] seconds"). Counts from
+        /// what the player had done when it was offered (score ones are the score itself, not points gained).
+        /// </summary>
+        Window = 2
     }
 
     /// <summary>
@@ -59,24 +86,41 @@ namespace Blocks.Gameplay.Core
     {
         public const string ResourcePath = "WagerCatalog";
 
+        /// <summary>
+        /// Bumped when the importer changes how it reads the text file, so the editor re-imports an older list by
+        /// itself. 2 (2026-10-30): per-wager spans in brackets ([1-100]) and "in the next [40-90] seconds".
+        /// </summary>
+        public const int CurrentVersion = 2;
+
+        [SerializeField] private int version;
+
+        public int Version => version;
+
         [Serializable]
         public class Template
         {
-            [Tooltip("The wager as shown, with [PLAYER] and the random-number placeholder still in it (no !CHALLENGE! marker).")]
+            [Tooltip("The wager as shown, with [PLAYER] and the placeholders still in it (no !CHALLENGE! marker). The text file's [1-100] spans become [NUMBER] / [SECONDS_NUMBER] / [SCORE_NUMBER], and the time window's becomes [WINDOW_SECONDS] - the English text is the localization key (LocStrings).")]
             public string text;
 
             [Tooltip("The placeholder that gets the random number, e.g. NUMBER (empty if there isn't one).")]
             public string numberPlaceholder;
 
-            [Tooltip("Random span for that number (inclusive), from the RANDOM SPANS part of the text file.")]
+            [Tooltip("Random span for that number (inclusive) - this wager's own [min-max] in the text file.")]
             public int minNumber = 1;
             public int maxNumber = 100;
+
+            [Tooltip("Window wagers: the placeholder that gets the window's length (WINDOW_SECONDS), else empty.")]
+            public string windowPlaceholder;
+
+            [Tooltip("Window wagers: random span for the window's length in seconds (inclusive) - the [min-max] after 'in the next'.")]
+            public int minWindowSeconds;
+            public int maxWindowSeconds;
 
             public WagerTrigger trigger;
             public WagerScope scope;
             public WagerStat stat;
 
-            [Tooltip("False for stats the game doesn't track yet (items) - never offered. Pickups wagers are offered whenever the map has pickups left.")]
+            [Tooltip("False when the line couldn't be read properly (no number to roll) - never offered. Pickup wagers are offered whenever the map has pickups left, item wagers whenever items are on and the map has item boxes.")]
             public bool supported = true;
 
             /// <summary>Seconds-based stats are stored in tenths of a second.</summary>
@@ -99,18 +143,23 @@ namespace Blocks.Gameplay.Core
 
         public static bool IsSecondsStat(WagerStat stat) =>
             stat == WagerStat.RunSeconds || stat == WagerStat.RailSeconds || stat == WagerStat.WallSeconds ||
-            stat == WagerStat.PoleSeconds || stat == WagerStat.IceSeconds;
+            stat == WagerStat.PoleSeconds || stat == WagerStat.IceSeconds || stat == WagerStat.WalkSeconds ||
+            stat == WagerStat.VerticalPoleSeconds || stat == WagerStat.HorizontalPoleSeconds;
 
         public static bool IsScoreStat(WagerStat stat) => stat == WagerStat.ScoreReached || stat == WagerStat.FinalScore;
 
-        /// <summary>The wager's text with the player's name and the rolled number filled in.</summary>
-        public static string Format(Template template, string playerName, int number)
+        /// <summary>The wager's text with the player's name, the rolled number and (window wagers) the rolled window filled in.</summary>
+        public static string Format(Template template, string playerName, int number, int windowSeconds = 0)
         {
             if (template == null) return "";
             string text = Loc.T(template.text).Replace("[PLAYER]", playerName ?? Loc.T("Someone"));
             if (!string.IsNullOrEmpty(template.numberPlaceholder))
             {
                 text = text.Replace("[" + template.numberPlaceholder + "]", number.ToString());
+            }
+            if (!string.IsNullOrEmpty(template.windowPlaceholder))
+            {
+                text = text.Replace("[" + template.windowPlaceholder + "]", windowSeconds.ToString());
             }
             return text;
         }
@@ -120,6 +169,7 @@ namespace Blocks.Gameplay.Core
         public void SetTemplates(List<Template> list)
         {
             templates = list;
+            version = CurrentVersion;
         }
 #endif
     }

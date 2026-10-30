@@ -39,6 +39,7 @@ namespace Blocks.Gameplay.Core
         private const string TitleScene = "TitleScreen";
         private const string SplashScene = "SplashScreen";
         private const string MatchScene = "[BB] Core";
+        private const string CreditsScene = "Credits";
         private const string RoundResultsScene = "RoundResults";
         private const string FinalScoreScene = "FinalScore";
 
@@ -180,6 +181,9 @@ namespace Blocks.Gameplay.Core
                     break;
                 case FinalScoreScene:
                     Play(MusicTracks.RoundLost, 1f);
+                    break;
+                case CreditsScene:
+                    Play(MusicTracks.Credits, 0.5f); // CreditsController follows this song's position
                     break;
                 default: // a menu
                     if (player.m_Held && player.CurrentVoice() != null) break; // a Sound Test pick keeps playing

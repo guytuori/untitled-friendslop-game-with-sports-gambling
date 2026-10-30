@@ -21,6 +21,9 @@ namespace Blocks.Gameplay.Core
         public const string Flyover = "Ready_to_Run";
         public const string RoundWon = "Banking_on_Victory";
 
+        /// <summary>The Credits scene (Single Player > Credits). Plays once; CreditsController is timed to it.</summary>
+        public const string Credits = "Credits";
+
         /// <summary>Main menu and the other menu screens.</summary>
         public const string Menu = "Parkour_Parley";
 

@@ -11,13 +11,19 @@ namespace Blocks.Gameplay.Core
     /// everyone's YES/NO bets, and pays them out.
     ///
     /// WHERE WAGERS COME FROM: the master list in WagerCatalog (built from wagers.txt). A wager is offered
-    /// about a player when they do one of its trigger actions (jump, start running, get on a rail / wall /
-    /// pole - reported by their LocalActionTracker), or, for the "no particular trigger" ones, every so
-    /// often about a random player. Challenge-only wagers (!CHALLENGE! in the text file) are only offered
-    /// about a player who's in a challenge, and run until that challenge ends. New wagers come at most every
-    /// <see cref="minSpawnInterval"/>-<see cref="maxSpawnInterval"/> seconds, whatever happens, so 16 people
-    /// jumping at once doesn't bury everyone in wagers. The [NUMBER]-style placeholder is rolled from its
-    /// span, never at or below what the player has already done.
+    /// about a player when they do one of its trigger actions (jump, start walking, get on a rail / wall /
+    /// vertical pole / horizontal pole - reported by their LocalActionTracker), or, for the "no particular
+    /// trigger" ones, every so often about a random player. Challenge-only wagers (!CHALLENGE! in the text
+    /// file) are only offered about a player who's in a challenge, and run until that challenge ends. New
+    /// wagers come at most every <see cref="minSpawnInterval"/>-<see cref="maxSpawnInterval"/> seconds,
+    /// whatever happens, so 16 people jumping at once doesn't bury everyone in wagers. The number is rolled
+    /// from the wager's own span ([1-100] in the text file), never at or below what the player has already
+    /// done.
+    ///
+    /// WINDOW WAGERS ("in the next [40-90] seconds", added 2026-10-30): the window's length is rolled from its
+    /// own span too (never longer than the round has left), progress counts from what the player had done
+    /// when it was offered (except score ones - "achieve a score of N" is the score itself), and it settles
+    /// NO when the window runs out.
     ///
     /// PRICES: from how far along the player already is (the hidden WagerStats): YES costs
     /// 100 - % complete, NO costs % complete (each at least 1, at most 99), updated live. Betting costs the
@@ -51,8 +57,12 @@ namespace Blocks.Gameplay.Core
             public int SubjectId;
             /// <summary>The rolled number, in the units the text shows (seconds, jumps, points).</summary>
             public int Target;
-            /// <summary>Challenge wagers: the stat's value when the wager was made (progress counts from there).</summary>
+            /// <summary>Challenge and window wagers: the stat's value when the wager was made (progress counts from there).</summary>
             public int Baseline;
+            /// <summary>Window wagers: the rolled window length (seconds, as the text shows it).</summary>
+            public int WindowSeconds;
+            /// <summary>Window wagers: runs out when the window does (not running for other wagers).</summary>
+            public TickTimer WindowEnd;
             public int YesCost;
             public int NoCost;
             public TickTimer BetWindow;
@@ -85,6 +95,8 @@ namespace Blocks.Gameplay.Core
         [Header("Betting")]
         [Tooltip("How long a wager can be bet on after it appears (seconds). It keeps running for the people who bet.")]
         [SerializeField] private float bettingWindowSeconds = 30f;
+        [Tooltip("Window wagers ('in the next N seconds') must end at least this many seconds before the round does.")]
+        [SerializeField] private float windowEndMargin = 5f;
 
         public static WagerManager Instance { get; private set; }
 
@@ -214,7 +226,7 @@ namespace Blocks.Gameplay.Core
                 {
                     Id = s.Id,
                     SubjectId = (ulong)s.SubjectId,
-                    Text = WagerCatalog.Format(template, NetworkPlayers.GetDisplayName((ulong)s.SubjectId), s.Target),
+                    Text = WagerCatalog.Format(template, NetworkPlayers.GetDisplayName((ulong)s.SubjectId), s.Target, s.WindowSeconds),
                     YesCost = s.YesCost,
                     NoCost = s.NoCost,
                     BettingOpen = !s.BetWindow.ExpiredOrNotRunning(Runner)
@@ -396,7 +408,7 @@ namespace Blocks.Gameplay.Core
                     for (int i = 0; i < Catalog.Templates.Count; i++)
                     {
                         WagerCatalog.Template template = Catalog.Templates[i];
-                        if (IsOfferable(template) && template.trigger == WagerTrigger.None && template.scope == WagerScope.Round) candidates.Add(i);
+                        if (IsOfferable(template) && template.trigger == WagerTrigger.None && template.scope != WagerScope.Challenge) candidates.Add(i);
                     }
                     if (TryCreateFromCandidates(candidates, subject))
                     {
@@ -408,15 +420,22 @@ namespace Blocks.Gameplay.Core
             return false;
         }
 
-        /// <summary>Whether the game can track this wager here: pickup wagers only on maps with pickups left.</summary>
+        /// <summary>
+        /// Whether the game can track this wager here: pickup wagers only on maps with pickups left, item wagers
+        /// only with items on and item boxes on the map.
+        /// </summary>
         private static bool IsOfferable(WagerCatalog.Template template)
         {
+            if (!template.supported) return false;
             if (template.stat == WagerStat.Pickups)
             {
-                return !string.IsNullOrEmpty(template.numberPlaceholder) &&
-                       PickupManager.Instance != null && PickupManager.Instance.RemainingCount > 0;
+                return PickupManager.Instance != null && PickupManager.Instance.RemainingCount > 0;
             }
-            return template.supported;
+            if (template.stat == WagerStat.Items)
+            {
+                return ItemManager.ItemsEnabled && ItemManager.Instance != null && ItemManager.Instance.BoxCount > 0;
+            }
+            return true;
         }
 
         /// <summary>A player wagers can be about: spawned, still in the round.</summary>
@@ -458,9 +477,28 @@ namespace Blocks.Gameplay.Core
             }
             if (slot < 0) return false;
 
+            // Window wagers: roll the window, never running past the end of the round.
+            int windowSeconds = 0;
+            if (template.scope == WagerScope.Window)
+            {
+                int windowLow = Mathf.Max(1, template.minWindowSeconds);
+                int windowHigh = Mathf.Max(windowLow, template.maxWindowSeconds);
+                RoundTimer round = RoundTimer.Instance;
+                if (round != null && round.IsPlaying && round.TimeRemaining > 0f)
+                {
+                    windowHigh = Mathf.Min(windowHigh, Mathf.FloorToInt(round.TimeRemaining - windowEndMargin));
+                }
+                if (windowLow > windowHigh) return false;
+                windowSeconds = Random.Range(windowLow, windowHigh + 1);
+            }
+
+            // Challenge and window wagers count from now; round ones (and "achieve a score of", always the score
+            // itself) from the start of the round.
             int raw = WagerStats.Get((int)subject, template.stat);
-            int baseline = template.scope == WagerScope.Challenge ? raw : 0;
-            int alreadyDone = template.scope == WagerScope.Challenge ? 0 : (template.IsSeconds ? raw / 10 : raw);
+            bool fromNow = template.scope == WagerScope.Challenge ||
+                           (template.scope == WagerScope.Window && !WagerCatalog.IsScoreStat(template.stat));
+            int baseline = fromNow ? raw : 0;
+            int alreadyDone = fromNow ? 0 : (template.IsSeconds ? raw / 10 : raw);
 
             // Roll a number the player hasn't reached yet.
             int low = Mathf.Max(template.minNumber, alreadyDone + 1);
@@ -480,6 +518,8 @@ namespace Blocks.Gameplay.Core
                 SubjectId = (int)subject,
                 Target = target,
                 Baseline = baseline,
+                WindowSeconds = windowSeconds,
+                WindowEnd = windowSeconds > 0 ? TickTimer.CreateFromSeconds(Runner, windowSeconds) : TickTimer.None,
                 BetWindow = TickTimer.CreateFromSeconds(Runner, bettingWindowSeconds),
                 Active = true
             };
@@ -489,7 +529,10 @@ namespace Blocks.Gameplay.Core
             return true;
         }
 
-        /// <summary>Re-prices open wagers, settles any that came true, and drops ones nobody bet on once betting closes.</summary>
+        /// <summary>
+        /// Re-prices open wagers, settles any that came true (and window wagers whose window ran out), and drops
+        /// ones nobody bet on once betting closes.
+        /// </summary>
         private void UpdateOpenWagers()
         {
             if (Catalog == null) return;
@@ -510,6 +553,11 @@ namespace Blocks.Gameplay.Core
                 if (template.stat != WagerStat.FinalScore && Progress(s, template) >= TargetUnits(s, template))
                 {
                     Settle(i, true, refund: false);
+                    continue;
+                }
+                if (template.scope == WagerScope.Window && s.WindowEnd.Expired(Runner))
+                {
+                    Settle(i, false, refund: false); // the window ran out first
                     continue;
                 }
                 if (!hasBets && s.BetWindow.ExpiredOrNotRunning(Runner))
@@ -560,11 +608,10 @@ namespace Blocks.Gameplay.Core
             DetectChanges();
         }
 
-        /// <summary>How far the player is, in the stat's own units (tenths of a second for time).</summary>
+        /// <summary>How far the player is, in the stat's own units (tenths of a second for time). Round wagers have no baseline.</summary>
         private static int Progress(WagerState s, WagerCatalog.Template template)
         {
-            int value = WagerStats.Get(s.SubjectId, template.stat);
-            return template.scope == WagerScope.Challenge ? value - s.Baseline : value;
+            return WagerStats.Get(s.SubjectId, template.stat) - s.Baseline;
         }
 
         private static int TargetUnits(WagerState s, WagerCatalog.Template template) =>

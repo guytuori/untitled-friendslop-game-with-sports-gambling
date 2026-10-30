@@ -67,6 +67,14 @@ namespace Blocks.Gameplay.Core
             }
         }
 
+        private sealed class RollerRun
+        {
+            public string Name;
+            public Vector3 A, B;           // the roller's centre at each end, Total Editor metres (x, y, z)
+            public Vector3[] Waypoints;    // in between, in order
+            public float Speed, Pause, Phase;
+        }
+
         private sealed class Spec
         {
             public string Name;
@@ -76,6 +84,53 @@ namespace Blocks.Gameplay.Core
             public Piece[] Pieces;
             public PoleLine[] Poles;
             public PlatformPath[] Platforms = new PlatformPath[0];
+            public RollerRun[] Rollers = new RollerRun[0];
+        }
+
+        /// <summary>
+        /// Challenge_32_08 "Steamroller" (2026-10-30), from the user's challenge_32_roller_1.glb (bricks + steel
+        /// railings, all Regular): a 4 m spine runs from the start (z 64) to the finish (z 0), crossed by seven
+        /// 4 m-wide ribs (z centres 56, 48 ... 8) that end in 45-degree ramps (x 20-24 and 40-44, up to y 6). A roller
+        /// (4 m cylinder) rolls each rib from ramp to ramp, across the spine, and touching one kills you - so the
+        /// run is timing your dash past each one.
+        /// Each roller's centre path (TE metres): up the left ramp at (22.83, 6) -> where it leaves the ramp
+        /// (24.83, 4) -> along the floor -> (39.17, 4) -> up the right ramp to (41.17, 6), 20 m each way. With
+        /// easing it slows into each ramp and is fastest crossing the spine. Speeds rise from 6.4 to 11.2 m/s down the
+        /// course (60% up on the first tuning, at the user's request), with staggered phases.
+        /// </summary>
+        private static readonly Spec RollerChallenge = new Spec
+        {
+            Name = "Challenge_32_08", Size = 32, Title = "Steamroller", Points = 250,
+            Pieces = new[]
+            {
+                new Piece("challenge_32_roller_1", MapObjectPropertyType.Regular),
+            },
+            Poles = new PoleLine[0],
+            Rollers = MakeRollers(),
+        };
+
+        private static RollerRun[] MakeRollers()
+        {
+            float[] ribZ = { 56f, 48f, 40f, 32f, 24f, 16f, 8f };          // first one met first (the start is at z 64)
+            float[] speed = { 6.4f, 7.2f, 8f, 8.8f, 9.6f, 10.4f, 11.2f };   // 2026-10-30: 60% faster than the first 4 - 7
+            float[] phase = { 0f, 0.35f, 0.7f, 0.15f, 0.5f, 0.85f, 0.3f };
+            const float flatY = 4f, rampY = 6f;                              // centre height on the floor / at the turn
+            const float rampX = 22.83f, footX = 24.83f;                      // left ramp turn / where it meets the floor
+            const float footX2 = 39.17f, rampX2 = 41.17f;                    // right side
+            var runs = new RollerRun[ribZ.Length];
+            for (int i = 0; i < ribZ.Length; i++)
+            {
+                float z = ribZ[i];
+                runs[i] = new RollerRun
+                {
+                    Name = $"roller {i + 1}",
+                    A = new Vector3(rampX, rampY, z),
+                    Waypoints = new[] { new Vector3(footX, flatY, z), new Vector3(footX2, flatY, z) },
+                    B = new Vector3(rampX2, rampY, z),
+                    Speed = speed[i], Pause = 0f, Phase = phase[i],
+                };
+            }
+            return runs;
         }
 
         /// <summary>
@@ -90,7 +145,7 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         private static readonly Spec MovingPlatformChallenge = new Spec
         {
-            Name = "Challenge_32_07", Size = 32, Title = "Shuttle Run", Points = 150,
+            Name = "Challenge_32_07", Size = 32, Title = "Shuttle Run", Points = 250,
             Pieces = new[]
             {
                 new Piece("challenge_32_07", MapObjectPropertyType.Regular),
@@ -134,7 +189,7 @@ namespace Blocks.Gameplay.Core
             },
             new Spec
             {
-                Name = "Challenge_32_06", Size = 32, Title = "Avalanche", Points = 150,
+                Name = "Challenge_32_06", Size = 32, Title = "Avalanche", Points = 250,
                 Pieces = new[]
                 {
                     new Piece("challenge_32_06", MapObjectPropertyType.Regular),
@@ -152,6 +207,10 @@ namespace Blocks.Gameplay.Core
 
         [MenuItem("Friendslop/Challenges/Build Example Challenges")]
         private static void BuildAll() => BuildSpecs(Specs, "Build Example Challenges");
+
+        [MenuItem("Friendslop/Challenges/Build Challenge_32_08 (Rollers)")]
+        private static void BuildRollerChallenge() =>
+            BuildSpecs(new[] { RollerChallenge }, "Build Challenge_32_08");
 
         [MenuItem("Friendslop/Challenges/Build Challenge_32_07 (Moving Platforms)")]
         private static void BuildMovingPlatformChallenge() =>
@@ -216,6 +275,7 @@ namespace Blocks.Gameplay.Core
             foreach (Piece piece in spec.Pieces) yield return piece.Glb;
             if (spec.Poles.Length > 0) yield return PoleGlb;
             if (spec.Platforms.Length > 0) yield return "moving_platform";
+            if (spec.Rollers.Length > 0) yield return "roller";
         }
 
         private static string GlbPath(string glb) => $"{GlbFolder}/{glb}.glb";
@@ -253,13 +313,23 @@ namespace Blocks.Gameplay.Core
                 if (MovingPlatformBuilder.Place(root.transform, path.Name, a, b, path.Speed, path.Pause, path.Phase) == null) problems++;
             }
 
+            foreach (RollerRun run in spec.Rollers)
+            {
+                // Total Editor metres -> challenge space (the glb import mirrors x).
+                Vector3 a = new Vector3(-run.A.x, run.A.y, run.A.z);
+                Vector3 b = new Vector3(-run.B.x, run.B.y, run.B.z);
+                var mids = new Vector3[run.Waypoints.Length];
+                for (int i = 0; i < mids.Length; i++) mids[i] = new Vector3(-run.Waypoints[i].x, run.Waypoints[i].y, run.Waypoints[i].z);
+                if (RollerBuilder.Place(root.transform, run.Name, a, mids, b, run.Speed, run.Pause, run.Phase) == null) problems++;
+            }
+
             AddZone(root, spec);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAssetAndConnect(root, PrefabPath(spec), InteractionMode.AutomatedAction, out bool saved);
             if (!saved || prefab == null) return $"{spec.Name}: couldn't save {PrefabPath(spec)}";
 
             EditorSceneManager.SaveScene(scene, ScenePath(spec));
-            return $"{spec.Name} \"{spec.Title}\": built ({spec.Pieces.Length} pieces, {spec.Poles.Length} poles, {spec.Platforms.Length} moving platforms)" +
+            return $"{spec.Name} \"{spec.Title}\": built ({spec.Pieces.Length} pieces, {spec.Poles.Length} poles, {spec.Platforms.Length} moving platforms, {spec.Rollers.Length} rollers)" +
                    (problems > 0 ? $" - {problems} piece(s) couldn't be set up, see the Console" : "");
         }
 

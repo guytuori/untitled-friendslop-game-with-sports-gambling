@@ -1,33 +1,50 @@
 On jump:
-Will [PLAYER] jump [NUMBER] times before the end of the game?
-!CHALLENGE! Will [PLAYER] jump [NUMBER] times before the end of his current challenge?
-On pressing the run button on the ground:
-Will [PLAYER] run for [SECONDS_NUMBER] seconds before the end of the game?
-!CHALLENGE! Will [PLAYER] run for [SECONDS_NUMBER] seconds before the end of his current challenge?
+Will [PLAYER] jump [1-100] times before the end of the game?
+Will [PLAYER] jump [1-50] times in the next [40-90] seconds?
+!CHALLENGE! Will [PLAYER] jump [1-15] times before the end of his current challenge?
+On pressing the walk button on the ground:
+Will [PLAYER] walk for [20-40] seconds before the end of the game?
+Will [PLAYER] walk for [10-20] seconds in the next [40-90] seconds?
+!CHALLENGE! Will [PLAYER] walk for [1-10] seconds before the end of his current challenge?
 On grind rail:
-Will [PLAYER] spend [SECONDS_NUMBER] seconds on grind rails before the end of the game?
-Will [PLAYER] jump [NUMBER] times from a grind rail before the end of the game?
-!CHALLENGE! Will [PLAYER] jump [NUMBER] times from a grind rail before the end of his current challenge?
+Will [PLAYER] spend [1-50] seconds on grind rails before the end of the game?
+Will [PLAYER] spend [1-30] seconds on grind rails in the next [40-90] seconds?
+Will [PLAYER] jump [1-20] times from a grind rail before the end of the game?
+Will [PLAYER] jump [1-10] times from a grind rail in the next [40-90] seconds?
+!CHALLENGE! Will [PLAYER] jump [1-5] times from a grind rail before the end of his current challenge?
 On wall run:
-Will [PLAYER] perform [NUMBER] wall jumps before the end of the game?
-Will [PLAYER] spend [SECONDS_NUMBER] seconds on a wall before the end of the game?
-!CHALLENGE! Will [PLAYER] spend [SECONDS_NUMBER] seconds on a wall before the end of his current challenge?
-On pole climb:
-Will [PLAYER] spend [SECONDS_NUMBER] seconds on a pole before the end of the game?
-Will [PLAYER] jump [NUMBER] times from a pole before the end of the game?
-!CHALLENGE! Will [PLAYER] spend [SECONDS_NUMBER] seconds on a pole before the end of his current challenge?
-!CHALLENGE! Will [PLAYER] jump [NUMBER] times from a pole before the end of his current challenge?
+Will [PLAYER] perform [1-20] wall jumps before the end of the game?
+Will [PLAYER] perform [1-10] wall jumps in the next [40-90] seconds?
+Will [PLAYER] spend [1-20] seconds on a wall before the end of the game?
+Will [PLAYER] spend [1-10] seconds on a wall in the next [40-90] seconds?
+!CHALLENGE! Will [PLAYER] spend [1-15] seconds on a wall before the end of his current challenge?
+On vertical pole swing:
+Will [PLAYER] spend [1-30] seconds on a vertical pole before the end of the game?
+Will [PLAYER] spend [1-15] seconds on a vertical pole in the next [40-90] seconds?
+Will [PLAYER] jump [1-30] times from a vertical pole before the end of the game?
+Will [PLAYER] jump [1-15] times from a vertical pole in the next [40-90] seconds?
+Will [PLAYER] swing [1-10] complete rotations on a vertical pole before the end of the game?
+Will [PLAYER] swing [1-5] complete rotations on a vertical pole in the next [40-90] seconds?
+!CHALLENGE! Will [PLAYER] spend [1-10] seconds on a vertical pole before the end of his current challenge?
+!CHALLENGE! Will [PLAYER] jump [1-5] times from a vertical pole before the end of his current challenge?
+!CHALLENGE! Will [PLAYER] swing [1-5] complete rotations on a vertical pole before the end of his current challenge?
+On horizontal pole swing:
+Will [PLAYER] spend [1-30] seconds on a horizontal pole before the end of the game?
+Will [PLAYER] spend [1-15] seconds on a horizontal pole in the next [40-90] seconds?
+Will [PLAYER] jump [1-30] times from a horizontal pole before the end of the game?
+Will [PLAYER] jump [1-15] times from a horizontal pole in the next [40-90] seconds?
+Will [PLAYER] swing [1-10] complete rotations on a horizontal pole before the end of the game?
+Will [PLAYER] swing [1-5] complete rotations on a horizontal pole in the next [40-90] seconds?
+!CHALLENGE! Will [PLAYER] spend [1-10] seconds on a horizontal pole before the end of his current challenge?
+!CHALLENGE! Will [PLAYER] jump [1-5] times from a horizontal pole before the end of his current challenge?
+!CHALLENGE! Will [PLAYER] swing [1-5] complete rotations on a horizontal pole before the end of his current challenge?
 No particular trigger:
-Will [PLAYER] die [NUMBER] times before the end of the game?
-Will [PLAYER] achieve a score of [SCORE_NUMBER] before the end of the game?
-Will [PLAYER] end with a score of [SCORE_NUMBER] before the end of the game?
-Will [PLAYER] spend [SECONDS_NUMBER] seconds on slippery floors before the end of the game?
-Will [PLAYER] collect [NUMBER] pickups by the end of the game?
-Will [PLAYER] collect [NUMBER] items by the end of the game?
-RANDOM SPANS
-SCORE_NUMBER
-2000-5000
-SECONDS_NUMBER
-1-60
-NUMBER
-1-100
+Will [PLAYER] die [1-10] times before the end of the game?
+Will [PLAYER] achieve a score of [2000-5000] before the end of the game?
+Will [PLAYER] achieve a score of [2000-5000] in the next [40-90] seconds?
+Will [PLAYER] spend [20-40] seconds on slippery floors before the end of the game?
+Will [PLAYER] spend [15-30] seconds on slippery floors in the next [40-90] seconds?
+Will [PLAYER] collect [1-20] pickups by the end of the game?
+Will [PLAYER] collect [1-10] pickups in the next [40-90] seconds?
+Will [PLAYER] collect [1-5] items by the end of the game?
+Will [PLAYER] collect [1-3] items in the next [40-90] seconds?

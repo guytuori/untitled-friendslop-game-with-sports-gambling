@@ -155,6 +155,17 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
+        /// Kills the local player now, the same way as falling off the map - a hazard touched them (Roller).
+        /// Ignored if they're already dead or dying.
+        /// </summary>
+        public void KillNow()
+        {
+            if (m_Player == null || m_Dying) return;
+            if (m_Player.PlayerState != null && m_Player.PlayerState.LifeState == PlayerLifeState.Eliminated) return;
+            Kill();
+        }
+
+        /// <summary>
         /// Practice Challenges' quick Retry: forget every safe spot and challenge entrance, so a death after the
         /// retry respawns near where the new run has been, not where the old one ended.
         /// </summary>

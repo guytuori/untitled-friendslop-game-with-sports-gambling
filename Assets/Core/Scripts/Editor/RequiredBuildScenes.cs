@@ -10,7 +10,8 @@ namespace Blocks.Gameplay.Core
     /// only finds scenes that are listed there). Runs once when the editor loads or scripts recompile, and
     /// adds any missing one right after the scene it belongs next to - no need to edit the list by hand.
     ///
-    /// Currently: GameplaySettings (Settings > Gameplay, added 2026-10-12), after Settings.
+    /// Currently: GameplaySettings (Settings > Gameplay, added 2026-10-12), after Settings; Credits (Single Player >
+    /// Credits, added 2026-10-30), after SinglePlayer.
     /// </summary>
     [InitializeOnLoad]
     public static class RequiredBuildScenes
@@ -18,6 +19,7 @@ namespace Blocks.Gameplay.Core
         private static readonly (string Scene, string After)[] Required =
         {
             ("Assets/Core/Scenes/GameplaySettings.unity", "Assets/Core/Scenes/Settings.unity"),
+            ("Assets/Core/Scenes/Credits.unity", "Assets/Core/Scenes/SinglePlayer.unity"),
         };
 
         static RequiredBuildScenes()

@@ -53,8 +53,17 @@ namespace Blocks.Gameplay.Core
         /// <summary>The challenge's name and points (from its start's ChallengeZone). May be null.</summary>
         public ChallengeDefinition Definition { get; private set; }
 
-        /// <summary>Points for completing it.</summary>
-        public int Points => Definition != null ? Mathf.Max(0, Definition.basePoints) : 0;
+        /// <summary>Points for completing a 16x16 challenge (any of them - set by size since 2026-10-30).</summary>
+        public const int PointsFor16 = 100;
+
+        /// <summary>Points for completing a 32x32 challenge.</summary>
+        public const int PointsFor32 = 250;
+
+        /// <summary>
+        /// Points for completing it: by size - <see cref="PointsFor16"/> or <see cref="PointsFor32"/> - the same
+        /// for every challenge of that size. (ChallengeDefinition.basePoints isn't used any more.)
+        /// </summary>
+        public int Points => Size >= 32 ? PointsFor32 : PointsFor16;
 
         /// <summary>This course's index in ChallengeManager's list (the same on every client), or -1.</summary>
         public int Index { get; internal set; } = -1;

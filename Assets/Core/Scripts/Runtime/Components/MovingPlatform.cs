@@ -18,6 +18,10 @@ namespace Blocks.Gameplay.Core
     /// a ghost of the platform at both ends. Any model works: put it under Platform with its top centre on
     /// Platform's origin. The nodes can be anywhere, so it can go sideways, up and down, or diagonally.
     ///
+    /// Optional <see cref="waypoints"/> (added 2026-10-30, for the Rollers) bend the path: A -> waypoint 1 -> ...
+    /// -> B and back, at the same speed all the way (e.g. along a floor and up a ramp at each end).
+    /// <see cref="Roller"/> builds on this: same movement, plus it spins as it rolls and kills on touch.
+    ///
     /// Movement: Node A -> pause -> Node B -> pause -> Node A ..., at <see cref="speed"/> m/s on average,
     /// easing in and out at the ends if <see cref="easeInOut"/> is on. <see cref="phase"/> (0-1) shifts it
     /// along its cycle, so several platforms with the same settings don't move in lockstep.
@@ -41,6 +45,9 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("The other end of the path.")]
         [SerializeField] private Transform nodeB;
+
+        [Tooltip("Optional points the path passes through between Node A and Node B, in order (leave empty for a straight line).")]
+        [SerializeField] private Transform[] waypoints = new Transform[0];
 
         [Tooltip("Average speed between the nodes, in meters per second.")]
         [Min(0.1f)]
@@ -72,20 +79,72 @@ namespace Blocks.Gameplay.Core
         public Transform PlatformTransform => platform;
         public Transform NodeA => nodeA;
         public Transform NodeB => nodeB;
+        public IReadOnlyList<Transform> Waypoints => waypoints;
+
+        /// <summary>How far along the path (from Node A, meters) Platform was put this frame.</summary>
+        public float DistanceAlongPath { get; private set; }
 
         /// <summary>Seconds for one full cycle: A -> B -> A, both pauses included.</summary>
         public float CycleSeconds => 2f * (TravelSeconds + pauseSeconds);
 
-        private float TravelSeconds => nodeA != null && nodeB != null
-            ? Vector3.Distance(nodeA.position, nodeB.position) / Mathf.Max(0.1f, speed)
-            : 0f;
+        private float TravelSeconds => PathLength / Mathf.Max(0.1f, speed);
 
-        /// <summary>Sets everything up (the Moving Platform builder and challenge builders use this).</summary>
-        public void Configure(Transform movingPart, Transform a, Transform b, float metersPerSecond, float pause, float cyclePhase, bool ease = true)
+        private readonly List<Vector3> m_Path = new List<Vector3>();
+
+        /// <summary>The path's points in world space: Node A, the waypoints, Node B (empty if a node is missing).</summary>
+        private List<Vector3> Path()
+        {
+            m_Path.Clear();
+            if (nodeA == null || nodeB == null) return m_Path;
+            m_Path.Add(nodeA.position);
+            if (waypoints != null)
+            {
+                foreach (Transform point in waypoints)
+                {
+                    if (point != null) m_Path.Add(point.position);
+                }
+            }
+            m_Path.Add(nodeB.position);
+            return m_Path;
+        }
+
+        /// <summary>The path's length in meters (A -> waypoints -> B).</summary>
+        public float PathLength
+        {
+            get
+            {
+                List<Vector3> path = Path();
+                float length = 0f;
+                for (int i = 1; i < path.Count; i++) length += Vector3.Distance(path[i - 1], path[i]);
+                return length;
+            }
+        }
+
+        /// <summary>The point <paramref name="distance"/> meters along the path from Node A.</summary>
+        public Vector3 PointAlongPath(float distance)
+        {
+            List<Vector3> path = Path();
+            if (path.Count == 0) return platform != null ? platform.position : transform.position;
+            for (int i = 1; i < path.Count; i++)
+            {
+                float segment = Vector3.Distance(path[i - 1], path[i]);
+                if (distance <= segment || i == path.Count - 1)
+                {
+                    return segment > 0f ? Vector3.Lerp(path[i - 1], path[i], Mathf.Clamp01(distance / segment)) : path[i];
+                }
+                distance -= segment;
+            }
+            return path[path.Count - 1];
+        }
+
+        /// <summary>Sets everything up (the Moving Platform / Roller builders and challenge builders use this).</summary>
+        public void Configure(Transform movingPart, Transform a, Transform b, float metersPerSecond, float pause, float cyclePhase, bool ease = true,
+            Transform[] pathWaypoints = null)
         {
             platform = movingPart;
             nodeA = a;
             nodeB = b;
+            waypoints = pathWaypoints ?? new Transform[0];
             speed = Mathf.Max(0.1f, metersPerSecond);
             pauseSeconds = Mathf.Max(0f, pause);
             phase = Mathf.Repeat(cyclePhase, 1f);
@@ -150,7 +209,8 @@ namespace Blocks.Gameplay.Core
             }
 
             Vector3 before = platform.position;
-            platform.position = Vector3.Lerp(nodeA.position, nodeB.position, ProgressAt(time));
+            DistanceAlongPath = ProgressAt(time) * PathLength;
+            platform.position = PointAlongPath(DistanceAlongPath);
 
             if (m_Snap)
             {
@@ -176,7 +236,9 @@ namespace Blocks.Gameplay.Core
             if (nodeA == null || nodeB == null) return;
 
             Gizmos.color = new Color(1f, 0.8f, 0.2f, 0.9f);
-            Gizmos.DrawLine(nodeA.position, nodeB.position);
+            List<Vector3> path = Path();
+            for (int i = 1; i < path.Count; i++) Gizmos.DrawLine(path[i - 1], path[i]);
+            for (int i = 1; i < path.Count - 1; i++) Gizmos.DrawWireSphere(path[i], 0.2f);
             Gizmos.DrawSphere(nodeA.position, 0.25f);
             Gizmos.DrawSphere(nodeB.position, 0.25f);
 

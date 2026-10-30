@@ -109,6 +109,14 @@ namespace Blocks.Gameplay.Core
         /// <summary>True while hanging on (and spinning round) a bar.</summary>
         public bool IsSwinging => m_Pole != null;
 
+        /// <summary>True while spinning round an upright (climbing) pole; false on a bar or off the pole.</summary>
+        public bool IsOnUprightPole => m_Pole != null && m_Upright;
+
+        /// <summary>Complete turns round poles since this avatar spawned (counted for wagers by LocalActionTracker).</summary>
+        public int CompletedRotations { get; private set; }
+
+        private float m_TurnRadians; // swept on this grab since the last complete turn
+
         private CoreMovement m_Motor;
         private CharacterController m_Controller;
         private CorePlayerManager m_Player;
@@ -336,6 +344,7 @@ namespace Blocks.Gameplay.Core
             m_Angle = fromPivot.sqrMagnitude > 0.01f
                 ? Mathf.Atan2(Vector3.Dot(fromPivot, forward), Vector3.Dot(fromPivot, down))
                 : 0f;
+            m_TurnRadians = 0f;
 
             // Swing speed: the speed coming in along the swing, turned into "speed at the top" (energy kept),
             // never less than enough to go all the way round.
@@ -387,8 +396,17 @@ namespace Blocks.Gameplay.Core
 
         private void Swing(float deltaTime)
         {
-            m_Angle += SpeedAt(m_Angle) / m_Radius * deltaTime;
+            float step = SpeedAt(m_Angle) / m_Radius * deltaTime;
+            m_Angle += step;
             if (m_Angle > Mathf.PI * 2f) m_Angle -= Mathf.PI * 2f;
+
+            // A full turn round the pole from where it was grabbed (or the last full turn) counts as a rotation.
+            m_TurnRadians += step;
+            while (m_TurnRadians >= Mathf.PI * 2f)
+            {
+                m_TurnRadians -= Mathf.PI * 2f;
+                CompletedRotations++;
+            }
 
             Shimmy(deltaTime);
 

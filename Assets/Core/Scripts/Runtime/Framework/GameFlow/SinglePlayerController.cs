@@ -22,6 +22,9 @@ namespace Blocks.Gameplay.Core
     /// SOUND TEST (under Practice Challenges) opens the <see cref="SoundTest"/> popup: listen to any of the game's
     /// songs. UI sounds and other music are muted while it's open (see that class).
     ///
+    /// CREDITS (under Sound Test, 2026-10-30) loads the Credits scene (<see cref="CreditsController"/>); coming back
+    /// from it focuses the Credits button.
+    ///
     /// How To Play is a placeholder for now (it just logs).
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -32,6 +35,9 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("Scene to load when Change Profile is clicked.")]
         [SerializeField] private string changeProfileSceneName = "ChangeProfile";
+
+        [Tooltip("The Credits scene (the Credits button, under Sound Test).")]
+        [SerializeField] private string creditsSceneName = "Credits";
 
         [Tooltip("Scene to load when Back (or B/Esc) is pressed.")]
         [SerializeField] private string backSceneName = "MainMenu";
@@ -101,6 +107,8 @@ namespace Blocks.Gameplay.Core
             m_Column.Add(m_ChallengesButton);
             m_SoundTestButton = MenuUI.MakeButton("Sound Test", OpenSoundTest, selectSound);
             m_Column.Add(m_SoundTestButton);
+            Button creditsButton = MenuUI.MakeButton("Credits", () => MenuTransition.LoadScene(creditsSceneName), selectSound);
+            m_Column.Add(creditsButton);
             m_Column.Add(MenuUI.MakeButton("Back", OnBack, cancelSound));
 
             BuildPracticePopup(root);
@@ -108,7 +116,9 @@ namespace Blocks.Gameplay.Core
             m_SoundTest = new SoundTest(root, CloseSoundTest);
 
             MenuUI.RegisterCancelAsBack(root, cancelSound, OnBack);
-            MenuUI.FocusFirst(changeProfileButton);
+            // Back from the credits: focus the Credits button, otherwise the first one.
+            MenuUI.FocusFirst(CreditsController.ReturningToMenu ? creditsButton : changeProfileButton);
+            CreditsController.ReturningToMenu = false;
 
             StartQueuedChallenge();
         }

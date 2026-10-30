@@ -11,7 +11,8 @@ namespace Blocks.Gameplay.Core
     /// CHALLENGES (reworked 2026-10-17 - "more points coming into the economy"):
     ///   - Every player can complete every challenge once per round, and any number of players can be in the
     ///     same challenge at the same time. Nobody "owns" a challenge any more.
-    ///   - Completing one is worth a flat <see cref="ChallengeDefinition.basePoints"/> - no time or death pars.
+    ///   - Completing one is worth a flat amount by size (ChallengeCourse.Points: 100 for a 16, 250 for a 32,
+    ///     since 2026-10-30) - no time or death pars.
     ///     Going fast just leaves more time for other challenges. Dying still costs the death penalty, as it
     ///     does anywhere.
     ///   - A run starts by passing through the challenge's start flag and ends at its end flag - see

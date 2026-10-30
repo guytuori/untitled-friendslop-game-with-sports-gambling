@@ -13,26 +13,34 @@ namespace Blocks.Gameplay.Core
     /// Builds the wager master list (Resources/WagerCatalog.asset) from the plain-text wager file
     /// (<see cref="TextFilePath"/>), so new wagers are added by editing that file:
     ///
-    ///   On jump:                                         &lt;- a section header (ends with ':') = the trigger
-    ///   Will [PLAYER] jump [NUMBER] times before ...?    &lt;- a wager
-    ///   !CHALLENGE! Will [PLAYER] jump [NUMBER] ...      &lt;- challenge-only (the marker isn't shown in game)
-    ///   ...
-    ///   RANDOM SPANS                                     &lt;- after this: a placeholder name, then its range
-    ///   NUMBER
-    ///   1-100
+    ///   On jump:                                                      &lt;- a section header (ends with ':') = the trigger
+    ///   Will [PLAYER] jump [1-100] times before the end of the game?  &lt;- a wager, with its own number span
+    ///   Will [PLAYER] jump [1-50] times in the next [40-90] seconds?  &lt;- a window wager (its own window span)
+    ///   !CHALLENGE! Will [PLAYER] jump [1-15] times before ...        &lt;- challenge-only (the marker isn't shown in game)
     ///
-    /// Headers: "No particular trigger", or ones mentioning grind (rail), wall, pole, jump or run. [PLAYER]
-    /// becomes the player's display name; the other [PLACEHOLDER] gets a random number from its span.
+    /// Every wager has its own [min-max] span (since 2026-10-30), so each one can be tuned on its own. A
+    /// second span right after "in the next" makes it a window wager: the window's length in seconds is rolled
+    /// from it, and the wager only runs that long (WagerScope.Window). In the master list the spans become
+    /// placeholders - [NUMBER], or [SECONDS_NUMBER] / [SCORE_NUMBER] for time and score wagers, and
+    /// [WINDOW_SECONDS] - and that English text is what LocStrings translates, so a new wording needs a new
+    /// LocStrings row (the English shows until it has one).
+    ///
+    /// Headers: "No particular trigger", or ones mentioning grind (rail), wall, vertical pole, horizontal
+    /// pole, pole, jump, walk or run. [PLAYER] becomes the player's display name.
     ///
     /// Which hidden stat a wager is about is worked out from its wording (see InferStat - e.g. "jump ...
-    /// from a grind rail" = rail jumps, "seconds on a wall" = wall time, "end with a score" = final score).
-    /// To force one, put it in braces anywhere in the line, e.g. {RailSeconds} - see WagerStat for names.
-    /// The summary after an update lists what each line was read as, so check it after adding wagers.
-    /// Items aren't in the game yet, so wagers about them are kept but never offered. Pickup wagers are
-    /// offered on maps that have pickups (see PickupManager).
+    /// from a vertical pole" = vertical pole jumps, "swing ... rotations on a horizontal pole" = turns round
+    /// bars, "end with a score" = final score). To force one, put it in braces anywhere in the line, e.g.
+    /// {RailSeconds} - see WagerStat for names. The summary after an update lists what each line was read
+    /// as, so check it after adding wagers. Pickup wagers are offered on maps that have pickups (see
+    /// PickupManager), item wagers when items are on and the map has item boxes.
+    ///
+    /// The old format (a named [NUMBER] placeholder, with its span under RANDOM SPANS at the bottom) still
+    /// works for any line without a span of its own.
     ///
     /// Run from Friendslop > Wagers > Update Wager Master List From Text File; it also runs by itself
-    /// whenever the text file is saved, and when the editor loads if there's no list yet.
+    /// whenever the text file is saved, and when the editor loads if there's no list yet or it was made by an
+    /// older version of this importer (WagerCatalog.CurrentVersion).
     /// </summary>
     [InitializeOnLoad]
     public static class WagerCatalogImporter
@@ -41,8 +49,11 @@ namespace Blocks.Gameplay.Core
         private const string CatalogPath = "Assets/Core/Resources/" + WagerCatalog.ResourcePath + ".asset";
         private const string ChallengeMarker = "!CHALLENGE!";
         private const string SpansHeader = "RANDOM SPANS";
+        private const string WindowPlaceholder = "WINDOW_SECONDS";
 
         private static readonly Regex Placeholder = new Regex(@"\[([A-Za-z_]+)\]");
+        private static readonly Regex InlineSpan = new Regex(@"\[\s*(\d+)\s*-\s*(\d+)\s*\]");
+        private static readonly Regex WindowLead = new Regex(@"in\s+the\s+next\s*$", RegexOptions.IgnoreCase);
         private static readonly Regex StatTag = new Regex(@"\{\s*([A-Za-z]+)\s*\}");
         private static readonly Regex Range = new Regex(@"^\s*(-?\d+)\s*-\s*(-?\d+)\s*$");
 
@@ -50,10 +61,9 @@ namespace Blocks.Gameplay.Core
         {
             EditorApplication.delayCall += () =>
             {
-                if (AssetDatabase.LoadAssetAtPath<WagerCatalog>(CatalogPath) == null && File.Exists(TextFilePath))
-                {
-                    Import(showDialog: false);
-                }
+                if (!File.Exists(TextFilePath)) return;
+                var catalog = AssetDatabase.LoadAssetAtPath<WagerCatalog>(CatalogPath);
+                if (catalog == null || catalog.Version < WagerCatalog.CurrentVersion) Import(showDialog: false);
             };
         }
 
@@ -105,8 +115,10 @@ namespace Blocks.Gameplay.Core
             summary.AppendLine($"Wager master list updated: {templates.Count} wager(s), {templates.Count(t => t.supported)} offered in game.");
             foreach (WagerCatalog.Template t in templates)
             {
-                string span = string.IsNullOrEmpty(t.numberPlaceholder) ? "" : $" {t.numberPlaceholder} {t.minNumber}-{t.maxNumber},";
-                summary.AppendLine($"- [{t.trigger}, {t.scope}] {t.stat},{span} {(t.supported ? "" : "(not tracked yet - never offered) ")}{t.text}");
+                string span = string.IsNullOrEmpty(t.numberPlaceholder) ? "" : $" {t.minNumber}-{t.maxNumber}{(t.IsSeconds ? " s" : "")},";
+                string window = t.scope == WagerScope.Window ? $" window {t.minWindowSeconds}-{t.maxWindowSeconds} s," : "";
+                string missing = Loc.HasEntry(t.text) ? "" : "(no translations yet) ";
+                summary.AppendLine($"- [{t.trigger}, {t.scope}] {t.stat},{span}{window} {(t.supported ? "" : "(can't be offered) ")}{missing}{t.text}");
             }
             if (problems.Length > 0) summary.AppendLine().AppendLine("Problems:").Append(problems);
 
@@ -127,6 +139,7 @@ namespace Blocks.Gameplay.Core
         internal static List<WagerCatalog.Template> Parse(string[] lines, StringBuilder problems)
         {
             var templates = new List<WagerCatalog.Template>();
+            var oldStyle = new List<WagerCatalog.Template>(); // named placeholders, spans from RANDOM SPANS
             var spans = new Dictionary<string, (int Min, int Max)>(StringComparer.OrdinalIgnoreCase);
 
             WagerTrigger trigger = WagerTrigger.None;
@@ -198,27 +211,34 @@ namespace Blocks.Gameplay.Core
                     continue;
                 }
 
-                template.text = text;
                 template.stat = stat.Value;
-                template.supported = stat != WagerStat.Items;
+                template.supported = true;
+                text = ReadInlineSpans(text, template, n + 1, problems, out bool hasSpans);
+                template.text = text;
 
-                foreach (Match m in Placeholder.Matches(text))
+                if (!hasSpans)
                 {
-                    string name = m.Groups[1].Value;
-                    if (string.Equals(name, "PLAYER", StringComparison.OrdinalIgnoreCase)) continue;
-                    template.numberPlaceholder = name;
-                    break;
+                    // Old format: a named placeholder, its span listed under RANDOM SPANS.
+                    foreach (Match m in Placeholder.Matches(text))
+                    {
+                        string name = m.Groups[1].Value;
+                        if (string.Equals(name, "PLAYER", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(name, WindowPlaceholder, StringComparison.OrdinalIgnoreCase)) continue;
+                        template.numberPlaceholder = name;
+                        break;
+                    }
+                    oldStyle.Add(template);
                 }
 
                 templates.Add(template);
             }
 
-            // Fill in the spans now that they've all been read (they're at the bottom of the file).
-            foreach (WagerCatalog.Template template in templates)
+            // Old-format lines: fill in their spans now that they've all been read (they're at the bottom of the file).
+            foreach (WagerCatalog.Template template in oldStyle)
             {
                 if (string.IsNullOrEmpty(template.numberPlaceholder))
                 {
-                    problems.AppendLine($"No [NUMBER]-style placeholder in: {template.text}");
+                    problems.AppendLine($"No [1-100]-style span in: {template.text}");
                     template.supported = false;
                     continue;
                 }
@@ -229,7 +249,7 @@ namespace Blocks.Gameplay.Core
                 }
                 else
                 {
-                    problems.AppendLine($"No RANDOM SPANS entry for [{template.numberPlaceholder}] - using 1-100: {template.text}");
+                    problems.AppendLine($"No span for [{template.numberPlaceholder}] - using 1-100: {template.text}");
                     template.minNumber = 1;
                     template.maxNumber = 100;
                 }
@@ -238,14 +258,81 @@ namespace Blocks.Gameplay.Core
             return templates;
         }
 
+        /// <summary>
+        /// Takes the line's own [min-max] spans: the one right after "in the next" is the window (seconds), the
+        /// other is the number. Returns the text with them swapped for placeholders.
+        /// </summary>
+        private static string ReadInlineSpans(string text, WagerCatalog.Template template, int lineNumber, StringBuilder problems, out bool hasSpans)
+        {
+            MatchCollection matches = InlineSpan.Matches(text);
+            hasSpans = matches.Count > 0;
+            if (!hasSpans) return text;
+
+            var result = new StringBuilder();
+            int last = 0;
+            foreach (Match m in matches)
+            {
+                result.Append(text, last, m.Index - last);
+                last = m.Index + m.Length;
+
+                int a = int.Parse(m.Groups[1].Value), b = int.Parse(m.Groups[2].Value);
+                int min = Mathf.Min(a, b), max = Mathf.Max(a, b);
+                bool isWindow = WindowLead.IsMatch(text.Substring(0, m.Index));
+
+                if (isWindow && string.IsNullOrEmpty(template.windowPlaceholder))
+                {
+                    if (template.scope == WagerScope.Challenge)
+                    {
+                        problems.AppendLine($"Line {lineNumber}: a challenge wager can't also be 'in the next ... seconds' - it runs as a window wager.");
+                    }
+                    template.scope = WagerScope.Window;
+                    template.windowPlaceholder = WindowPlaceholder;
+                    template.minWindowSeconds = Mathf.Max(1, min);
+                    template.maxWindowSeconds = Mathf.Max(1, max);
+                    result.Append('[').Append(WindowPlaceholder).Append(']');
+                }
+                else if (!isWindow && string.IsNullOrEmpty(template.numberPlaceholder))
+                {
+                    template.numberPlaceholder = NumberPlaceholderFor(template.stat);
+                    template.minNumber = min;
+                    template.maxNumber = max;
+                    result.Append('[').Append(template.numberPlaceholder).Append(']');
+                }
+                else
+                {
+                    problems.AppendLine($"Line {lineNumber}: more spans than it can use - '{m.Value}' is left as it is.");
+                    result.Append(m.Value);
+                }
+            }
+            result.Append(text, last, text.Length - last);
+
+            if (string.IsNullOrEmpty(template.numberPlaceholder))
+            {
+                problems.AppendLine($"Line {lineNumber}: only a window span - there's no number to roll, so it's never offered.");
+                template.supported = false;
+            }
+            return result.ToString();
+        }
+
+        /// <summary>Same names as the old RANDOM SPANS placeholders, so existing LocStrings rows still match.</summary>
+        private static string NumberPlaceholderFor(WagerStat stat)
+        {
+            if (WagerCatalog.IsSecondsStat(stat)) return "SECONDS_NUMBER";
+            if (WagerCatalog.IsScoreStat(stat)) return "SCORE_NUMBER";
+            return "NUMBER";
+        }
+
         private static bool TryParseTrigger(string header, out WagerTrigger trigger)
         {
             string h = header.ToLowerInvariant();
             if (h.Contains("no particular")) trigger = WagerTrigger.None;
             else if (h.Contains("grind")) trigger = WagerTrigger.GrindRail;
             else if (h.Contains("wall")) trigger = WagerTrigger.WallRun;
+            else if (h.Contains("vertical pole")) trigger = WagerTrigger.VerticalPole;
+            else if (h.Contains("horizontal pole")) trigger = WagerTrigger.HorizontalPole;
             else if (h.Contains("pole")) trigger = WagerTrigger.PoleClimb;
             else if (h.Contains("jump")) trigger = WagerTrigger.Jump;
+            else if (h.Contains("walk")) trigger = WagerTrigger.Walk;
             else if (h.Contains("run")) trigger = WagerTrigger.Run;
             else
             {
@@ -260,14 +347,20 @@ namespace Blocks.Gameplay.Core
         {
             string t = text.ToLowerInvariant();
             bool jump = t.Contains("jump");
+            bool vertical = t.Contains("vertical pole");
+            bool horizontal = t.Contains("horizontal pole");
+            bool pole = t.Contains("pole");
+            bool rotations = Regex.IsMatch(t, @"\brotations?\b|\bspins?\b|\bturns?\b");
 
             if (jump && t.Contains("grind")) return WagerStat.RailJumps;
-            if (jump && t.Contains("pole")) return WagerStat.PoleJumps;
+            if (jump && pole) return vertical ? WagerStat.VerticalPoleJumps : horizontal ? WagerStat.HorizontalPoleJumps : WagerStat.PoleJumps;
+            if (rotations && pole) return vertical ? WagerStat.VerticalPoleRotations : horizontal ? WagerStat.HorizontalPoleRotations : WagerStat.PoleRotations;
             if (t.Contains("wall jump")) return WagerStat.WallJumps;
             if (t.Contains("grind")) return WagerStat.RailSeconds;
             if (t.Contains("wall")) return WagerStat.WallSeconds;
-            if (t.Contains("pole")) return WagerStat.PoleSeconds;
+            if (pole) return vertical ? WagerStat.VerticalPoleSeconds : horizontal ? WagerStat.HorizontalPoleSeconds : WagerStat.PoleSeconds;
             if (t.Contains("slippery") || t.Contains(" ice")) return WagerStat.IceSeconds;
+            if (Regex.IsMatch(t, @"\bwalk(s|ing)?\b")) return WagerStat.WalkSeconds;
             if (t.Contains(" run") || t.Contains("running")) return WagerStat.RunSeconds;
             if (Regex.IsMatch(t, @"\bdie\b|\bdies\b|\bdeath")) return WagerStat.Deaths;
             if (t.Contains("end with a score") || t.Contains("finish with a score")) return WagerStat.FinalScore;

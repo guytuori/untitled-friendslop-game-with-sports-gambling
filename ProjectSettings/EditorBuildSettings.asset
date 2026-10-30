@@ -57,6 +57,9 @@ EditorBuildSettings:
     path: Assets/Core/Scenes/SinglePlayer.unity
     guid: 7bf79d29596b49dd84000c6edc5cee68
   - enabled: 1
+    path: Assets/Core/Scenes/Credits.unity
+    guid: 662737baf6bd4e9583bc2a618dd84d48
+  - enabled: 1
     path: Assets/Core/Scenes/ChangeProfile.unity
     guid: ec8e734dfddb454ea28a783e41db748d
   - enabled: 1
