@@ -53,6 +53,18 @@ MonoBehaviour:
     size: 16
     prefab: {fileID: 8729598837036834493, guid: 36541fd1a3cf7984687dac9e1bc05dba, type: 3}
     thumbnail: {fileID: 2800000, guid: bba8442edb93004429ec2895282b59f9, type: 3}
+  - id: Challenge_16_11
+    size: 16
+    prefab: {fileID: 6581127963635932757, guid: 6a6a1208999f83c4bb0b18f7e38928eb, type: 3}
+    thumbnail: {fileID: 2800000, guid: 0d1aabe2dbf2ed348a38b8cb9f1afd8c, type: 3}
+  - id: Challenge_16_12
+    size: 16
+    prefab: {fileID: 5368686430052284721, guid: 1d181d7afb704344dbe7de07bd768bc7, type: 3}
+    thumbnail: {fileID: 2800000, guid: 03134e0d399a21645869b188ca780af2, type: 3}
+  - id: Challenge_16_13
+    size: 16
+    prefab: {fileID: 218911496894633706, guid: 1fabbf57ceaaccc42bd79d8585e81bb9, type: 3}
+    thumbnail: {fileID: 2800000, guid: 77fd00addeeca09468cff8520b66173c, type: 3}
   - id: Challenge_32_01
     size: 32
     prefab: {fileID: 4009937417778457704, guid: 1706642b7dbf80a47913948eea8c7b85, type: 3}
@@ -85,6 +97,14 @@ MonoBehaviour:
     size: 32
     prefab: {fileID: 7464270832644472938, guid: a34e62fd997c0334295e123e0255f60e, type: 3}
     thumbnail: {fileID: 2800000, guid: 6528d03b392ece3459a27a3b1b98c196, type: 3}
+  - id: Challenge_32_09
+    size: 32
+    prefab: {fileID: 8245637096002974555, guid: 41dfb3bf49159da4894c380b549ee03e, type: 3}
+    thumbnail: {fileID: 2800000, guid: b8a2845c6e21c5f4bb1ec8cbd5c8a74a, type: 3}
+  - id: Challenge_32_10
+    size: 32
+    prefab: {fileID: 2457141249828356906, guid: c1607680c7d7f274296f71a9a827ef2b, type: 3}
+    thumbnail: {fileID: 2800000, guid: 452446b45b4c28241bcc9e410cc483e5, type: 3}
   practice16: {fileID: 7995870167889056463, guid: 69a3b2a870c642f4b8a5a12d17563556, type: 3}
   practice32: {fileID: 915372512405286612, guid: d87f519ff8386404e86f17c21c89662b, type: 3}
   startFlag16: {fileID: 4288283407821777295, guid: 946ca866a4852be419b54ede9c8ac0de, type: 3}

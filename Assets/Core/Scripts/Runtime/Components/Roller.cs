@@ -23,6 +23,9 @@ namespace Blocks.Gameplay.Core
     ///     1.8 m tall) against the cylinder, counting anything within <see cref="touchMargin"/> of its surface
     ///     (so bumping into the solid roller counts) - and kills them like falling off the map
     ///     (LocalRespawnTracker.KillNow).
+    ///   - Except (2026-11-01) a player standing on something else right above it - e.g. on top of the tunnel
+    ///     block a one-way roller is tucked inside - who'd otherwise be within the margin of an unseen roller.
+    ///     Landing on the roller itself still kills.
     /// </summary>
     [RequireComponent(typeof(MovingPlatform))]
     [DisallowMultipleComponent]
@@ -123,7 +126,19 @@ namespace Blocks.Gameplay.Core
             if (player == null || tracker == null) return;
             if (player.PlayerState != null && player.PlayerState.LifeState == PlayerLifeState.Eliminated) return;
 
-            if (Touches(player.transform.position)) tracker.KillNow();
+            Vector3 feet = player.transform.position;
+            if (!Touches(feet)) return;
+            if (IsStandingOnSomethingAbove(player, feet)) return;
+            tracker.KillNow();
+        }
+
+        /// <summary>Standing on solid ground (not this roller) at or above its top - e.g. on the block it's hidden in.</summary>
+        private bool IsStandingOnSomethingAbove(CorePlayerManager player, Vector3 feet)
+        {
+            CoreMovement movement = player.CoreMovement;
+            if (movement == null || !movement.IsGrounded || movement.GroundPlatform == m_Mover) return false;
+            float top = m_Part.position.y + m_CentreOffset.y + m_Radius;
+            return feet.y >= top - 0.05f;
         }
 
         /// <summary>Whether a player standing at <paramref name="feet"/> touches the cylinder.</summary>

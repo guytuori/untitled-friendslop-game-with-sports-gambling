@@ -34,6 +34,7 @@ namespace Blocks.Gameplay.Core
         private CoreStatsHandler m_CoreStats;
 
         private int m_doubleJumpedCount;
+        private CharacterController m_Body;
         private bool m_HasDoubleJumped;
         private bool m_IsActive = true;
 
@@ -86,7 +87,37 @@ namespace Blocks.Gameplay.Core
 
         private void Update()
         {
-            if (m_CoreMovement != null && m_CoreMovement.MovementAbilityActive()) m_LastAbilityFrame = Time.frameCount;
+            if (m_CoreMovement == null) return;
+            if (m_CoreMovement.MovementAbilityActive()) m_LastAbilityFrame = Time.frameCount;
+
+            // Air jumps come back on a real landing (2026-11-01).
+            if (m_doubleJumpedCount > 0 && IsOwner && HasReallyLanded())
+            {
+                ResetAirJumps();
+            }
+        }
+
+        /// <summary>
+        /// On the ground for real: CoreMovement's ground check, not going up, and the body actually resting on
+        /// something. The ground check alone isn't enough - its sphere reaches 0.42 m below the feet and can brush a
+        /// ledge, slope or wall edge in mid-air (the jetpack hit the same thing), and resetting then gave the jump
+        /// boots endless air jumps.
+        /// </summary>
+        private bool HasReallyLanded()
+        {
+            if (!m_CoreMovement.IsGrounded || m_CoreMovement.VerticalVelocity > 0.1f) return false;
+            if (m_Body == null) m_Body = m_CoreMovement.GetComponent<CharacterController>();
+            return m_Body == null || !m_Body.enabled || m_Body.isGrounded;
+        }
+
+        private void ResetAirJumps()
+        {
+            if (m_doubleJumpedCount > 0 && maxDoubleJumps > 0)
+            {
+                Debug.Log($"[Items] Landed: air jumps back ({maxDoubleJumps}).", this);
+            }
+            m_HasDoubleJumped = false;
+            m_doubleJumpedCount = 0;
         }
 
         private void RegisterEventListeners()
@@ -122,7 +153,11 @@ namespace Blocks.Gameplay.Core
             if (m_CoreMovement == null) return;
 
             // Out of double jumps until the player lands (maxDoubleJumps -1 = unlimited).
-            if (maxDoubleJumps >= 0 && m_doubleJumpedCount >= maxDoubleJumps) return;
+            if (maxDoubleJumps >= 0 && m_doubleJumpedCount >= maxDoubleJumps)
+            {
+                if (maxDoubleJumps > 0 && !m_CoreMovement.IsGrounded) Debug.Log($"[Items] No air jumps left ({m_doubleJumpedCount} of {maxDoubleJumps} used).", this);
+                return;
+            }
 
             // This press is jumping off a rail, wall or pole, not a double jump.
             if (Time.frameCount - m_LastAbilityFrame <= 1) return;
@@ -153,6 +188,7 @@ namespace Blocks.Gameplay.Core
         {
             m_HasDoubleJumped = true;
             m_doubleJumpedCount++;
+            if (maxDoubleJumps > 0) Debug.Log($"[Items] Air jump {m_doubleJumpedCount} of {maxDoubleJumps}.", this);
             // Calculate jump velocity: v = sqrt(2 * g * h)
             // Note: Gravity is negative, so we multiply by -2
             float jumpVelocity = Mathf.Sqrt(doubleJumpHeight * -2f * m_CoreMovement.gravity);
@@ -167,10 +203,11 @@ namespace Blocks.Gameplay.Core
 
         private void HandleGroundedStateChanged(bool isGrounded)
         {
-            if (isGrounded)
+            // Only a real landing gives the air jumps back - Update checks that every frame (this event can fire
+            // from the ground check brushing a ledge in mid-air).
+            if (isGrounded && m_CoreMovement != null && HasReallyLanded())
             {
-                m_HasDoubleJumped = false;
-                m_doubleJumpedCount = 0;
+                ResetAirJumps();
             }
         }
 

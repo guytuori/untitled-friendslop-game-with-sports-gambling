@@ -26,6 +26,11 @@ namespace Blocks.Gameplay.Core
     /// easing in and out at the ends if <see cref="easeInOut"/> is on. <see cref="phase"/> (0-1) shifts it
     /// along its cycle, so several platforms with the same settings don't move in lockstep.
     ///
+    /// One way (<see cref="oneWay"/>, added 2026-11-01 for the tunnel rollers): Node A -> Node B at a steady
+    /// speed, then straight back to Node A in one jump and off again (the pause is spent waiting at Node A). Meant
+    /// for things that come out of one opening and disappear into another - nothing is created or destroyed, the
+    /// same object just starts over, so it costs nothing. Two on one path = the same settings, phases 0.5 apart.
+    ///
     /// Everyone sees the same thing: the position is worked out from the network clock (<see cref="SharedClock"/>),
     /// not moved step by step, so nothing is networked and late joiners match too.
     ///
@@ -64,6 +69,9 @@ namespace Blocks.Gameplay.Core
         [Tooltip("Slow down into each end and speed up out of it, instead of stopping dead.")]
         [SerializeField] private bool easeInOut = true;
 
+        [Tooltip("One way: Node A -> Node B, then jump straight back to Node A and go again (e.g. rollers coming out of a tunnel and into another). The pause is spent at Node A.")]
+        [SerializeField] private bool oneWay;
+
         private static readonly List<MovingPlatform> s_Active = new List<MovingPlatform>();
         private bool m_Snap = true;
 
@@ -84,8 +92,11 @@ namespace Blocks.Gameplay.Core
         /// <summary>How far along the path (from Node A, meters) Platform was put this frame.</summary>
         public float DistanceAlongPath { get; private set; }
 
-        /// <summary>Seconds for one full cycle: A -> B -> A, both pauses included.</summary>
-        public float CycleSeconds => 2f * (TravelSeconds + pauseSeconds);
+        /// <summary>Seconds for one full cycle: A -> B -> A, both pauses included (one way: A -> B plus one pause).</summary>
+        public float CycleSeconds => oneWay ? TravelSeconds + pauseSeconds : 2f * (TravelSeconds + pauseSeconds);
+
+        /// <summary>Goes A -> B, then starts over at A.</summary>
+        public bool OneWay => oneWay;
 
         private float TravelSeconds => PathLength / Mathf.Max(0.1f, speed);
 
@@ -139,8 +150,9 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>Sets everything up (the Moving Platform / Roller builders and challenge builders use this).</summary>
         public void Configure(Transform movingPart, Transform a, Transform b, float metersPerSecond, float pause, float cyclePhase, bool ease = true,
-            Transform[] pathWaypoints = null)
+            Transform[] pathWaypoints = null, bool oneWayLoop = false)
         {
+            oneWay = oneWayLoop;
             platform = movingPart;
             nodeA = a;
             nodeB = b;
@@ -182,13 +194,18 @@ namespace Blocks.Gameplay.Core
         public float ProgressAt(double time)
         {
             float travel = TravelSeconds;
-            float cycle = 2f * (travel + pauseSeconds);
+            float cycle = oneWay ? travel + pauseSeconds : 2f * (travel + pauseSeconds);
             if (cycle <= 0f) return 0f;
 
             double cycles = time / cycle + phase;
             float u = (float)((cycles - Math.Floor(cycles)) * cycle); // seconds into this cycle
 
             float s;
+            if (oneWay)
+            {
+                s = u < pauseSeconds ? 0f : Mathf.Clamp01((u - pauseSeconds) / Mathf.Max(0.0001f, travel)); // waiting at A, then A -> B
+                return easeInOut ? s * s * (3f - 2f * s) : s;
+            }
             if (u < pauseSeconds) s = 0f;                                             // waiting at A
             else if (u < pauseSeconds + travel) s = (u - pauseSeconds) / travel;      // A -> B
             else if (u < 2f * pauseSeconds + travel) s = 1f;                         // waiting at B
@@ -209,8 +226,12 @@ namespace Blocks.Gameplay.Core
             }
 
             Vector3 before = platform.position;
+            float previousDistance = DistanceAlongPath;
             DistanceAlongPath = ProgressAt(time) * PathLength;
             platform.position = PointAlongPath(DistanceAlongPath);
+
+            // One way: back at the start is a jump, not movement (nothing to carry, no speed).
+            if (oneWay && DistanceAlongPath < previousDistance - 0.001f) m_Snap = true;
 
             if (m_Snap)
             {

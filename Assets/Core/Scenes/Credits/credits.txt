@@ -5,8 +5,23 @@ Game Design:
 Guy Tuori
 Daniel Donato
 ---
+Program:
+Daniel Donato
+Claude
+Guy Tuori
+---
 Art Design:
 Guy Tuori
+
+Some Art Assets from:
+Total Editor 3 by The Tophat Demon
+POLYGON - Battle Royale Pack by Synty Studios
+Animated LowPoly Dinosaurs by Quaternius
+Assets by jamesdev
+Tiny Quelaag by JaysThing
+Low Poly Pirate & Beach Pack by reodesuxz
+Low Poly Ninja Pack by Akochan
+
 ---
 Sound Design:
 Guy Tuori
@@ -15,7 +30,8 @@ Voice:
 Announcer: Guy Tuori
 ---
 Play Testers:
-TBD
+Guy T Tuori
+George Tuori
 ---
 Special Thanks:
 George Donnelly

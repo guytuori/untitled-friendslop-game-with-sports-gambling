@@ -433,7 +433,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   airControl: 0.3
-  airRotationSpeed: 999
+  airRotationSpeed: 5
   conserveMomentum: 1
   minIceTurnGrip: 0.1
   loseControlThreshold: 0

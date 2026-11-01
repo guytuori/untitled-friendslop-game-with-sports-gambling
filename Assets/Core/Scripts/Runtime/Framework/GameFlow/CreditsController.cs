@@ -286,9 +286,14 @@ namespace Blocks.Gameplay.Core
                 if (!m_Planned) return;
             }
 
+            // Everything keeps scrolling at the same speed, except the last section ("Thanks for playing!"), which
+            // stops mid-screen at finalStopSeconds (2026-11-01: before, everything stopped with it, so the end of the
+            // section above could be left showing).
             float t = m_ClockStarted ? m_Clock : 0f;
-            float scroll = m_Speed * Mathf.Clamp(t - logoHoldSeconds, 0f, finalStopSeconds - logoHoldSeconds);
-            float centre = height * 0.5f - scroll; // screen y of the reference point (the logo's centre at scroll 0)
+            float scroll = m_Speed * Mathf.Max(0f, t - logoHoldSeconds);
+            float finalScroll = m_Speed * Mathf.Clamp(t - logoHoldSeconds, 0f, finalStopSeconds - logoHoldSeconds);
+            float centre = height * 0.5f - scroll;           // screen y of the reference point (the logo's centre at scroll 0)
+            float finalCentre = height * 0.5f - finalScroll; // the same, for the last section
 
             float logoHeight = m_Logo.resolvedStyle.height;
             m_Logo.style.top = centre - (float.IsNaN(logoHeight) ? 0f : logoHeight * 0.5f);
@@ -296,7 +301,7 @@ namespace Blocks.Gameplay.Core
             for (int i = 0; i < m_Sections.Count; i++)
             {
                 VisualElement section = m_Sections[i];
-                float y = centre + m_Tops[i];
+                float y = (i == m_Sections.Count - 1 ? finalCentre : centre) + m_Tops[i];
                 section.style.top = y;
                 bool onScreen = y < height && y + section.layout.height > 0f;
                 section.style.visibility = onScreen ? Visibility.Visible : Visibility.Hidden;

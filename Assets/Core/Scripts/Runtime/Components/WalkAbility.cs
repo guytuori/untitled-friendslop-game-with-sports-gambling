@@ -40,6 +40,9 @@ namespace Blocks.Gameplay.Core
         [Tooltip("If true, the character keeps their momentum when jumping, especially from a sprint.")]
         [SerializeField] private bool conserveMomentum = true;
 
+        [Tooltip("Only steer in the air (Air Control / Air Rotation Speed) while holding Grab. Off (2026-11-01, the user's call): air control is just how jumps work, no button needed. On: Dan's original behaviour - without Grab, jumps keep their take-off direction and speed.")]
+        [SerializeField] private bool airSteeringNeedsGrab = false;
+
         [Header("Ice / Low-Grip Turning")]
         [Tooltip("On low-grip ground (e.g. ice), direction changes ease in at speedChangeRate scaled by GroundGrip instead of snapping instantly, so momentum from the old direction carries through a turn. GroundGrip can be as low as 0.03 (near-frictionless), which would make a full reversal take absurdly long - this is the floor GroundGrip is clamped to specifically for that direction-change rate, so even the iciest surface still lets a turn complete in a few seconds. Raise it for a shorter, snappier slide; lower it for a longer one. Does not affect normal-grip ground, which still turns instantly as before.")]
         [SerializeField] private float minIceTurnGrip = 0.2f;
@@ -235,7 +238,8 @@ namespace Blocks.Gameplay.Core
 
             if (!m_Motor.IsGrounded)
             {
-                if (m_Motor.IsGrabHeld)
+                // Air steering is on by default (2026-11-01); airSteeringNeedsGrab brings back hold-Grab-to-steer.
+                if (!airSteeringNeedsGrab || m_Motor.IsGrabHeld)
                 {
                     return true;
                 }
