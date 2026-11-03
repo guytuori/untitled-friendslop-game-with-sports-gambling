@@ -163,7 +163,8 @@ namespace Blocks.Gameplay.Core
             if (!m_Completed.Add(Key(player, courseIndex))) return;
             if (!wasRunning) Debug.Log($"[ChallengeManager] Player {player} completed challenge {courseIndex} without a recorded start (master change?) - awarding it anyway.", this);
 
-            int points = PracticeMode.IsActive ? 0 : course.Points; // the practice score only counts pickups
+            // The practice score only counts pickups - except Practice Map with "Populate Challenges", which scores them as normal.
+            int points = PracticeMode.IsActive && !PracticeMode.PopulatedChallenges ? 0 : course.Points;
             if (points != 0) GetPlayerScore(player)?.AddScore(points);
             ChallengeCompletedRpc((int)player, courseIndex, points);
         }

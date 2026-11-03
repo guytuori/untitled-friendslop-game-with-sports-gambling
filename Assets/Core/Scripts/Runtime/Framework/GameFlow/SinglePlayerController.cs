@@ -25,7 +25,8 @@ namespace Blocks.Gameplay.Core
     /// CREDITS (under Sound Test, 2026-10-30) loads the Credits scene (<see cref="CreditsController"/>); coming back
     /// from it focuses the Credits button.
     ///
-    /// How To Play is a placeholder for now (it just logs).
+    /// HOW TO PLAY (2026-11-03) loads the How To Play slideshow (<see cref="HowToPlayController"/>); coming back from it
+    /// focuses the How To Play button.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class SinglePlayerController : MonoBehaviour
@@ -38,6 +39,9 @@ namespace Blocks.Gameplay.Core
 
         [Tooltip("The Credits scene (the Credits button, under Sound Test).")]
         [SerializeField] private string creditsSceneName = "Credits";
+
+        [Tooltip("The How To Play slideshow (the How To Play button).")]
+        [SerializeField] private string howToPlaySceneName = "HowToPlay";
 
         [Tooltip("Scene to load when Back (or B/Esc) is pressed.")]
         [SerializeField] private string backSceneName = "MainMenu";
@@ -58,6 +62,7 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>The map last picked for practice, so the popup reopens on it.</summary>
         private static int s_LastPracticeMap;
+        private static bool s_PopulateChallenges; // Practice Map's "Populate Challenges" box: off until ticked, then remembered
 
         /// <summary>A challenge to start as soon as this screen opens (Retry / Change Challenge in a practice run).</summary>
         private static string s_QueuedChallengeId;
@@ -83,6 +88,7 @@ namespace Blocks.Gameplay.Core
         private Label m_StatusLabel;
         private Button m_StartButton;
         private Button m_PopupBackButton;
+        private Toggle m_PopulateToggle;
         private int m_Selected;
         private bool m_Starting;
 
@@ -100,7 +106,8 @@ namespace Blocks.Gameplay.Core
             m_Column = MenuUI.AddBottomRightColumn(root);
             Button changeProfileButton = MenuUI.MakeButton("Change Profile", () => MenuTransition.LoadScene(changeProfileSceneName), selectSound);
             m_Column.Add(changeProfileButton);
-            m_Column.Add(MenuUI.MakeButton("How To Play", () => NotImplemented("How To Play"), selectSound));
+            Button howToPlayButton = MenuUI.MakeButton("How To Play", () => MenuTransition.LoadScene(howToPlaySceneName), selectSound);
+            m_Column.Add(howToPlayButton);
             m_PracticeButton = MenuUI.MakeButton("Practice Map", OpenPracticePopup, selectSound);
             m_Column.Add(m_PracticeButton);
             m_ChallengesButton = MenuUI.MakeButton("Practice Challenges", OpenChallengePicker, selectSound);
@@ -116,9 +123,12 @@ namespace Blocks.Gameplay.Core
             m_SoundTest = new SoundTest(root, CloseSoundTest);
 
             MenuUI.RegisterCancelAsBack(root, cancelSound, OnBack);
-            // Back from the credits: focus the Credits button, otherwise the first one.
-            MenuUI.FocusFirst(CreditsController.ReturningToMenu ? creditsButton : changeProfileButton);
+            // Back from the credits / How To Play: focus that button, otherwise the first one.
+            MenuUI.FocusFirst(CreditsController.ReturningToMenu ? creditsButton
+                : HowToPlayController.ReturningToMenu ? howToPlayButton
+                : changeProfileButton);
             CreditsController.ReturningToMenu = false;
+            HowToPlayController.ReturningToMenu = false;
 
             StartQueuedChallenge();
         }
@@ -137,11 +147,6 @@ namespace Blocks.Gameplay.Core
             OpenChallengePicker();
             m_ChallengePicker.Open(id);
             StartChallengePractice(entry);
-        }
-
-        private static void NotImplemented(string option)
-        {
-            Debug.Log($"[SinglePlayer] {option} selected (not implemented yet).");
         }
 
         /// <summary>B/Esc or Back: closes the practice popup or challenge list if one is open, otherwise back to the main menu.</summary>
@@ -331,6 +336,8 @@ namespace Blocks.Gameplay.Core
             m_FlavorLabel.style.minHeight = 40;
             panel.Add(m_FlavorLabel);
 
+            BuildPopulateRow(panel);
+
             m_StatusLabel = new Label("");
             m_StatusLabel.style.fontSize = 15;
             m_StatusLabel.style.color = ErrorColor;
@@ -349,7 +356,8 @@ namespace Blocks.Gameplay.Core
             m_PopupBackButton = MenuUI.MakeButton("Back", ClosePracticePopup, cancelSound, 180f);
             buttons.Add(m_PopupBackButton);
 
-            // Grid: arrows / stick move the selection; A/Enter starts; down from the bottom row goes to Start.
+            // Grid: arrows / stick move the selection; A/Enter starts; down from the bottom row goes to the
+            // Populate Challenges box, and down from that to Start.
             m_Grid.RegisterCallback<NavigationMoveEvent>(OnGridMove, TrickleDown.TrickleDown);
             m_Grid.RegisterCallback<NavigationSubmitEvent>(evt =>
             {
@@ -360,16 +368,89 @@ namespace Blocks.Gameplay.Core
             m_Grid.RegisterCallback<FocusInEvent>(_ => RefreshCells());
             m_Grid.RegisterCallback<FocusOutEvent>(_ => RefreshCells());
 
-            // Up from either button goes back to the grid.
+            // Up from either button goes back to the Populate Challenges box.
             foreach (Button b in new[] { m_StartButton, m_PopupBackButton })
             {
                 b.RegisterCallback<NavigationMoveEvent>(evt =>
                 {
                     if (evt.direction != NavigationMoveEvent.Direction.Up) return;
                     evt.StopPropagation();
-                    m_Grid.Focus();
+                    evt.PreventDefault();
+                    m_PopulateToggle.Focus();
                 }, TrickleDown.TrickleDown);
             }
+        }
+
+        /// <summary>
+        /// "Populate Challenges" (added 2026-11-03): off by default; ticked, the practice map's holes get real
+        /// challenges, picked as in a match, and they score as normal (see PracticeMode.PopulatedChallenges).
+        /// </summary>
+        private void BuildPopulateRow(VisualElement panel)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.justifyContent = Justify.Center;
+            row.style.marginTop = 4;
+            panel.Add(row);
+
+            var label = new Label("Populate Challenges");
+            label.style.fontSize = 17;
+            label.style.color = Color.white;
+            label.style.marginRight = 10;
+            label.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (m_Starting) return;
+                m_PopulateToggle.value = !m_PopulateToggle.value;
+                MenuUI.PlaySound(selectSound);
+            });
+            row.Add(label);
+
+            m_PopulateToggle = new Toggle();
+            m_PopulateToggle.SetValueWithoutNotify(s_PopulateChallenges);
+            m_PopulateToggle.style.marginTop = 4;
+            m_PopulateToggle.style.marginBottom = 4;
+            m_PopulateToggle.style.paddingLeft = 6;
+            m_PopulateToggle.style.paddingRight = 6;
+            m_PopulateToggle.RegisterValueChangedCallback(evt => s_PopulateChallenges = evt.newValue);
+
+            SetToggleFocused(false);
+            m_PopulateToggle.RegisterCallback<FocusInEvent>(_ => SetToggleFocused(true));
+            m_PopulateToggle.RegisterCallback<FocusOutEvent>(_ => SetToggleFocused(false));
+
+            // A / Enter toggles it (the Toggle's own Submit action prevented, so it can't double-toggle).
+            m_PopulateToggle.RegisterCallback<NavigationSubmitEvent>(evt =>
+            {
+                evt.PreventDefault();
+                evt.StopPropagation();
+                if (m_Starting) return;
+                m_PopulateToggle.value = !m_PopulateToggle.value;
+                MenuUI.PlaySound(selectSound);
+            }, TrickleDown.TrickleDown);
+
+            // Up goes back to the grid, down to Start.
+            m_PopulateToggle.RegisterCallback<NavigationMoveEvent>(evt =>
+            {
+                if (evt.direction == NavigationMoveEvent.Direction.Up)
+                {
+                    evt.StopPropagation();
+                    evt.PreventDefault();
+                    m_Grid.Focus();
+                }
+                else if (evt.direction == NavigationMoveEvent.Direction.Down)
+                {
+                    evt.StopPropagation();
+                    evt.PreventDefault();
+                    MenuUI.FocusFirst(m_StartButton);
+                }
+            }, TrickleDown.TrickleDown);
+
+            row.Add(m_PopulateToggle);
+        }
+
+        private void SetToggleFocused(bool focused)
+        {
+            m_PopulateToggle.style.backgroundColor = focused ? new Color(0.92f, 0.92f, 0.92f) : new Color(0.12f, 0.12f, 0.12f);
         }
 
         private void OpenPracticePopup()
@@ -415,7 +496,7 @@ namespace Blocks.Gameplay.Core
                 case NavigationMoveEvent.Direction.Down:
                     if (row >= lastRow)
                     {
-                        MenuUI.FocusFirst(m_StartButton);
+                        m_PopulateToggle.Focus();
                         return;
                     }
                     row++;
@@ -472,7 +553,7 @@ namespace Blocks.Gameplay.Core
             m_StatusLabel.style.color = new Color(0.8f, 0.8f, 0.8f);
             m_StatusLabel.text = "Starting practice...";
 
-            string error = await FusionSessionService.Instance.StartPracticeAsync(mapPrefab, entry.displayName);
+            string error = await FusionSessionService.Instance.StartPracticeAsync(mapPrefab, entry.displayName, null, s_PopulateChallenges);
             if (this == null) return; // the gameplay scene has already replaced this one
 
             if (error != null)
@@ -505,6 +586,7 @@ namespace Blocks.Gameplay.Core
         private void SetPopupInteractable(bool interactable)
         {
             m_Grid.SetEnabled(interactable);
+            m_PopulateToggle.SetEnabled(interactable);
             m_StartButton.SetEnabled(interactable);
             m_PopupBackButton.SetEnabled(interactable);
         }

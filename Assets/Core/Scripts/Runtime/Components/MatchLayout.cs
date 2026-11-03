@@ -130,9 +130,10 @@ namespace Blocks.Gameplay.Core
             {
                 picks = PickPracticeChallenge(sockets, ChallengeCatalog.Load(), PracticeMode.ChallengeId);
             }
-            else if (PracticeMode.IsActive)
+            else if (PracticeMode.IsActive && !PracticeMode.PopulatedChallenges)
             {
-                // Practice Map is about the map itself: every hole gets the plain piece, no challenges.
+                // Practice Map is about the map itself: every hole gets the plain piece, no challenges
+                // (unless "Populate Challenges" was ticked - then they're picked as in a match, below).
                 picks = new int[sockets.Count];
                 for (int i = 0; i < picks.Length; i++) picks[i] = PracticePiecePick;
             }

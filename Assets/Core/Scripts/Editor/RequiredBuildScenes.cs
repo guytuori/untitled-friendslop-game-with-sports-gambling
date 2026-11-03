@@ -11,7 +11,8 @@ namespace Blocks.Gameplay.Core
     /// adds any missing one right after the scene it belongs next to - no need to edit the list by hand.
     ///
     /// Currently: GameplaySettings (Settings > Gameplay, added 2026-10-12), after Settings; Credits (Single Player >
-    /// Credits, added 2026-10-30), after SinglePlayer.
+    /// Credits, added 2026-10-30), after SinglePlayer; HowToPlay (Single Player > How To Play, added 2026-11-03), after
+    /// SinglePlayer.
     /// </summary>
     [InitializeOnLoad]
     public static class RequiredBuildScenes
@@ -20,6 +21,7 @@ namespace Blocks.Gameplay.Core
         {
             ("Assets/Core/Scenes/GameplaySettings.unity", "Assets/Core/Scenes/Settings.unity"),
             ("Assets/Core/Scenes/Credits.unity", "Assets/Core/Scenes/SinglePlayer.unity"),
+            ("Assets/Core/Scenes/HowToPlay.unity", "Assets/Core/Scenes/SinglePlayer.unity"),
         };
 
         static RequiredBuildScenes()

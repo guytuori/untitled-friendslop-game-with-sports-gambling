@@ -84,10 +84,14 @@ namespace Blocks.Gameplay.Core
     /// ItemCatalogBuilder when the editor loads. Edit the numbers in its Inspector - the builder never
     /// overwrites them. If the asset is missing, the built-in defaults below are used.
     ///
-    /// Item boxes roll by <see cref="ItemDefinition.boxChance"/>. The between-rounds shop offers three items
-    /// from the tiers a player's placing allows (<see cref="TiersFor"/>): the bottom third of the table sees
-    /// tiers 1-2, the middle all tiers, the top third tiers 2-3 - so the best items are off the table for
-    /// players doing poorly and the leader doesn't get offered the basic ones.
+    /// Item boxes roll by <see cref="ItemDefinition.boxChance"/> (every item can come from a box since
+    /// 2026-11-03). The between-rounds shop offers three different items picked by
+    /// <see cref="ItemDefinition.shopWeight"/> from the items with inShop on (not the points items or the 1-Up,
+    /// since 2026-11-03), all at a flat 100.
+    ///
+    /// Shop tiers (optional, <see cref="useShopTiers"/> - off since 2026-11-03, when the user set flat shop odds):
+    /// when on, a player only sees the tiers their placing allows (<see cref="TiersFor"/>): the bottom third of the
+    /// table tiers 1-2, the middle all tiers, the top third tiers 2-3.
     /// </summary>
     public class ItemCatalog : ScriptableObject
     {
@@ -103,6 +107,8 @@ namespace Blocks.Gameplay.Core
         [SerializeField, Min(0.1f)] private float boxSize = 1.4f;
 
         [Header("Between-rounds shop")]
+        [Tooltip("Limit each player's offer to the tiers their placing allows (below). Off: every shop item can be offered, by its shop weight alone.")]
+        [SerializeField] private bool useShopTiers;
         [Tooltip("Placing at or below this (0 = last, 1 = first) is 'doing poorly': offered tiers 1 and 2 only.")]
         [SerializeField, Range(0f, 1f)] private float lowStandingMax = 0.34f;
         [Tooltip("Placing at or above this is 'doing well': offered tiers 2 and 3 only.")]
@@ -113,7 +119,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private List<ItemDefinition> items = new List<ItemDefinition>();
 
         /// <summary>Bumped when the defaults change in a way an existing asset should pick up (see EditorTopUp).</summary>
-        public const int CurrentVersion = 5;
+        public const int CurrentVersion = 6;
         [SerializeField, HideInInspector] private int version = 1;
 
         private static ItemCatalog s_Loaded;
@@ -227,6 +233,7 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public static bool[] TiersFor(float standing)
         {
+            if (Instance == null || !Instance.useShopTiers) return new[] { false, true, true, true }; // tiers off: everything
             float low = Instance != null ? Instance.lowStandingMax : 0.34f;
             float high = Instance != null ? Instance.highStandingMin : 0.67f;
             var tiers = new bool[4]; // index 1..3
@@ -285,18 +292,19 @@ namespace Blocks.Gameplay.Core
 
         private static List<ItemDefinition> CreateDefaults()
         {
-            // Shop costs are all 200 for now (to be balanced). Tiers: 1 basic, 2 good, 3 best.
-            return new List<ItemDefinition>
+            // Tiers: 1 basic, 2 good, 3 best (only used with useShopTiers on). Box chances and shop weights: the
+            // user's table of 2026-11-03 (both add up to 100). The points items and the 1-Up aren't in the shop.
+            var items = new List<ItemDefinition>
             {
-                Timed(ItemId.DoubleJumpBoots, "Double Jump Boots", "Double jump for 30 seconds.", 30f, 20f, 1, new Color(0.20f, 0.55f, 0.95f)),
-                Timed(ItemId.TripleJumpBoots, "Triple Jump Boots", "Triple jump for 15 seconds.", 15f, 5f, 3, new Color(0.10f, 0.30f, 0.85f)),
-                Timed(ItemId.RocketShoes, "Rocket Shoes", "Run faster for 30 seconds.", 30f, 20f, 1, new Color(0.95f, 0.55f, 0.10f)),
-                Timed(ItemId.SuperRocketShoes, "Super Rocket Shoes", "Run a lot faster for 15 seconds.", 15f, 5f, 3, new Color(0.90f, 0.25f, 0.05f)),
-                WithPoints(Instant(ItemId.SmallPoints, "Small Points", "Single use: gain 100 points straight away.", 20f, 1, new Color(0.45f, 0.75f, 0.30f)), 100),
-                WithPoints(Instant(ItemId.MediumPoints, "Medium Points", "Single use: gain 300 points straight away.", 10f, 2, new Color(0.25f, 0.65f, 0.20f)), 300),
-                WithPoints(Instant(ItemId.BigPoints, "Big Points", "Single use: gain 500 points straight away.", 5f, 3, new Color(0.95f, 0.78f, 0.15f)), 500),
-                Instant(ItemId.OneUp, "1-Up", "Single use: gain a life if lives are limited; otherwise your next death costs no points.", 5f, 2, new Color(0.15f, 0.70f, 0.35f)),
-                Instant(ItemId.Teleporter, "Teleporter", "Single use: teleports you to a random challenge you haven't completed yet, or to the end if you've done them all.", 10f, 2, new Color(0.65f, 0.25f, 0.85f)),
+                Timed(ItemId.DoubleJumpBoots, "Double Jump Boots", "Double jump for 30 seconds.", 30f, 0f, 1, new Color(0.20f, 0.55f, 0.95f)),
+                Timed(ItemId.TripleJumpBoots, "Triple Jump Boots", "Triple jump for 15 seconds.", 15f, 0f, 3, new Color(0.10f, 0.30f, 0.85f)),
+                Timed(ItemId.RocketShoes, "Rocket Shoes", "Run faster for 30 seconds.", 30f, 0f, 1, new Color(0.95f, 0.55f, 0.10f)),
+                Timed(ItemId.SuperRocketShoes, "Super Rocket Shoes", "Run a lot faster for 15 seconds.", 15f, 0f, 3, new Color(0.90f, 0.25f, 0.05f)),
+                WithPoints(Instant(ItemId.SmallPoints, "Small Points", "Single use: gain 100 points straight away.", 0f, 1, new Color(0.45f, 0.75f, 0.30f)), 100),
+                WithPoints(Instant(ItemId.MediumPoints, "Medium Points", "Single use: gain 300 points straight away.", 0f, 2, new Color(0.25f, 0.65f, 0.20f)), 300),
+                WithPoints(Instant(ItemId.BigPoints, "Big Points", "Single use: gain 500 points straight away.", 0f, 3, new Color(0.95f, 0.78f, 0.15f)), 500),
+                Instant(ItemId.OneUp, "1-Up", "Single use: gain a life if lives are limited; otherwise your next death costs no points.", 0f, 2, new Color(0.15f, 0.70f, 0.35f)),
+                Instant(ItemId.Teleporter, "Teleporter", "Single use: teleports you to a random challenge you haven't completed yet, or to the end if you've done them all.", 0f, 2, new Color(0.65f, 0.25f, 0.85f)),
                 Timed(ItemId.Jetpack, "Jetpack", "You get a jetpack for 20 seconds.", 20f, 0f, 3, new Color(0.55f, 0.55f, 0.60f)),
                 Timed(ItemId.SpringShoes, "Spring Shoes", "You get a high jump for 30 seconds.", 30f, 0f, 1, new Color(0.30f, 0.80f, 0.75f)),
                 Timed(ItemId.Glider, "Glider", "You can glide after jumping for 30 seconds.", 30f, 0f, 2, new Color(0.45f, 0.75f, 0.95f)),
@@ -307,10 +315,55 @@ namespace Blocks.Gameplay.Core
                 Timed(ItemId.GravityBoots, "Gravity Boots", "Triple gravity for 30 seconds - but challenges and pickups are worth double.", 30f, 0f, 2, new Color(0.35f, 0.25f, 0.50f)),
                 Timed(ItemId.SuperSpringShoes, "Super Spring Shoes", "An even higher jump for 15 seconds.", 15f, 0f, 3, new Color(0.15f, 0.65f, 0.60f)),
             };
+            foreach (ItemDefinition item in items) ApplyOdds(item);
+            return items;
+        }
+
+        /// <summary>
+        /// The user's odds (2026-11-03): item box chance, shop weight (0 = not in the shop) and shop price, per item.
+        /// Used for the defaults and, once, to update an existing catalog asset (version 6).
+        /// </summary>
+        public static bool TryGetOdds(ItemId id, out float boxChance, out float shopWeight, out int shopCost)
+        {
+            shopCost = ShopPrice;
+            switch (id)
+            {
+                case ItemId.SmallPoints: boxChance = 8f; shopWeight = 0f; return true;
+                case ItemId.MediumPoints: boxChance = 4f; shopWeight = 0f; return true;
+                case ItemId.BigPoints: boxChance = 2f; shopWeight = 0f; return true;
+                case ItemId.OneUp: boxChance = 1f; shopWeight = 0f; return true;
+                case ItemId.DoubleJumpBoots: boxChance = 12f; shopWeight = 14f; return true;
+                case ItemId.TripleJumpBoots: boxChance = 8f; shopWeight = 9f; return true;
+                case ItemId.QuadrupleJumpBoots: boxChance = 4f; shopWeight = 5f; return true;
+                case ItemId.RocketShoes: boxChance = 10f; shopWeight = 12f; return true;
+                case ItemId.SuperRocketShoes: boxChance = 5f; shopWeight = 6f; return true;
+                case ItemId.SpringShoes: boxChance = 10f; shopWeight = 12f; return true;
+                case ItemId.SuperSpringShoes: boxChance = 5f; shopWeight = 6f; return true;
+                case ItemId.Jetpack: boxChance = 3f; shopWeight = 3f; return true;
+                case ItemId.Glider: boxChance = 4f; shopWeight = 4f; return true;
+                case ItemId.MagnetBoots: boxChance = 3f; shopWeight = 4f; return true;
+                case ItemId.BigArms: boxChance = 8f; shopWeight = 9f; return true;
+                case ItemId.SlipperyBoots: boxChance = 5f; shopWeight = 6f; return true;
+                case ItemId.GravityBoots: boxChance = 5f; shopWeight = 6f; return true;
+                case ItemId.Teleporter: boxChance = 3f; shopWeight = 4f; return true;
+                default: boxChance = 0f; shopWeight = 0f; return false;
+            }
+        }
+
+        /// <summary>Every item in the between-rounds shop costs this (2026-11-03).</summary>
+        public const int ShopPrice = 100;
+
+        private static void ApplyOdds(ItemDefinition item)
+        {
+            if (item == null || !TryGetOdds(item.id, out float box, out float weight, out int cost)) return;
+            item.boxChance = box;
+            item.shopWeight = weight;
+            item.inShop = weight > 0f;
+            item.shopCost = cost;
         }
 
         private static ItemDefinition Timed(ItemId id, string name, string description, float seconds, float boxChance, int tier, Color color) =>
-            new ItemDefinition { id = id, displayName = name, description = description, kind = ItemKind.Timed, durationSeconds = seconds, boxChance = boxChance, inShop = true, shopCost = 200, shopTier = tier, shopWeight = 1f, color = color };
+            new ItemDefinition { id = id, displayName = name, description = description, kind = ItemKind.Timed, durationSeconds = seconds, boxChance = boxChance, inShop = true, shopCost = ShopPrice, shopTier = tier, shopWeight = 1f, color = color };
 
         private static ItemDefinition WithPoints(ItemDefinition item, int points)
         {
@@ -346,7 +399,7 @@ namespace Blocks.Gameplay.Core
         }
 
         private static ItemDefinition Instant(ItemId id, string name, string description, float boxChance, int tier, Color color) =>
-            new ItemDefinition { id = id, displayName = name, description = description, kind = ItemKind.Instant, durationSeconds = 0f, boxChance = boxChance, inShop = true, shopCost = 200, shopTier = tier, shopWeight = 1f, color = color };
+            new ItemDefinition { id = id, displayName = name, description = description, kind = ItemKind.Instant, durationSeconds = 0f, boxChance = boxChance, inShop = true, shopCost = ShopPrice, shopTier = tier, shopWeight = 1f, color = color };
 
 #if UNITY_EDITOR
         /// <summary>
@@ -358,6 +411,15 @@ namespace Blocks.Gameplay.Core
         public bool EditorTopUp(GameObject boxModel, Func<string, Texture2D> findIcon, Func<string, AudioClip> findSound = null)
         {
             bool changed = false;
+
+            if (version < 6)
+            {
+                // Version 6 (2026-11-03): the user's new item box chances, shop weights and a flat shop price of 100;
+                // the points items and the 1-Up leave the shop. Applied to every item (the user asked for these exact
+                // numbers); edit them in the Inspector afterwards as usual.
+                foreach (ItemDefinition item in items) ApplyOdds(item);
+                useShopTiers = false;
+            }
 
             if (version < 5)
             {

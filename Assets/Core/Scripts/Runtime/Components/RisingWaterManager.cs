@@ -13,11 +13,12 @@ namespace Blocks.Gameplay.Core
     ///   - The water: an object whose name starts with <c>ninja_pirate_water</c> (or contains
     ///     <c>rising_water</c>, for future maps). Its top surface is the water level. It starts where it's
     ///     placed in the map, and any colliders on it are removed so players fall in rather than stand on it.
-    ///   - Pumps: objects whose name starts with <c>pump_head</c>. A player holding Grab within
-    ///     <see cref="grabRange"/> of a pump sets it off: everyone hears Resources/Water/Water.mp3 and the
+    ///   - Pumps: objects whose name starts with <c>pump_head</c>. A player pressing Interact (E / R1 by
+    ///     default - was holding Grab/Parkour until 2026-11-03) within <see cref="grabRange"/> of a pump sets it off: everyone hears Resources/Water/Water.mp3 and the
     ///     water rises (at <see cref="riseSpeed"/>) until its top is flush with the bottom of that pump.
     ///     Water never goes down - a pump at or below the current level does nothing. Add as many as you like.
     ///     Pumps are solid: any mesh in one without a collider gets a MeshCollider when the map is built.
+    ///     Each pump has an InteractMarker (a spinning arrow over it) while it would still raise the water.
     ///
     /// DEATH: a player whose feet are more than <see cref="DeathDepth"/> below the water's surface dies (a
     /// normal death, see LocalRespawnTracker). RESPAWN: if the spot LocalRespawnTracker would bring them back
@@ -51,7 +52,7 @@ namespace Blocks.Gameplay.Core
         [Tooltip("How fast the water rises, in meters per second.")]
         [SerializeField] private float riseSpeed = 2f;
 
-        [Tooltip("How close (meters, from the pump's surface to the player's body) a player holding Grab has to be to set a pump off.")]
+        [Tooltip("How close (meters, from the pump's surface to the player's body) a player pressing Interact has to be to set a pump off.")]
         [SerializeField] private float grabRange = 1f;
 
         public static RisingWaterManager Instance { get; private set; }
@@ -79,6 +80,7 @@ namespace Blocks.Gameplay.Core
         private AudioClip m_WaterSound;
         private CharacterController m_LocalController;
         private CorePlayerManager m_LocalControllerOwner;
+        private int m_SeenInteractPresses = -1; // CoreInputHandler.InteractPressCount already dealt with
 
         /// <summary>True on a map with rising water.</summary>
         public bool HasWater => m_Water != null;
@@ -196,7 +198,7 @@ namespace Blocks.Gameplay.Core
                 ApplyWaterHeight();
             }
 
-            CheckLocalPlayerGrab();
+            CheckLocalPlayerInteract();
         }
 
         #endregion
@@ -256,7 +258,18 @@ namespace Blocks.Gameplay.Core
             m_CurrentTop = m_StartTop;
 
             Debug.Log($"[Water] Rising water found ('{m_Water.name}', top at {m_StartTop:0.##}) with {m_Pumps.Count} pump(s).", this);
+
+            // "This can be interacted with": an arrow over each pump while it would still raise the water.
+            for (int i = 0; i < m_Pumps.Count; i++)
+            {
+                int index = i;
+                InteractMarker.Add(m_Pumps[i].Transform, m_Pumps[i].Bounds, () => this != null && IsPumpLive(index));
+            }
         }
+
+        /// <summary>True while setting off pump <paramref name="index"/> would still raise the water.</summary>
+        private bool IsPumpLive(int index) =>
+            index >= 0 && index < m_Pumps.Count && m_Pumps[index].Bounds.min.y > TargetTop + 0.01f;
 
         /// <summary>Gives every mesh under <paramref name="root"/> that has no collider a MeshCollider of its own shape.</summary>
         private static void AddMissingColliders(Transform root)
@@ -310,13 +323,19 @@ namespace Blocks.Gameplay.Core
 
         #region Pumps
 
-        private void CheckLocalPlayerGrab()
+        private void CheckLocalPlayerInteract()
         {
             if (m_Pumps.Count == 0) return;
+
+            // A new Interact press since last time? (Counted by CoreInputHandler, so none is missed.)
+            int presses = CoreInputHandler.InteractPressCount;
+            bool pressed = m_SeenInteractPresses >= 0 && presses != m_SeenInteractPresses;
+            m_SeenInteractPresses = presses;
+            if (!pressed) return;
             if (Time.time - m_LastReportTime < ReportRetrySeconds) return;
 
             CorePlayerManager local = NetworkPlayers.Local;
-            if (local == null || !local.IsSpawned || local.CoreMovement == null || !local.CoreMovement.IsGrabHeld) return;
+            if (local == null || !local.IsSpawned || local.CoreMovement == null) return;
             if (local.PlayerState != null && local.PlayerState.LifeState == PlayerLifeState.Eliminated) return;
             if (!ChallengeManager.IsRoundOpenFor(NetworkPlayers.LocalClientId)) return;
 

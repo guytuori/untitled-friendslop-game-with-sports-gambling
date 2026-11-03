@@ -24,6 +24,9 @@ namespace Blocks.Gameplay.Core
         /// <summary>The Credits scene (Single Player > Credits). Plays once; CreditsController is timed to it.</summary>
         public const string Credits = "Credits";
 
+        /// <summary>The How To Play slideshow (Single Player > How To Play). Loops.</summary>
+        public const string HowToPlay = "Preliminary_Parkour";
+
         /// <summary>Main menu and the other menu screens.</summary>
         public const string Menu = "Parkour_Parley";
 

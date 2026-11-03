@@ -8,7 +8,8 @@ namespace Blocks.Gameplay.Core
     /// 1-Up (PlayerScore.GrantOneUp - a life, or the death shield with unlimited lives) and the Double / Triple /
     /// Quadruple Jump Boots (2 / 3 / 4 jumps in total while they last), Rocket Shoes / Super Rocket Shoes (+50% /
     /// +100% run speed), Spring Shoes / Super Spring Shoes (+50% / +100% jump height) and the Jetpack (hold Jump in
-    /// the air, burning stamina - see JetpackAbility). The rest only log for now.
+    /// the air, burning stamina - see JetpackAbility) and (2026-11-03) the Teleporter (see Teleporter). The rest only
+    /// log for now.
     ///
     /// The planned effects, for whoever fills these in:
     ///   - Double / Triple / Quadruple Jump Boots: 2 / 3 / 4 jumps in total - the jump off the ground plus 1 / 2 / 3
@@ -105,6 +106,10 @@ namespace Blocks.Gameplay.Core
                 case ItemId.SpringShoes:
                 case ItemId.SuperSpringShoes:
                     StartBoost(item, player, who);
+                    return;
+
+                case ItemId.Teleporter:
+                    Teleporter.Use(player, who);
                     return;
 
                 case ItemId.Jetpack:

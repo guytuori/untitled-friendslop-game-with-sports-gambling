@@ -1,0 +1,49 @@
+1---
+how_to_play1.png
+Parkour Predictions is a cooperative multiplayer game in which you and your party will work together to parkour your way through various maps and gather points in the time limit.
+2---
+how_to_play2.png
+You gather points through collecting pick-ups and items, performing parkour challenges, and predicting the outcomes of the game as it's taking place.
+3---GAMEPAD
+how_to_play3.png
+To move press the [Movement Stick].
+Jump with [Jump].
+Press [Walk] to enable walking.
+Move the camera with the [Camera Stick].
+Zoom the camera in and out with [Camera Zoom In] and [Camera Zoom Out].
+Open the menu with [Open Menu].
+3---KEYBOARD
+how_to_play3.png
+Move forwards with [Move Forward].
+Move left with [Strafe Left].
+Move right with [Strafe Right].
+Move back with [Move Back].
+Jump with [Jump].
+Press [Walk] to enable walking.
+Move the camera with the mouse.
+Zoom the camera in and out with [Camera Zoom In] and [Camera Zoom Out] or the scroll wheel.
+Open the menu with [Open Menu].
+4---
+how_to_play4.png
+Press and hold the [Parkour] button to perform parkour.
+You can grind on rails, swing from horizontal and vertical poles, and climb on climbable walls.
+5---
+how_to_play5.png
+Press the [Interact] button to interact with widgets and objects in the environment.
+Maps are full of interesting things to interact with; be sure to try everything you can.
+6---
+how_to_play6.png
+As you play options will pop up in the prediction market.  You can spend your current points to buy a Yes share with [Buy Yes], buy a No share with [Buy No], or dismiss the current option with [Dismiss Current Option].  You can change the purchase amount between x1, x2, x3, and x5 with the [Purchase Multiplier] button.  High risk, high reward!
+7---
+how_to_play7.png
+Use items with the [Use Item] button.  These powerful tools can help you complete challenges.
+8---
+how_to_play8.png
+At the end of each map is an End of Map Flag.  Get there before the bonus time limit and you'll immediately end the map and receive a bonus for your time remaining.  You won't, however, be able to collect any more points in the map, nor use the prediction market.  Use the time bonus wisely; it may be worth it to go back into the map and collect more points.
+9---
+how_to_play9.png
+In between rounds you'll have the option to spend some of your personally accrued points on an item to start the next round with.  A function of your points are carried over to the next round.  Each subsequent round the amount the group needs to collect will increase, so be ready for a harder challenge.
+10---
+how_to_play10.png
+Aim for a high score and have fun.
+3, 2, 1, Parkour!

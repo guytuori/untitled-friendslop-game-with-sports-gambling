@@ -33,10 +33,10 @@ MonoBehaviour:
     clip: {fileID: 8300000, guid: 5ece22fe7b80c30419ce85c65983c4ca, type: 3}
     loops: 1
     loopStartSeconds: 16.889
-    musicalSamples: 7837850
+    musicalSamples: 7837943
     sourceSampleRate: 44100
     encoderDelay: 576
-    encoderPadding: 934
+    encoderPadding: 841
   - id: Last_Stop
     clip: {fileID: 8300000, guid: 064789f4ef2570e479a94b8b61ec9932, type: 3}
     loops: 1
@@ -61,14 +61,22 @@ MonoBehaviour:
     sourceSampleRate: 44100
     encoderDelay: 576
     encoderPadding: 1119
+  - id: Parkour_Part_Ways
+    clip: {fileID: 8300000, guid: 4e54fb007ae2e544cb821720d47bd05a, type: 3}
+    loops: 1
+    loopStartSeconds: 15.375
+    musicalSamples: 7026938
+    sourceSampleRate: 44100
+    encoderDelay: 576
+    encoderPadding: 838
   - id: Parkour_Predictions
     clip: {fileID: 8300000, guid: f17c40a0a86d1924389bcaae77943aa3, type: 3}
     loops: 0
     loopStartSeconds: 0
-    musicalSamples: 2389889
+    musicalSamples: 1779450
     sourceSampleRate: 44100
     encoderDelay: 576
-    encoderPadding: 1087
+    encoderPadding: 966
   - id: Preliminary_Parkour
     clip: {fileID: 8300000, guid: f5c07459d8db43344b5c22eb9f9d605c, type: 3}
     loops: 1
@@ -137,9 +145,9 @@ MonoBehaviour:
     title: Banking on Victory
     id: Banking_on_Victory
   - number: 15
-    title: Crash Out
-    id: Crash_Out
+    title: Parkour Part Ways
+    id: Parkour_Part_Ways
   - number: 16
     title: Credits
     id: Credits
-  sourceStamp: Banking_on_Victory.mp3|115392|270CAA159252;Credits.mp3|1005212|764279B94DBD;Dinosaur_Country.mp3|2850078|CDEEC20703A3;Last_Stop.mp3|3125490|D9178081E852;Of_Ninjas_and_Pirates.mp3|1875765|18347584F766;Parkour_Parley.mp3|2810777|EDA31F774D08;Parkour_Predictions.mp3|856131|5D66221CD03B;Preliminary_Parkour.mp3|1026904|67D9444A1859;Ready_to_Run.mp3|2301894|7C422C21C656;Twenty_Thousand_Inches_Over_the_Sea.mp3|3584618|58B6F27BEA7E;music_info.txt|1175|2344048C49F1
+  sourceStamp: Banking_on_Victory.mp3|115392|270CAA159252;Credits.mp3|1005212|764279B94DBD;Dinosaur_Country.mp3|2849776|2D491743476C;Last_Stop.mp3|3125490|D9178081E852;Of_Ninjas_and_Pirates.mp3|1875765|18347584F766;Parkour_Parley.mp3|2810777|EDA31F774D08;Parkour_Part_Ways.mp3|2524835|560312676595;Parkour_Predictions.mp3|636841|13CE0A2C404A;Preliminary_Parkour.mp3|1026904|67D9444A1859;Ready_to_Run.mp3|2301894|7C422C21C656;Twenty_Thousand_Inches_Over_the_Sea.mp3|3584618|58B6F27BEA7E;music_info.txt|1173|1CB27C3F163A

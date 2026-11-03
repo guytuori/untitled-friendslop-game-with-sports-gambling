@@ -173,6 +173,9 @@ namespace Blocks.Gameplay.Core
         /// <summary>Practice Challenges: the ChallengeCatalog id being practised. Null in Practice Map (and outside practice).</summary>
         public string PracticeChallengeId { get; private set; }
 
+        /// <summary>Practice Map with "Populate Challenges" ticked: the holes get real challenges, which score as normal.</summary>
+        public bool PracticePopulateChallenges { get; private set; }
+
         /// <summary>The rules the host published for the current session (Normal defaults if none).</summary>
         public HostGameRulesData SessionRules
         {
@@ -485,10 +488,11 @@ namespace Blocks.Gameplay.Core
         /// that plays <paramref name="mapPrefab"/> and loads the gameplay scene straight away - no lobby. The
         /// session is marked as practice (<see cref="PracticeMode"/>): no time limit, no wagers, score starts
         /// at 0. With a <paramref name="challengeId"/> it's Practice Challenges: that challenge goes in the
-        /// map's hole (the map should be <see cref="PracticeMode.MapForSize"/>).
+        /// map's hole (the map should be <see cref="PracticeMode.MapForSize"/>). Without one (Practice Map),
+        /// <paramref name="populateChallenges"/> fills the map's holes with real challenges, as in a match.
         /// Returns null on success, or a player-facing error message.
         /// </summary>
-        public async Task<string> StartPracticeAsync(string mapPrefab, string mapName, string challengeId = null)
+        public async Task<string> StartPracticeAsync(string mapPrefab, string mapName, string challengeId = null, bool populateChallenges = false)
         {
             if (m_GameRunner != null) return m_Starting ? "Already starting." : "Already in a game.";
             if (string.IsNullOrWhiteSpace(mapPrefab)) return "That map isn't set up yet.";
@@ -524,6 +528,7 @@ namespace Blocks.Gameplay.Core
 
             IsPracticeSession = true;
             PracticeChallengeId = string.IsNullOrEmpty(challengeId) ? null : challengeId;
+            PracticePopulateChallenges = populateChallenges && PracticeChallengeId == null;
             RoomCode = sessionName;
             IsPublic = false;
             MaxPlayers = 1;
@@ -683,6 +688,7 @@ namespace Blocks.Gameplay.Core
             IsDevSession = false;
             IsPracticeSession = false;
             PracticeChallengeId = null;
+            PracticePopulateChallenges = false;
             m_RosterMasterId = -1;
             m_Players.Clear();
             SessionProfiles.Clear();

@@ -143,6 +143,9 @@ namespace Blocks.Gameplay.Core
             m_Overlay.style.display = DisplayStyle.None;
             root.Add(m_Overlay);
 
+            // One Up / Down press can arrive twice in the gameplay scene - count it once (NavigationDedupe).
+            NavigationDedupe.Attach(m_Overlay, "Esc menu");
+
             // B / Esc: back out of whatever's showing (bubble phase, so nothing else needs to handle it).
             m_Overlay.RegisterCallback<NavigationCancelEvent>(evt =>
             {

@@ -100,6 +100,7 @@ namespace Blocks.Gameplay.Core
                 document.sortingOrder = 1000f; // above the HUD, if they share a panel
                 document.rootVisualElement.style.backgroundColor = new Color(0f, 0f, 0f, 0.9f);
                 document.rootVisualElement.RegisterCallback<NavigationCancelEvent>(_ => LastCancelFrame = Time.frameCount, TrickleDown.TrickleDown);
+                NavigationDedupe.Attach(document.rootVisualElement, scene.name + " (over the game)"); // doubled Up / Down
             }
         }
 

@@ -75,6 +75,9 @@ namespace Blocks.Gameplay.Core
         private float m_MinX, m_MaxX, m_MinZ, m_MaxZ; // the challenge's square, in this object's space
         private Gate m_StartGate;
         private Gate m_EndGate;
+        private Vector3 m_EntranceLocal;     // the cell just outside the square, in front of the start row (floor level)
+        private Vector3 m_EntranceFacingLocal; // from there into the challenge
+        private bool m_HasEntrance;
 
         private static readonly Dictionary<Texture, Material> s_FlagMaterials = new Dictionary<Texture, Material>();
         private static Material s_FlagMaterialSource;
@@ -149,11 +152,57 @@ namespace Blocks.Gameplay.Core
             }
 
             Vector3 centre = new Vector3((course.m_MinX + course.m_MaxX) * 0.5f, 0f, (course.m_MinZ + course.m_MaxZ) * 0.5f);
+            course.SetEntrance(starts, centre);
             course.m_StartGate = course.MakeGate("Start Flag", startPrefab, starts, flagMaterial, centre);
             course.m_EndGate = course.MakeGate("End Flag", endPrefab, finishes, flagMaterial, centre);
 
             course.SetLocalState(LocalState.Open);
             return course;
+        }
+
+        /// <summary>
+        /// The Teleporter's spot (2026-11-03): the cell just in front of the start row, outside the square, centred
+        /// across the challenge, on the start row's floor - facing in.
+        /// </summary>
+        private void SetEntrance(List<Vector3> starts, Vector3 centre)
+        {
+            Vector3 mean = Vector3.zero;
+            foreach (Vector3 p in starts) mean += p;
+            mean /= starts.Count;
+
+            // The square's edge the start row lies on.
+            float toMinX = Mathf.Abs(mean.x - m_MinX), toMaxX = Mathf.Abs(mean.x - m_MaxX);
+            float toMinZ = Mathf.Abs(mean.z - m_MinZ), toMaxZ = Mathf.Abs(mean.z - m_MaxZ);
+            float floor = mean.y - Cell * 0.5f;
+            if (Mathf.Min(toMinZ, toMaxZ) <= Mathf.Min(toMinX, toMaxX))
+            {
+                float outward = toMaxZ <= toMinZ ? 1f : -1f;
+                float edge = outward > 0f ? m_MaxZ : m_MinZ;
+                m_EntranceLocal = new Vector3(centre.x, floor, edge + outward * Cell * 0.5f);
+                m_EntranceFacingLocal = new Vector3(0f, 0f, -outward);
+            }
+            else
+            {
+                float outward = toMaxX <= toMinX ? 1f : -1f;
+                float edge = outward > 0f ? m_MaxX : m_MinX;
+                m_EntranceLocal = new Vector3(edge + outward * Cell * 0.5f, floor, centre.z);
+                m_EntranceFacingLocal = new Vector3(-outward, 0f, 0f);
+            }
+            m_HasEntrance = true;
+        }
+
+        /// <summary>
+        /// Where the Teleporter puts a player for this challenge: the floor of the cell just before its start row
+        /// (outside the challenge, centred across it), and the level direction facing into it.
+        /// </summary>
+        public bool TryGetEntrance(out Vector3 feet, out Vector3 facing)
+        {
+            feet = transform.TransformPoint(m_EntranceLocal);
+            facing = transform.TransformDirection(m_EntranceFacingLocal);
+            facing.y = 0f;
+            if (!m_HasEntrance || facing.sqrMagnitude < 1e-6f) return false;
+            facing.Normalize();
+            return true;
         }
 
         private void Grow(Vector3 p)

@@ -244,11 +244,11 @@ namespace Blocks.Gameplay.Core
             AddRow(list, "INTERACT", "Interact");
             AddRow(list, "USE ITEM", "UseItem");
             AddRow(list, "TOGGLE WALK", "ToggleWalk");
-            AddRow(list, "BET YES", "BetYes");
-            AddRow(list, "BET NO", "BetNo");
-            AddRow(list, "BET MULTIPLIER", "BetMultiplier");
-            AddRow(list, "DISMISS CURRENT BET", "DismissBet");
-            AddRow(list, "OPEN ESCAPE MENU", "OpenEscapeMenu");
+            AddRow(list, "BUY YES", "BetYes");
+            AddRow(list, "BUY NO", "BetNo");
+            AddRow(list, "PURCHASE MULTIPLIER", "BetMultiplier");
+            AddRow(list, "DISMISS CURRENT OPTION", "DismissBet");
+            AddRow(list, "OPEN MENU", "OpenEscapeMenu");
             AddRow(list, "OPEN ITEM MENU (PRACTICE MODE)", "OpenItemMenu");
             AddRow(list, "CAMERA ZOOM IN", "CameraZoomIn");
             AddRow(list, "CAMERA ZOOM OUT", "CameraZoomOut");

@@ -30,6 +30,13 @@ namespace Blocks.Gameplay.Core
 
         private bool m_Built;
         private Vector3 m_Center;
+        private Bounds m_TileBounds;
+
+        /// <summary>Every end point in the loaded scenes.</summary>
+        public static System.Collections.Generic.IReadOnlyList<PlayerEndPoint> All => s_All;
+
+        /// <summary>The tile's box (world space) - the trigger covers its footprint.</summary>
+        public Bounds TileBounds => m_Built ? m_TileBounds : new Bounds(transform.position, new Vector3(2f, 0.2f, 2f));
 
         private static readonly System.Collections.Generic.List<PlayerEndPoint> s_All = new System.Collections.Generic.List<PlayerEndPoint>();
 
@@ -128,6 +135,7 @@ namespace Blocks.Gameplay.Core
 
             triggerObject.AddComponent<PlayerEndPointTrigger>();
             m_Center = bounds.center;
+            m_TileBounds = bounds;
         }
 
         private bool TryGetRendererBounds(out Bounds bounds)

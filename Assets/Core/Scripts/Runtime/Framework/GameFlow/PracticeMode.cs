@@ -12,7 +12,9 @@ namespace Blocks.Gameplay.Core
     ///
     /// PRACTICE MAP (<see cref="IsChallenge"/> false): the player alone on a chosen map, to learn it. The
     /// challenge holes get the plain Challenge16 / Challenge32 pieces, the end point does nothing, and the way
-    /// out is Esc > Quit to Main Menu (without the usual 2-second safety delay).
+    /// out is Esc > Quit to Main Menu (without the usual 2-second safety delay). With "Populate Challenges"
+    /// ticked on the map select screen (<see cref="PopulatedChallenges"/>, added 2026-11-03) the holes get real
+    /// challenges instead, picked as in a match, and completing one scores its points as normal.
     ///
     /// PRACTICE CHALLENGES (<see cref="IsChallenge"/> true): one chosen challenge (<see cref="ChallengeId"/>),
     /// in the Practice16 or Practice32 map (<see cref="MapForSize"/>). Reaching the end point asks "Retry
@@ -38,6 +40,9 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>True in Practice Challenges.</summary>
         public static bool IsChallenge => !string.IsNullOrEmpty(ChallengeId);
+
+        /// <summary>True in Practice Map with "Populate Challenges" ticked: real challenges in the holes, scoring as normal.</summary>
+        public static bool PopulatedChallenges => IsActive && !IsChallenge && FusionSessionService.Instance.PracticePopulateChallenges;
 
         /// <summary>The map a challenge of this size is practised in (Assets/Core/Prefabs/Maps).</summary>
         public static string MapForSize(int size) => size == 32 ? "Practice32" : "Practice16";

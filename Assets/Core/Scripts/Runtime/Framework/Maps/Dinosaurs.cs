@@ -15,7 +15,8 @@ namespace Blocks.Gameplay.Core
     /// anyway, it's put back where it was placed.
     ///
     /// Interact (E / R1 by default) within <see cref="InteractRange"/> of a dinosaur plays dinosaur.mp3 from it,
-    /// for everyone (through MatchLayout's RPC), unless it's already making that sound.
+    /// for everyone (through MatchLayout's RPC), unless it's already making that sound. Each one has an
+    /// InteractMarker (a spinning arrow over its head) to show it can be interacted with.
     ///
     /// Not networked: each machine walks its own copy of each dinosaur, so they won't be in the same spots
     /// on everyone's screen. Since they're only scenery that doesn't matter.
@@ -75,6 +76,9 @@ namespace Blocks.Gameplay.Core
                 var wander = found[i].Root.gameObject.AddComponent<DinosaurWander>();
                 wander.Init(i, found[i].Entry);
                 s_All.Add(wander);
+
+                // "This can be interacted with": an arrow over its head, following it around.
+                if (InteractMarker.TryGetRendererBounds(found[i].Root, out Bounds bounds)) InteractMarker.Add(found[i].Root, bounds);
             }
 
             // One listener for the Interact button, living (and dying) with the map.

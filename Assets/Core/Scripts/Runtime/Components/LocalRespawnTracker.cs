@@ -14,8 +14,10 @@ namespace Blocks.Gameplay.Core
     /// emptied, so it's a normal death (death penalty, death counted for wagers, the usual respawn countdown).
     ///
     /// RESPAWN POINT (GameManager asks <see cref="TryGetRespawnPoint"/> when respawning):
-    ///   - died in a challenge: the last safe spot they stood on before running through its start flag, in
-    ///     front of the flag (dying abandons the run, so they run through the flag again to retry);
+    ///   - died in a challenge: in front of it, centred, facing in - the same spot the Teleporter uses
+    ///     (Teleporter.TryGetChallengeSpot, changed 2026-11-03), with the camera turned to face the challenge too.
+    ///     Dying abandons the run, so they run through the flag again to retry. If that spot has no floor or
+    ///     isn't safe (rising water), it's the last safe spot they stood on before running through the start flag;
     ///   - otherwise: the safe ground closest to where they died, preferring spots that aren't inside a
     ///     challenge (so nobody comes back halfway through one they never started).
     /// "Safe ground" = spots this player has actually stood on recently (sampled while grounded and able to
@@ -49,6 +51,7 @@ namespace Blocks.Gameplay.Core
         private SafeSpot? m_LastSafe;
 
         private SafeSpot? m_ChallengeEntry; // where the current (or just-died-in) challenge run was entered from
+        private ChallengeCourse m_ChallengeCourse; // ...and that challenge
         private bool m_InChallenge;
         private bool m_RespawnAtEntry;      // died in a challenge: come back at its entrance
 
@@ -175,6 +178,7 @@ namespace Blocks.Gameplay.Core
             m_HistoryNext = 0;
             m_LastSafe = null;
             m_ChallengeEntry = null;
+            m_ChallengeCourse = null;
             m_InChallenge = false;
             m_RespawnAtEntry = false;
             m_HasDeathPosition = false;
@@ -197,7 +201,11 @@ namespace Blocks.Gameplay.Core
                 {
                     // Back (at the entrance, by TryGetRespawnPoint) - that run is over.
                     m_RespawnAtEntry = false;
-                    if (!m_InChallenge) m_ChallengeEntry = null;
+                    if (!m_InChallenge)
+                    {
+                        m_ChallengeEntry = null;
+                        m_ChallengeCourse = null;
+                    }
                 }
             }
         }
@@ -207,6 +215,7 @@ namespace Blocks.Gameplay.Core
             // The newest safe spot still in front of the start flag (the latest samples may already be past it).
             SafeSpot? entry = LatestSafeSpot(course.IsBeforeStart);
             m_ChallengeEntry = entry ?? m_LastSafe ?? new SafeSpot { Position = transform.position, Yaw = transform.eulerAngles.y };
+            m_ChallengeCourse = course;
             m_InChallenge = true;
             m_RespawnAtEntry = false;
         }
@@ -219,6 +228,7 @@ namespace Blocks.Gameplay.Core
             {
                 m_RespawnAtEntry = false;
                 m_ChallengeEntry = null;
+                m_ChallengeCourse = null;
             }
         }
 
@@ -257,6 +267,16 @@ namespace Blocks.Gameplay.Core
             SafeSpot? chosen = null;
             if ((m_InChallenge || m_RespawnAtEntry) && m_ChallengeEntry.HasValue)
             {
+                // In front of the challenge, centred and facing in, where the Teleporter puts players - well away
+                // from the holes beside its start. The camera is turned to face it too.
+                if (m_ChallengeCourse != null && m_ChallengeCourse.isActiveAndEnabled
+                    && Teleporter.TryGetChallengeSpot(m_ChallengeCourse, true, out Vector3 feet, out Vector3 facing))
+                {
+                    position = feet + Vector3.up * RespawnLift;
+                    rotation = Quaternion.LookRotation(facing, Vector3.up);
+                    if (m_Player != null && m_Player.CoreCamera != null) m_Player.CoreCamera.ResetLook(rotation.eulerAngles.y);
+                    return true;
+                }
                 chosen = m_ChallengeEntry;
             }
             else if (m_History.Count > 0)

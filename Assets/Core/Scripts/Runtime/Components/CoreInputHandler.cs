@@ -59,6 +59,18 @@ namespace Blocks.Gameplay.Core
 
         private GameplayInputSystem_Actions m_InputActions;
 
+        // Interact (E / R1 by default) isn't an action in the asset - it's a settings.json binding
+        // (InputBindingsStore), read every frame in Update.
+        private InputBindingsData m_Bindings;
+        private bool m_InteractHeld;
+        private bool m_Spawned;
+
+        /// <summary>
+        /// Counts the local player's Interact presses (only while gameplay input isn't blocked), so something
+        /// that polls (RisingWaterManager's pumps) can't miss one, whatever order the scripts update in.
+        /// </summary>
+        public static int InteractPressCount { get; private set; }
+
         /// <summary>
         /// Jump is held down right now (this player's own input; the Jetpack reads it). Read straight from the
         /// Jump action every time rather than tracked from press/release callbacks, so a missed release (or press)
@@ -146,6 +158,7 @@ namespace Blocks.Gameplay.Core
         {
             if (m_InputActions == null) return;
             InputBindingOverridesStore.ApplySavedOverrides(m_InputActions.asset);
+            m_Bindings = InputBindingsStore.Load(); // Interact
         }
 
         private void OnDestroy()
@@ -161,6 +174,33 @@ namespace Blocks.Gameplay.Core
                 RegisterInputActions();
                 m_InputActions.Player.Enable();
                 s_Blocked += ReleaseEverything;
+                m_Bindings = InputBindingsStore.Load();
+                m_Spawned = true;
+            }
+        }
+
+        /// <summary>
+        /// The Interact button (2026-11-03): raises onInteractPressed / onInteractReleased and counts presses.
+        /// It used to be raised by the Grab action, i.e. the Parkour button - left over from before Parkour and
+        /// Interact were split. Ignored while gameplay input is blocked or the window isn't focused.
+        /// </summary>
+        private void Update()
+        {
+            if (!m_Spawned || m_Bindings == null) return;
+
+            bool held = !GameplayInputBlocked && Application.isFocused
+                        && BoundControls.IsHeld(m_Bindings.Keyboard.Interact, m_Bindings.Gamepad.Interact);
+            if (held == m_InteractHeld) return;
+
+            m_InteractHeld = held;
+            if (held)
+            {
+                InteractPressCount++;
+                onInteractPressed?.Raise();
+            }
+            else
+            {
+                onInteractReleased?.Raise();
             }
         }
 
@@ -171,6 +211,7 @@ namespace Blocks.Gameplay.Core
                 m_InputActions.Player.Disable();
                 UnregisterInputActions();
                 s_Blocked -= ReleaseEverything;
+                m_Spawned = false;
             }
         }
 
@@ -195,6 +236,11 @@ namespace Blocks.Gameplay.Core
             onGrabStateChanged?.Raise(false);
             onJumpReleased?.Raise();
             onPrimaryActionReleased?.Raise();
+            if (m_InteractHeld)
+            {
+                m_InteractHeld = false;
+                onInteractReleased?.Raise();
+            }
         }
 
         #endregion
@@ -256,9 +302,6 @@ namespace Blocks.Gameplay.Core
             m_InputActions.Player.Grab.started += HandleGrabPressed;
             m_InputActions.Player.Grab.canceled += HandleGrabReleased;
 
-            m_InputActions.Player.Grab.started += HandleInteractPressed;
-            m_InputActions.Player.Grab.canceled += HandleInteractReleased;
-            
 
             m_InputActions.Player.PrimaryAction.started += HandlePrimaryActionPressed;
             m_InputActions.Player.PrimaryAction.canceled += HandlePrimaryActionReleased;
@@ -285,9 +328,6 @@ namespace Blocks.Gameplay.Core
             
             m_InputActions.Player.Grab.started -= HandleGrabPressed;
             m_InputActions.Player.Grab.canceled -= HandleGrabReleased;
-
-            m_InputActions.Player.Grab.started -= HandleInteractPressed;
-            m_InputActions.Player.Grab.canceled -= HandleInteractReleased;
 
             m_InputActions.Player.PrimaryAction.started -= HandlePrimaryActionPressed;
             m_InputActions.Player.PrimaryAction.canceled -= HandlePrimaryActionReleased;
@@ -328,8 +368,6 @@ namespace Blocks.Gameplay.Core
         private void HandleGrabState(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabStateChanged?.Raise(context.ReadValueAsButton()); }
         private void HandleGrabPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabPressed?.Raise(); }
         private void HandleGrabReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onGrabReleased?.Raise(); }
-        private void HandleInteractPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onInteractPressed?.Raise(); }
-        private void HandleInteractReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onInteractReleased?.Raise(); }
         private void HandlePrimaryActionPressed(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onPrimaryActionPressed?.Raise(); }
         private void HandlePrimaryActionReleased(InputAction.CallbackContext context) { if (!ShouldIgnore(context)) onPrimaryActionReleased?.Raise(); }
         private void HandleMenuPressed(InputAction.CallbackContext context)
@@ -354,9 +392,16 @@ namespace Blocks.Gameplay.Core
             return !Application.isFocused && context.control.device is Gamepad;
         }
 
-        /// <summary>Gameplay actions (everything but Menu) are dropped while blocked, or for an unfocused gamepad.</summary>
+        /// <summary>
+        /// Gameplay actions (everything but Menu) are dropped while blocked, or for an unfocused gamepad - but
+        /// releases always get through (2026-11-03). Dropping a gamepad release while the window was unfocused
+        /// (alt-tab) left Parkour "held" for good: pumps went off just by walking up to them, and walls and
+        /// poles would be grabbed without the button. A release while blocked is harmless (blocking already
+        /// let go of everything).
+        /// </summary>
         private static bool ShouldIgnore(InputAction.CallbackContext context)
         {
+            if (context.canceled) return false;
             return GameplayInputBlocked || ShouldIgnoreGamepadWhileUnfocused(context);
         }
 
