@@ -126,7 +126,7 @@ namespace Blocks.Gameplay.Core
             bool onWall = m_Wall != null && m_Wall.IsClimbing;
             bool onSwing2 = m_Swing2 != null && m_Swing2.IsSwinging;
             bool onPole = onSwing2 || (m_Pole != null && m_Pole.IsOnPole);
-            bool onIce = grounded && m_Movement.GroundGrip < SlipperyGrip;
+            bool onIce = grounded && m_Movement.SurfaceGrip < SlipperyGrip; // the floor itself, not Slippery / Magnet Boots
 
             // Which kind of pole, worked out on grabbing: Pole Swing 2 knows; for Dan's poles, the nearest one.
             if (onPole && !m_WasOnPole) m_PoleHorizontal = onSwing2 ? !m_Swing2.IsOnUprightPole : NearestPoleIsHorizontal();

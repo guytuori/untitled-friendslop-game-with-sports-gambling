@@ -42,6 +42,23 @@ namespace Blocks.Gameplay.Core
         private ScrollView m_Scroll;
         private Label m_NameLabel;
         private Label m_DescriptionLabel;
+        /// <summary>
+        /// The list's order, six to a row (the user's, 2026-11-04): jumps and the jetpack; speed and the boots;
+        /// the arms, the teleporter, the points items and the 1-Up. Items not listed here go at the end.
+        /// </summary>
+        private static readonly ItemId[] Order =
+        {
+            ItemId.DoubleJumpBoots, ItemId.TripleJumpBoots, ItemId.QuadrupleJumpBoots, ItemId.Jetpack, ItemId.SpringShoes, ItemId.SuperSpringShoes,
+            ItemId.RocketShoes, ItemId.SuperRocketShoes, ItemId.MagnetBoots, ItemId.SlipperyBoots, ItemId.GravityBoots, ItemId.Glider,
+            ItemId.BigArms, ItemId.Teleporter, ItemId.SmallPoints, ItemId.MediumPoints, ItemId.BigPoints, ItemId.OneUp,
+        };
+
+        private static int OrderOf(ItemId id)
+        {
+            int index = System.Array.IndexOf(Order, id);
+            return index >= 0 ? index : Order.Length + (int)id;
+        }
+
         private Button m_GiveButton;
         private Button m_BackButton;
         private int m_Selected;
@@ -58,7 +75,7 @@ namespace Blocks.Gameplay.Core
             {
                 if (item != null && item.id != ItemId.None) m_Items.Add(item);
             }
-            m_Items.Sort((a, b) => ((int)a.id).CompareTo((int)b.id));
+            m_Items.Sort((a, b) => OrderOf(a.id).CompareTo(OrderOf(b.id)));
 
             Build(root);
         }

@@ -34,6 +34,12 @@ namespace Blocks.Gameplay.Core
         private CoreStatsHandler m_CoreStats;
 
         private int m_doubleJumpedCount;
+
+        /// <summary>
+        /// Raised on the owner's machine for every air jump: the player's avatar (CoreMovement's GameObject) and
+        /// which air jump it was (1 = the first). ItemSounds plays the double / triple / quadruple jump sound.
+        /// </summary>
+        public static event System.Action<GameObject, int> AirJumped;
         private CharacterController m_Body;
         private bool m_HasDoubleJumped;
         private bool m_IsActive = true;
@@ -197,6 +203,7 @@ namespace Blocks.Gameplay.Core
             m_CoreMovement.ApplyExternalForce(Vector3.zero,ForceMode.Impulse);
             m_CoreMovement.SetVerticalVelocity(jumpVelocity);
 
+            AirJumped?.Invoke(m_CoreMovement.gameObject, m_doubleJumpedCount); // before the Jump report (ItemSounds tells them apart)
             PlayerActions.Report(m_CoreMovement.gameObject, PlayerAction.Jump); // counted for wagers (LocalActionTracker)
             // Reset any downward force/gravity accumulation if needed, though SetVerticalVelocity handles the main part
         }

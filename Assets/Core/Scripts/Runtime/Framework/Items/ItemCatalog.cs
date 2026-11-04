@@ -119,7 +119,9 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private List<ItemDefinition> items = new List<ItemDefinition>();
 
         /// <summary>Bumped when the defaults change in a way an existing asset should pick up (see EditorTopUp).</summary>
-        public const int CurrentVersion = 6;
+        public const int CurrentVersion = 7;
+
+        private const string BigArmsDescription = "Twice the launch off poles, twice the climbing speed and stronger wall jumps for 30 seconds.";
         [SerializeField, HideInInspector] private int version = 1;
 
         private static ItemCatalog s_Loaded;
@@ -309,7 +311,7 @@ namespace Blocks.Gameplay.Core
                 Timed(ItemId.SpringShoes, "Spring Shoes", "You get a high jump for 30 seconds.", 30f, 0f, 1, new Color(0.30f, 0.80f, 0.75f)),
                 Timed(ItemId.Glider, "Glider", "You can glide after jumping for 30 seconds.", 30f, 0f, 2, new Color(0.45f, 0.75f, 0.95f)),
                 Timed(ItemId.MagnetBoots, "Magnet Boots", "You ignore slippery floors for 30 seconds.", 30f, 0f, 1, new Color(0.75f, 0.20f, 0.25f)),
-                Timed(ItemId.BigArms, "Big Arms", "More launching power from poles for 30 seconds.", 30f, 0f, 2, new Color(0.85f, 0.45f, 0.35f)),
+                Timed(ItemId.BigArms, "Big Arms", BigArmsDescription, 30f, 0f, 2, new Color(0.85f, 0.45f, 0.35f)),
                 Timed(ItemId.QuadrupleJumpBoots, "Quadruple Jump Boots", "Quadruple jump for 15 seconds.", 15f, 0f, 3, new Color(0.05f, 0.15f, 0.60f)),
                 Timed(ItemId.SlipperyBoots, "Slippery Boots", "Every floor is slippery for 30 seconds - but challenges and pickups are worth double.", 30f, 0f, 2, new Color(0.60f, 0.85f, 1.00f)),
                 Timed(ItemId.GravityBoots, "Gravity Boots", "Triple gravity for 30 seconds - but challenges and pickups are worth double.", 30f, 0f, 2, new Color(0.35f, 0.25f, 0.50f)),
@@ -411,6 +413,13 @@ namespace Blocks.Gameplay.Core
         public bool EditorTopUp(GameObject boxModel, Func<string, Texture2D> findIcon, Func<string, AudioClip> findSound = null)
         {
             bool changed = false;
+
+            if (version < 7)
+            {
+                // Version 7 (2026-11-04): Big Arms also climb walls twice as fast and jump off them harder.
+                ItemDefinition arms = items.Find(i => i != null && i.id == ItemId.BigArms);
+                if (arms != null && arms.description == "More launching power from poles for 30 seconds.") arms.description = BigArmsDescription;
+            }
 
             if (version < 6)
             {

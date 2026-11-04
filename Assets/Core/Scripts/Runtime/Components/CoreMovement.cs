@@ -96,6 +96,30 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public float JumpHeightMultiplier { get; set; } = 1f;
 
+        /// <summary>
+        /// Multiplies gravity as it pulls the player down - 1 = normal. Gravity Boots set it to 3 (ItemEffects).
+        /// Jump take-off speeds are still worked out from the plain <see cref="gravity"/>, so with it raised
+        /// every jump is lower and shorter, and falls are faster.
+        /// </summary>
+        public float GravityMultiplier { get; set; } = 1f;
+
+        /// <summary>
+        /// Item limits on <see cref="GroundGrip"/>: it's the surface's own grip (<see cref="SurfaceGrip"/>)
+        /// clamped between these. Slippery Boots lower the ceiling to ice's grip (every floor is ice); Magnet
+        /// Boots raise the floor to 1 (no floor is slippery). 0 and 1 = no change.
+        /// </summary>
+        public float GroundGripFloor { get; set; } = 0f;
+        public float GroundGripCeiling { get; set; } = 1f;
+
+        /// <summary>Multiplies the launch off a pole or bar when jumping off it - 1 = normal. Big Arms: 2.</summary>
+        public float PoleLaunchMultiplier { get; set; } = 1f;
+
+        /// <summary>Multiplies wall-climbing speed (up and sideways) - 1 = normal. Big Arms: 2.</summary>
+        public float ClimbSpeedMultiplier { get; set; } = 1f;
+
+        /// <summary>Multiplies the power of jumps off a climbing wall - 1 = normal. Big Arms: 1.5.</summary>
+        public float WallJumpMultiplier { get; set; } = 1f;
+
         [Header("Ground Check")]
         [Tooltip("Vertical offset for the ground check sphere.")]
         [SerializeField] private float groundedOffset = -0.14f;
@@ -146,6 +170,13 @@ namespace Blocks.Gameplay.Core
         /// by this to get a sliding feel on low-grip surfaces.
         /// </summary>
         public float GroundGrip { get; private set; } = 1f;
+
+        /// <summary>
+        /// The grip of the surface itself (its PhysicMaterial), before any item changes it (see
+        /// <see cref="GroundGripFloor"/>) - 1 when ungrounded or the surface has no PhysicMaterial. "Is this
+        /// really ice?" (the ice wagers) reads this.
+        /// </summary>
+        public float SurfaceGrip { get; private set; } = 1f;
 
         /// <summary>
         /// The <see cref="MovingPlatform"/> the character is standing on, or null. While grounded on one, the
@@ -318,7 +349,7 @@ namespace Blocks.Gameplay.Core
                 CarryWithPlatform();
                 if (m_VerticalVelocity < m_TerminalVelocity)
                 {
-                    m_VerticalVelocity += gravity * Time.deltaTime;
+                    m_VerticalVelocity += gravity * GravityMultiplier * Time.deltaTime;
                 }
                 if (m_CharacterController.enabled)
                 {
@@ -674,7 +705,7 @@ namespace Blocks.Gameplay.Core
                 // Accelerate due to gravity, respecting terminal velocity
                 if (m_VerticalVelocity < m_TerminalVelocity)
                 {
-                    m_VerticalVelocity += gravity * Time.deltaTime;
+                    m_VerticalVelocity += gravity * GravityMultiplier * Time.deltaTime;
                 }
             }
 
@@ -781,15 +812,17 @@ namespace Blocks.Gameplay.Core
             // Read grip from whatever we're standing on. Defaults to 1 (normal) if ungrounded or the
             // ground collider has no PhysicMaterial - so surfaces that were never set up keep behaving
             // exactly as before.
-            GroundGrip = 1f;
+            SurfaceGrip = 1f;
             if (IsGrounded)
             {
                 PhysicsMaterial groundMaterial = s_GroundedHits[0].sharedMaterial;
                 if (groundMaterial != null)
                 {
-                    GroundGrip = Mathf.Clamp01(groundMaterial.dynamicFriction);
+                    SurfaceGrip = Mathf.Clamp01(groundMaterial.dynamicFriction);
                 }
             }
+            // Items (Slippery / Magnet Boots) can make every floor ice, or none of them slippery.
+            GroundGrip = IsGrounded ? Mathf.Clamp(SurfaceGrip, GroundGripFloor, Mathf.Max(GroundGripFloor, GroundGripCeiling)) : 1f;
 
             if (IsGrounded)
             {

@@ -294,7 +294,7 @@ namespace Blocks.Gameplay.Core
             SetBit(index);
             NetCollectedCount++;
 
-            if (NetworkPlayers.TryGetComponent(player, out PlayerScore score)) score.AddScore(pointsPerPickup);
+            if (NetworkPlayers.TryGetComponent(player, out PlayerScore score)) score.AddScore(pointsPerPickup * score.PointsMultiplier); // Slippery / Gravity Boots: double
             PickupCollectedRpc(index, (int)player);
         }
 

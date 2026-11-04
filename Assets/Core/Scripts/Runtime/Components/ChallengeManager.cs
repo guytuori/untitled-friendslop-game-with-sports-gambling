@@ -165,7 +165,9 @@ namespace Blocks.Gameplay.Core
 
             // The practice score only counts pickups - except Practice Map with "Populate Challenges", which scores them as normal.
             int points = PracticeMode.IsActive && !PracticeMode.PopulatedChallenges ? 0 : course.Points;
-            if (points != 0) GetPlayerScore(player)?.AddScore(points);
+            PlayerScore score = GetPlayerScore(player);
+            if (score != null) points *= score.PointsMultiplier; // Slippery / Gravity Boots: double
+            if (points != 0) score?.AddScore(points);
             ChallengeCompletedRpc((int)player, courseIndex, points);
         }
 

@@ -249,8 +249,9 @@ namespace Blocks.Gameplay.Core
             Vector3 up = Vector3.up;
             Vector3 alongWall = Vector3.Cross(WallNormal, up).normalized;
 
-            float vertSpeed = m_Motor.moveSpeed * climbSpeedMultiplier;
-            float horizSpeed = m_Motor.moveSpeed * shimmySpeedMultiplier;
+            // Big Arms: x2 (CoreMovement.ClimbSpeedMultiplier - Claude, 2026-11-04)
+            float vertSpeed = m_Motor.moveSpeed * climbSpeedMultiplier * m_Motor.ClimbSpeedMultiplier;
+            float horizSpeed = m_Motor.moveSpeed * shimmySpeedMultiplier * m_Motor.ClimbSpeedMultiplier;
             Vector3 velocity = up * (rawInput.y * vertSpeed) + (transform.right * (rawInput.x * horizSpeed));
 
             velocity = (Vector3.Cross(-WallNormal, alongWall) * (rawInput.y * vertSpeed)) + (alongWall * (rawInput.x * horizSpeed));
@@ -372,7 +373,7 @@ namespace Blocks.Gameplay.Core
             
 
             float jumpVelocity = Mathf.Sqrt(wallJumpHeight * -2f * m_Motor.gravity);
-            m_Motor.SetVerticalVelocity(jumpVelocity);
+            m_Motor.SetVerticalVelocity(jumpVelocity * m_Motor.WallJumpMultiplier); // Big Arms: x1.5
 
             ExitClimb();
             
@@ -390,7 +391,7 @@ namespace Blocks.Gameplay.Core
                 jumpDirection = rawInput.normalized;
                 
             }
-            jumpDirection = PlayerCamera().transform.forward * wallJumpPushForce;
+            jumpDirection = PlayerCamera().transform.forward * wallJumpPushForce * m_Motor.WallJumpMultiplier; // Big Arms: x1.5
             m_Motor.SetVerticalVelocity(jumpDirection.y );
             m_Motor.ApplyExternalForce(jumpDirection, ForceMode.Impulse);
 

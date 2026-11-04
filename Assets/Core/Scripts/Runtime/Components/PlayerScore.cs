@@ -39,6 +39,20 @@ namespace Blocks.Gameplay.Core
         [Networked] private int NetScore { get; set; }
         [Networked] private int NetLives { get; set; }
         [Networked] private NetworkBool NetDeathShield { get; set; }
+        [Networked] private int NetPointsMultiplier { get; set; } // 0 (unset) = 1
+
+        /// <summary>
+        /// Challenge and pickup points are multiplied by this (Slippery / Gravity Boots: 2). Set by the owner,
+        /// read by the master client when it awards them (ChallengeManager, PickupManager).
+        /// </summary>
+        public int PointsMultiplier => IsSpawned ? Mathf.Max(1, NetPointsMultiplier) : 1;
+
+        /// <summary>Owner only: sets <see cref="PointsMultiplier"/> (1 = normal).</summary>
+        public void SetPointsMultiplier(int multiplier)
+        {
+            if (!IsSpawned || !IsOwner) return;
+            NetPointsMultiplier = Mathf.Max(1, multiplier);
+        }
 
         private int m_LastScore;
 

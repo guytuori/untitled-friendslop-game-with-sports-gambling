@@ -467,8 +467,9 @@ namespace Blocks.Gameplay.Core
             PlayerActions.Report(m_Motor.gameObject, PlayerAction.PoleJump); // counted for wagers (LocalActionTracker)
 
             float jumpVelocity = Mathf.Sqrt(Mathf.Max(0.01f, jumpHeight * m_Motor.jumpHeight) * -2f * m_Motor.gravity);
-            m_Motor.SetVerticalVelocity(5);
-            m_Motor.ApplyExternalForce(transform.forward * jumpPushForce * 10, ForceMode.Impulse);
+            float arms = m_Motor.PoleLaunchMultiplier; // Big Arms: x2 (Claude, 2026-11-04)
+            m_Motor.SetVerticalVelocity(5 * arms);
+            m_Motor.ApplyExternalForce(transform.forward * jumpPushForce * 10 * arms, ForceMode.Impulse);
 
             
         }

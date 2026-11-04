@@ -507,8 +507,9 @@ namespace Blocks.Gameplay.Core
             float up = velocity.y;
             if (jumped)
             {
-                up = up * verticalLaunchScale + launchUpBonus;
-                sideways *= horizontalLaunchScale;
+                float arms = m_Motor.PoleLaunchMultiplier; // Big Arms: x2
+                up = (up * verticalLaunchScale + launchUpBonus) * arms;
+                sideways *= horizontalLaunchScale * arms;
                 PlayerActions.Report(m_Motor.gameObject, PlayerAction.PoleJump); // counted for wagers (LocalActionTracker)
             }
             m_Motor.SetVerticalVelocity(up);

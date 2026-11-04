@@ -79,6 +79,7 @@ namespace Blocks.Gameplay.Core
             if (LocalRespawnTracker.Local != null) LocalRespawnTracker.Local.ResetHistory();
 
             PracticeMode.StartRun();
+            AudioVolumeService.PlayOneShot(GameSounds.Spawn, AudioCategory.SoundEffects, Vector3.zero); // spawn.mp3
             return true;
         }
     }

@@ -206,7 +206,8 @@ MonoBehaviour:
     points: 0
   - id: 14
     displayName: Big Arms
-    description: More launching power from poles for 30 seconds.
+    description: Twice the launch off poles, twice the climbing speed and stronger
+      wall jumps for 30 seconds.
     kind: 1
     durationSeconds: 30
     boxChance: 8
@@ -276,4 +277,4 @@ MonoBehaviour:
     color: {r: 0.15, g: 0.65, b: 0.6, a: 1}
     useSound: {fileID: 8300000, guid: d0b3ff1a82d4e2c4c8af3e1ec69659f3, type: 3}
     points: 0
-  version: 6
+  version: 7

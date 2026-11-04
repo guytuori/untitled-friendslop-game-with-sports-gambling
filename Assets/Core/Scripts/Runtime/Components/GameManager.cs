@@ -48,7 +48,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float fadeDuration = 0.5f;
 
         [Header("Game Rules")]
-        [Tooltip("Time in seconds before the local player respawns.")]
+        [Tooltip("Unused since 2026-11-04: a respawn now takes as long as the 321 voice line takes to reach \"PARKOUR!\" (RoundTimer.CountdownSeconds).")]
         [SerializeField] private float respawnDelay = 0.5f;
 
         [Tooltip("If true, the local player respawns automatically.")]
@@ -69,7 +69,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private RespawnStatusEvent onRespawnStatus;
 
         [Header("Sound Effects")]
-        [Tooltip("Sound effect played during respawn countdown timer ticks.")]
+        [Tooltip("Unused since 2026-11-04 - the respawn countdown plays the 321 voice line instead of ticks.")]
         [SerializeField] private SoundDef respawnTimerSFX;
 
         private bool m_HasSpawnedLocalPlayer;
@@ -206,7 +206,17 @@ namespace Blocks.Gameplay.Core
                 m_LocalSpawnYaw = float.NaN;
             }
             StartCoroutine(SetUpLocalPlayer(localPlayer));
+
+            // Practice Map / Practice Challenges: spawn.mp3 on arriving (a match has the 3, 2, 1 countdown instead).
+            if (PracticeMode.IsActive) AudioVolumeService.PlayOneShot(GameSounds.Spawn, AudioCategory.SoundEffects, Vector3.zero);
+
+            // The respawn countdown's voice line: loaded now so it starts on time (its import doesn't preload).
+            AudioClip countdown = VoiceCatalog.Get(RespawnVoiceId);
+            if (countdown != null && countdown.loadState == AudioDataLoadState.Unloaded) countdown.LoadAudioData();
         }
+
+        /// <summary>The voice line a respawn plays: "3, 2, 1, PARKOUR!" (Assets/Core/Audio/Voice/321.mp3).</summary>
+        private const string RespawnVoiceId = "321";
 
         private IEnumerator SetUpLocalPlayer(CorePlayerManager localPlayer)
         {
@@ -328,21 +338,25 @@ namespace Blocks.Gameplay.Core
                 yield break;
             }
 
-            float timer = respawnDelay;
             ulong localId = playerState.OwnerClientId;
 
-            // Countdown loop: update UI every second
-            while (timer > 0)
+            // The "3, 2, 1, PARKOUR!" voice line (2026-11-04): RESPAWNING IN shows 3, 2, 1 on the clip's own beats
+            // (RoundAnnouncer.Beats: 0, 0.469, 0.823 s) and the player is back as it says PARKOUR! (1.192 s).
+            AudioClip countdown = VoiceCatalog.Get(RespawnVoiceId);
+            if (countdown != null) AudioVolumeService.PlayOneShot(countdown, AudioCategory.Voice, Vector3.zero);
+            float start = Time.time;
+            float[] beats = RoundAnnouncer.Beats;
+            for (int beat = 0; beat < 3; beat++)
             {
+                float wait = beats[beat] - (Time.time - start);
+                if (wait > 0f) yield return new WaitForSeconds(wait);
                 if (onRespawnStatus != null)
                 {
-                    onRespawnStatus.Raise(new RespawnStatusPayload { playerId = localId, message = "RESPAWNING IN", subtext = Mathf.CeilToInt(timer).ToString(), showSubtext = true });
-                    PlayRespawnTimerSFX();
+                    onRespawnStatus.Raise(new RespawnStatusPayload { playerId = localId, message = "RESPAWNING IN", subtext = (3 - beat).ToString(), showSubtext = true });
                 }
-
-                yield return new WaitForSeconds(1.0f);
-                timer -= 1.0f;
             }
+            float rest = RoundTimer.CountdownSeconds - (Time.time - start);
+            if (rest > 0f) yield return new WaitForSeconds(rest);
 
             // The avatar may have despawned during the countdown (left the session).
             if (playerState == null || !playerState.IsSpawned) yield break;
@@ -362,7 +376,6 @@ namespace Blocks.Gameplay.Core
                 coreMovement.transform.rotation = safeRotation;
                 coreMovement.SetPosition(safePosition);
                 coreMovement.ResetMovementForces();
-                PlayRespawnTimerSFX();
             }
             else if (coreMovement != null)
             {
@@ -381,7 +394,6 @@ namespace Blocks.Gameplay.Core
                 }
 
                 coreMovement.ResetMovementForces();
-                PlayRespawnTimerSFX();
             }
             else
             {
@@ -406,21 +418,6 @@ namespace Blocks.Gameplay.Core
         #endregion
 
         #region Private Methods
-
-        /// <summary>
-        /// Plays the respawn timer sound effect locally (not networked).
-        /// Uses spatial blend of 0 in the SoundDef, so position has no effect on panning or attenuation.
-        /// </summary>
-        private void PlayRespawnTimerSFX()
-        {
-            
-            if ( respawnTimerSFX != null)
-            {
-                CoreDirector.RequestAudio(respawnTimerSFX)
-                     .WithPosition(Vector3.zero)
-                     .Play();
-            }
-        }
 
         /// <summary>
         /// Finds every <see cref="PlayerSpawnPoint"/> marker currently in the scene and uses them as the

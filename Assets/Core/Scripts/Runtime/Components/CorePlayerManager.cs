@@ -357,12 +357,8 @@ namespace Blocks.Gameplay.Core
                 // Reset physics and play respawn effects when returning to life
                 if (newState == PlayerLifeState.Respawned || newState == PlayerLifeState.InitialSpawn)
                 {
-                    if (respawnSFX != null)
-                    {
-                        CoreDirector.RequestAudio(respawnSFX)
-                             .WithPosition(transform.position)
-                             .Play();
-                    }
+                    // The template's respawn sound (respawnSFX) is no longer played (2026-11-04): practice arrivals
+                    // play spawn.mp3 and respawns after a death the 321 voice line (GameManager).
 
                     coreMovement.ResetMovementForces();
                 }

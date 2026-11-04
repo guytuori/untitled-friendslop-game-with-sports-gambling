@@ -10,6 +10,8 @@ namespace Blocks.Gameplay.Core
     ///   - <see cref="ChallengeSuccess"/>: challenge_success.mp3 - this player completing a challenge, with
     ///     its notification (CoreHUD).
     ///   - <see cref="Points"/>: points.mp3 - this player collecting a pickup (PickupManager).
+    ///   - <see cref="Spawn"/>: spawn.mp3 - arriving in Practice Map / Practice Challenges, and a Practice
+    ///     Challenges Retry (GameManager, PracticeRetry). Not on respawns after a death (those get the 321 voice).
     /// All play at the Sound Effects volume.
     /// </summary>
     public class GameSounds : ScriptableObject
@@ -19,6 +21,7 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private AudioClip death;
         [SerializeField] private AudioClip challengeSuccess;
         [SerializeField] private AudioClip points;
+        [SerializeField] private AudioClip spawn;
 
         private static GameSounds s_Loaded;
         private static bool s_Tried;
@@ -49,18 +52,23 @@ namespace Blocks.Gameplay.Core
         /// <summary>points.mp3, or null.</summary>
         public static AudioClip Points => Load() != null ? s_Loaded.points : null;
 
+        /// <summary>spawn.mp3, or null.</summary>
+        public static AudioClip Spawn => Load() != null ? s_Loaded.spawn : null;
+
 #if UNITY_EDITOR
         /// <summary>Editor only - used by GameSoundsBuilder.</summary>
-        public void Set(AudioClip deathClip, AudioClip challengeSuccessClip, AudioClip pointsClip)
+        public void Set(AudioClip deathClip, AudioClip challengeSuccessClip, AudioClip pointsClip, AudioClip spawnClip)
         {
             death = deathClip;
             challengeSuccess = challengeSuccessClip;
             points = pointsClip;
+            spawn = spawnClip;
         }
 
         public AudioClip DeathClip => death;
         public AudioClip ChallengeSuccessClip => challengeSuccess;
         public AudioClip PointsClip => points;
+        public AudioClip SpawnClip => spawn;
 #endif
     }
 }
