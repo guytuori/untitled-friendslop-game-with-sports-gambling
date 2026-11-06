@@ -650,7 +650,14 @@ namespace Blocks.Gameplay.Core
             m_ExternalForce = Vector3.zero;
             m_ArealVelocity = Vector3.zero;
             gravity = m_InitialGravity;
+
+            // WalkAbility keeps its own running / air velocity (and a grind rail's carried speed) - a respawn,
+            // teleport or Retry stops that too (2026-11-05: respawning mid-fall kept the old momentum).
+            if (m_Walk == null) m_Walk = GetComponent<WalkAbility>();
+            if (m_Walk != null) m_Walk.ResetMomentum();
         }
+
+        private WalkAbility m_Walk;
 
         #endregion
 

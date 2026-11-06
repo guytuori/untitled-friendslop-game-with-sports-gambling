@@ -22,6 +22,10 @@ namespace Blocks.Gameplay.Core
     ///
     /// There are no player names yet, so players are numbered in join order, with the host and "you"
     /// marked.
+    ///
+    /// MAKE PUBLIC (added 2026-11-05): in a private game the host also gets Make Public, to the left of Start
+    /// Match - e.g. open an 8-player game privately, share the code with a few friends, then let the public fill
+    /// the rest. One way: once pressed the game is public for good and the button goes away.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class GameLobbyController : MonoBehaviour
@@ -43,6 +47,7 @@ namespace Blocks.Gameplay.Core
         private Label m_StatusLabel;
         private Button m_StartButton;
         private Button m_LeaveButton;
+        private Button m_PublicButton;
         private bool m_Ended;
         private bool m_Leaving;
         private bool m_Starting;
@@ -99,7 +104,15 @@ namespace Blocks.Gameplay.Core
             // No click sound here - OnStartMatch plays it only when the press is actually accepted.
             m_StartButton = MenuUI.MakeButton("Start Match", OnStartMatch, null);
             m_LeaveButton = MenuUI.MakeButton("Leave", OnLeave, cancelSound);
-            column.Add(m_StartButton);
+            m_PublicButton = MenuUI.MakeButton("Make Public", OnMakePublic, null);
+            m_PublicButton.style.marginRight = 12;
+
+            // Make Public sits to the left of Start Match (host, private game only).
+            var startRow = new VisualElement();
+            startRow.style.flexDirection = FlexDirection.Row;
+            startRow.Add(m_PublicButton);
+            startRow.Add(m_StartButton);
+            column.Add(startRow);
             column.Add(m_LeaveButton);
 
             MenuUI.RegisterCancelAsBack(root, cancelSound, OnLeave);
@@ -163,12 +176,23 @@ namespace Blocks.Gameplay.Core
             bool enoughPlayers = count >= FusionSessionService.MinPlayersToStart;
             m_StartButton.style.display = isHost ? DisplayStyle.Flex : DisplayStyle.None;
             m_StartButton.style.opacity = enoughPlayers ? 1f : 0.4f;
+            bool canMakePublic = isHost && !m_Service.IsPublic && !m_Starting;
+            if (!canMakePublic && m_PublicButton.focusController?.focusedElement == m_PublicButton) MenuUI.FocusFirst(m_StartButton);
+            m_PublicButton.style.display = canMakePublic ? DisplayStyle.Flex : DisplayStyle.None;
             if (!m_Starting)
             {
                 m_StatusLabel.text = !isHost ? "Waiting for the host to start the match..."
                     : enoughPlayers ? "Start the match whenever you're ready."
                     : "Waiting for at least one more player to join.";
             }
+        }
+
+        private void OnMakePublic()
+        {
+            if (m_Ended || m_Starting || Time.unscaledTime - m_OpenedAt < StartMatchGraceSeconds) return;
+            if (!m_Service.MakePublic()) return;
+            MenuUI.PlaySound(selectSound);
+            Refresh(); // the button goes; PUBLIC GAME shows
         }
 
         private void OnStartMatch()
@@ -212,6 +236,7 @@ namespace Blocks.Gameplay.Core
             m_CountLabel.text = "";
             m_PlayersLabel.text = "";
             m_StartButton.style.display = DisplayStyle.None;
+            m_PublicButton.style.display = DisplayStyle.None;
             m_LeaveButton.text = "Back";
             MenuUI.FocusFirst(m_LeaveButton);
         }

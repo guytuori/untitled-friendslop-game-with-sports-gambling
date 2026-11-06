@@ -65,6 +65,26 @@ MonoBehaviour:
     size: 16
     prefab: {fileID: 218911496894633706, guid: 1fabbf57ceaaccc42bd79d8585e81bb9, type: 3}
     thumbnail: {fileID: 2800000, guid: 77fd00addeeca09468cff8520b66173c, type: 3}
+  - id: Challenge_16_14
+    size: 16
+    prefab: {fileID: 5020480565588049144, guid: ca9a9d8293a52724fb59bc3470773dc7, type: 3}
+    thumbnail: {fileID: 2800000, guid: c6713b3c1d4534f42b69dd49cd76641b, type: 3}
+  - id: Challenge_16_15
+    size: 16
+    prefab: {fileID: 74953674600405336, guid: 58819583461e22f45a06fb109629bc96, type: 3}
+    thumbnail: {fileID: 2800000, guid: 795a18063dc23374aa7e7ce23a757208, type: 3}
+  - id: Challenge_16_16
+    size: 16
+    prefab: {fileID: 6532765988818388187, guid: d84d8a1d115da27499d211f28a414eff, type: 3}
+    thumbnail: {fileID: 2800000, guid: 06a74a97d8df16746aebd6724f9b370c, type: 3}
+  - id: Challenge_16_17
+    size: 16
+    prefab: {fileID: 3810361742345678183, guid: f84111da2d764134d837a90b30d4b9d8, type: 3}
+    thumbnail: {fileID: 2800000, guid: 9354996ae081be240ba3f4b36e38907e, type: 3}
+  - id: Challenge_16_18
+    size: 16
+    prefab: {fileID: 2772901027898393757, guid: 486af828153e91649b8a8f91dcc22ce9, type: 3}
+    thumbnail: {fileID: 2800000, guid: f4a101c709dd2cf43a7f63d76df4bf5a, type: 3}
   - id: Challenge_32_01
     size: 32
     prefab: {fileID: 4009937417778457704, guid: 1706642b7dbf80a47913948eea8c7b85, type: 3}

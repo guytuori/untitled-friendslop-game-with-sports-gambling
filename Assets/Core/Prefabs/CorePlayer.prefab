@@ -192,6 +192,7 @@ GameObject:
   - component: {fileID: 8341354711323544292}
   - component: {fileID: 7646443965227562787}
   - component: {fileID: 3563004876585452367}
+  - component: {fileID: 1727502454434668296}
   m_Layer: 3
   m_Name: CorePlayer
   m_TagString: Player
@@ -816,6 +817,27 @@ MonoBehaviour:
   verticalLaunchScale: 1.12
   horizontalLaunchScale: 4
   launchUpBonus: 3.35
+  onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
+--- !u!114 &1727502454434668296
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1637903110319045308}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8818aaa7e4e49559d0f276f615e63b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.GrindRail2Ability
+  snapRange: 0.9
+  snapCooldown: 0.3
+  grindSpeedMultiplier: 1
+  fullTankBlocks: 8
+  topSpeedJumpBlocks: 12
+  jumpHeightMultiplier: 1
+  jumpAirControlScale: 0.5
+  jumpReducedControlSeconds: 0.2
   onJumpPressed: {fileID: 11400000, guid: 84375de8d548d4a43a42608cffd89549, type: 2}
 --- !u!1 &1735581466166165262
 GameObject:

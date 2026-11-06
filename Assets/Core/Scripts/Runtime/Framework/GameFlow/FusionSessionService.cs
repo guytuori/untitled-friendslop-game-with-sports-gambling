@@ -45,7 +45,8 @@ namespace Blocks.Gameplay.Core
     /// nobody else can ever end up in it.
     ///
     /// Public/Private is the session's IsVisible flag: private games never appear in the lobby list but
-    /// can still be joined by code. The host's rules are published as session properties so the browser
+    /// can still be joined by code. The host can open a private game to the public from the lobby
+    /// (<see cref="MakePublic"/>, added 2026-11-05) - one way, it can't be made private again. The host's rules are published as session properties so the browser
     /// can show and filter them, and so every player in the match can read them (<see cref="SessionRules"/>).
     ///
     /// ROSTER: in Shared mode every client sees every player (Runner.ActivePlayers, OnPlayerJoined/Left),
@@ -204,6 +205,36 @@ namespace Blocks.Gameplay.Core
             if (!InGame) return;
             int masterId = m_GameRunner.GetMasterClient().PlayerId;
             if (masterId != m_RosterMasterId) RebuildRoster();
+
+            // The host made the game public (MakePublic): everyone else in the lobby sees it here. Only this way
+            // round - Start Match hides the session again, which doesn't make the game private.
+            if (!IsPublic && !IsPracticeSession && !IsDevSession)
+            {
+                SessionInfo info = m_GameRunner.SessionInfo;
+                if (info != null && info.IsValid && info.IsVisible && info.IsOpen)
+                {
+                    IsPublic = true;
+                    RosterChanged?.Invoke();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Host only, in the lobby: opens a private game to the public - it shows up in the Game Browser and
+        /// anyone can join until it's full (the room code keeps working). One way: there's no making it private
+        /// again. False if this player isn't the host, the game is already public, or it isn't a lobby.
+        /// </summary>
+        public bool MakePublic()
+        {
+            if (!IsHost || IsPublic || IsPracticeSession || IsDevSession) return false;
+            SessionInfo info = m_GameRunner.SessionInfo;
+            if (info == null || !info.IsValid || !info.IsOpen) return false; // the match has started
+
+            info.IsVisible = true;
+            IsPublic = true;
+            Debug.Log($"[Fusion] Game {RoomCode} is now public.");
+            RosterChanged?.Invoke();
+            return true;
         }
 
         // =====================================================================================

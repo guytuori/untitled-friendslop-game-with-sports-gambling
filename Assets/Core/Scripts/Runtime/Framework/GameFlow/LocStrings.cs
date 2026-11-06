@@ -142,6 +142,7 @@ namespace Blocks.Gameplay.Core
             ["{0} games found."] = new[] { "{0} partidas encontradas.", "{0} partite trovate.", "{0} parties trouvées.", "{0} Spiele gefunden.", "{0} partidas encontradas." },
             ["\"{0}\" is a sample game - it can't be joined."] = new[] { "\"{0}\" es una partida de ejemplo: no se puede entrar.", "\"{0}\" è una partita di esempio: non puoi unirti.", "\"{0}\" est une partie d'exemple : impossible de la rejoindre.", "\"{0}\" ist ein Beispielspiel und kann nicht betreten werden.", "\"{0}\" é uma partida de exemplo e não dá para entrar." },
             ["ROOM CODE"] = new[] { "CÓDIGO DE SALA", "CODICE STANZA", "CODE DU SALON", "RAUMCODE", "CÓDIGO DA SALA" },
+            ["Make Public"] = new[] { "Hacer pública", "Rendi pubblica", "Rendre publique", "Öffentlich machen", "Tornar pública" },
             ["Start Match"] = new[] { "Empezar partida", "Inizia partita", "Lancer la partie", "Match starten", "Iniciar partida" },
             ["Leave"] = new[] { "Salir", "Esci", "Quitter", "Verlassen", "Sair" },
             ["Not connected to a game."] = new[] { "No estás conectado a ninguna partida.", "Non sei connesso a una partita.", "Pas connecté à une partie.", "Nicht mit einem Spiel verbunden.", "Não conectado a uma partida." },

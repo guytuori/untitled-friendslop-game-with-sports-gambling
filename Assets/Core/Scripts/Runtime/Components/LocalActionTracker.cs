@@ -32,6 +32,7 @@ namespace Blocks.Gameplay.Core
         private CorePlayerManager m_Player;
         private CoreMovement m_Movement;
         private GrindRailAbility m_Rail;
+        private GrindRail2Ability m_Rail2;
         private WallClimbAbility m_Wall;
         private PoleGrabAbility m_Pole;
         private PoleSwing2Ability m_Swing2;
@@ -59,6 +60,7 @@ namespace Blocks.Gameplay.Core
             if (m_Player == null) m_Player = GetComponent<CorePlayerManager>();
             m_Movement = m_Player != null ? m_Player.CoreMovement : GetComponent<CoreMovement>();
             m_Rail = GetComponent<GrindRailAbility>();
+            m_Rail2 = GetComponent<GrindRail2Ability>();
             m_Wall = GetComponent<WallClimbAbility>();
             m_Pole = GetComponent<PoleGrabAbility>();
             m_Swing2 = GetComponent<PoleSwing2Ability>();
@@ -122,7 +124,7 @@ namespace Blocks.Gameplay.Core
             // IsSprinting is the walk toggle now (the walk/run speeds were swapped).
             bool walking = moving && m_Movement.IsSprinting;
             bool running = moving && !m_Movement.IsSprinting;
-            bool onRail = m_Rail != null && m_Rail.IsOnRail;
+            bool onRail = (m_Rail != null && m_Rail.IsOnRail) || (m_Rail2 != null && m_Rail2.IsOnRail);
             bool onWall = m_Wall != null && m_Wall.IsClimbing;
             bool onSwing2 = m_Swing2 != null && m_Swing2.IsSwinging;
             bool onPole = onSwing2 || (m_Pole != null && m_Pole.IsOnPole);

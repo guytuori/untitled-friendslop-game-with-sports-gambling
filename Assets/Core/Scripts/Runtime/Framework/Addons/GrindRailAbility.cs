@@ -191,6 +191,14 @@ namespace Blocks.Gameplay.Core
                 return modifier;
             }
 
+            // Grind Rail 2 on this player (and enabled) does all the grinding (2026-11-05) - this one steps aside.
+            if (Rail2 != null)
+            {
+                if (IsOnRail) ExitRail();
+                m_AirborneMomentum = Vector3.zero;
+                return modifier;
+            }
+
             if (m_LastRailGuardTimer > 0f)
             {
                 m_LastRailGuardTimer -= Time.deltaTime;
@@ -731,6 +739,22 @@ namespace Blocks.Gameplay.Core
         }
 
         #endregion
+
+        /// <summary>Grind Rail 2 (GrindRail2Ability) on the same player, when it's enabled - then this ability does nothing.</summary>
+        private GrindRail2Ability Rail2
+        {
+            get
+            {
+                if (!m_Rail2Checked)
+                {
+                    m_Rail2 = GetComponent<GrindRail2Ability>();
+                    m_Rail2Checked = true;
+                }
+                return m_Rail2 != null && m_Rail2.isActiveAndEnabled ? m_Rail2 : null;
+            }
+        }
+        private GrindRail2Ability m_Rail2;
+        private bool m_Rail2Checked;
 
         public CoreAnimator Animator()
         {

@@ -17,6 +17,12 @@ namespace Blocks.Gameplay.Core
         private Vector3 m_CurrentVelocity;
         private bool m_WasSprinting;
 
+        // Momentum carried off a grind rail (GrindRail2Ability, 2026-11-05) - see CarryMomentum.
+        private float m_CarriedSpeed;
+        private float m_CarryStartTime;
+        private float m_ReducedControlUntil;
+        private float m_ReducedControlScale = 1f;
+
         /// <summary>
         /// Gets the priority of the Walk ability. It is set to 0, the lowest priority, because it represents
         /// the most basic form of movement. All other abilities (like jumping or dashing) will be processed
@@ -69,7 +75,7 @@ namespace Blocks.Gameplay.Core
         public MovementModifier Process()
         {
             var modifier = new MovementModifier();
-            if (m_Motor.MovementAbilityActive()) { return modifier; }
+            if (m_Motor.MovementAbilityActive()) { m_CarriedSpeed = 0f; return modifier; }
             if (m_Motor.WalkLockedByExternalForce()) { return modifier; }
             // Determine if we should be using sprint speed
             // If we are grounded, we check the current sprint state
@@ -100,7 +106,7 @@ namespace Blocks.Gameplay.Core
                 if (UserInputInControl())
                 {
                     // Reduce control authority in air based on airControl setting
-                    acceleration *= airControl;
+                    acceleration *= airControl * AirControlScale;
                 }
                 else { acceleration = 0; }
                 
@@ -129,6 +135,15 @@ namespace Blocks.Gameplay.Core
                 {
                     m_CurrentSpeed = targetSpeed;
                 }
+            }
+
+            // Carrying a grind rail's speed (CarryMomentum): it stays until landing (or grabbing something) -
+            // the stick only steers. A ground check brushing the rail right as the player leaves doesn't count.
+            if (m_CarriedSpeed > 0f)
+            {
+                bool landed = m_Motor.IsGrounded && m_Motor.VerticalVelocity <= 0.1f && Time.time - m_CarryStartTime > 0.1f;
+                if (landed) m_CarriedSpeed = 0f;
+                else m_CurrentSpeed = m_CarriedSpeed;
             }
 
             // Convert 2D input to 3D direction
@@ -212,7 +227,7 @@ namespace Blocks.Gameplay.Core
                 {
                      // Steer towards target direction
                      // We use airRotationSpeed to interpolate the direction
-                     m_CurrentVelocity = Vector3.Lerp(m_CurrentVelocity, targetMoveDirection.normalized * m_CurrentSpeed, Time.deltaTime * airRotationSpeed);
+                     m_CurrentVelocity = Vector3.Lerp(m_CurrentVelocity, targetMoveDirection.normalized * m_CurrentSpeed, Time.deltaTime * airRotationSpeed * AirControlScale);
                 }
                 else
                 {
@@ -230,6 +245,35 @@ namespace Blocks.Gameplay.Core
 
             return modifier;
         }
+        /// <summary>
+        /// Leaving a grind rail (GrindRail2Ability): the player flies on at <paramref name="horizontalVelocity"/>
+        /// - that speed is kept in the air (the stick steers, at the normal air control) until they land or grab
+        /// something. <paramref name="reducedControlSeconds"/> / <paramref name="controlScale"/>: air control is
+        /// scaled down for that long first (jumping off a rail: half for 0.2 s).
+        /// </summary>
+        public void CarryMomentum(Vector3 horizontalVelocity, float reducedControlSeconds = 0f, float controlScale = 1f)
+        {
+            horizontalVelocity.y = 0f;
+            m_CurrentVelocity = horizontalVelocity;
+            m_CurrentSpeed = horizontalVelocity.magnitude;
+            m_CarriedSpeed = m_CurrentSpeed;
+            m_CarryStartTime = Time.time;
+            m_ReducedControlUntil = Time.time + Mathf.Max(0f, reducedControlSeconds);
+            m_ReducedControlScale = Mathf.Clamp01(controlScale);
+        }
+
+        /// <summary>Stops dead: no running speed, no air velocity, no carried rail speed (CoreMovement.ResetMovementForces - respawn, teleport, Retry).</summary>
+        public void ResetMomentum()
+        {
+            m_CurrentVelocity = Vector3.zero;
+            m_CurrentSpeed = 0f;
+            m_CarriedSpeed = 0f;
+            m_ReducedControlUntil = 0f;
+        }
+
+        /// <summary>Air control right now: normally 1, less just after jumping off a rail (CarryMomentum).</summary>
+        private float AirControlScale => Time.time < m_ReducedControlUntil ? m_ReducedControlScale : 1f;
+
         [SerializeField] private float loseControlThreshold; // the magnitude of velocity where the user input is overriden by the force
         public bool UserInputInControl()
         {
