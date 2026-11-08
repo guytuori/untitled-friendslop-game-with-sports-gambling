@@ -45,6 +45,9 @@ namespace Blocks.Gameplay.Core
         // Tracks the last time each stat was consumed to enforce regeneration delays
         private readonly Dictionary<int, float> m_LastStatUseTime = new Dictionary<int, float>();
 
+        // Stats held from regenerating for now (SetRegenerationPaused - the Glider holds stamina while gliding).
+        private readonly HashSet<int> m_RegenPaused = new HashSet<int>();
+
         // Caches stat definitions by hash for fast lookup without config access
         private readonly Dictionary<int, StatDefinition> m_StatDefinitions = new Dictionary<int, StatDefinition>();
 
@@ -197,6 +200,22 @@ namespace Blocks.Gameplay.Core
         }
 
         /// <summary>
+        /// Holds a stat from regenerating (2026-11-08, the Glider: no stamina comes back while gliding). When the
+        /// hold ends, the stat's normal regeneration delay starts from then, as if it had just been used.
+        /// </summary>
+        public void SetRegenerationPaused(int statHash, bool paused)
+        {
+            if (paused)
+            {
+                m_RegenPaused.Add(statHash);
+            }
+            else if (m_RegenPaused.Remove(statHash))
+            {
+                m_LastStatUseTime[statHash] = Time.time;
+            }
+        }
+
+        /// <summary>
         /// Gets an enumerable collection of all stats with their current and max values.
         /// </summary>
         /// <returns>An IEnumerable of tuples containing the stat name, current value, and max value.</returns>
@@ -301,7 +320,7 @@ namespace Blocks.Gameplay.Core
                 var stat = NetStats[i];
                 if (m_StatDefinitions.TryGetValue(stat.StatHash, out var def))
                 {
-                    if (def.regenRate > 0 && stat.CurrentValue < def.maxValue)
+                    if (def.regenRate > 0 && stat.CurrentValue < def.maxValue && !m_RegenPaused.Contains(stat.StatHash))
                     {
                         // Only regenerate if the stat has never been used or enough time has passed since last consumption
                         if (!m_LastStatUseTime.ContainsKey(stat.StatHash) ||

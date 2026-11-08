@@ -9,7 +9,7 @@ namespace Blocks.Gameplay.Core
     /// Quadruple Jump Boots (2 / 3 / 4 jumps in total while they last), Rocket Shoes / Super Rocket Shoes (+50% /
     /// +100% run speed), Spring Shoes / Super Spring Shoes (+50% / +100% jump height) and the Jetpack (hold Jump in
     /// the air, burning stamina - see JetpackAbility), (2026-11-03) the Teleporter (see Teleporter) and (2026-11-04)
-    /// Slippery Boots, Magnet Boots, Gravity Boots and Big Arms. The Glider only logs for now.
+    /// Slippery Boots, Magnet Boots, Gravity Boots and Big Arms, and (2026-11-08) the Glider (see GlideAbility).
     ///
     /// The planned effects, for whoever fills these in:
     ///   - Double / Triple / Quadruple Jump Boots: 2 / 3 / 4 jumps in total - the jump off the ground plus 1 / 2 / 3
@@ -21,7 +21,8 @@ namespace Blocks.Gameplay.Core
     ///   - Teleporter: to the start of a random challenge this player hasn't completed, or to the end point if
     ///     they've done them all.
     ///   - Jetpack: hold Jump in the air to fly, on stamina (JetpackAbility).
-    ///   - Glider (glide after jumping).
+    ///   - Glider: press Jump in the air to glide, Minecraft elytra style; Use Item mid-glide on a full stamina bar
+    ///     for a boost (GlideAbility).
     ///   - Slippery Boots: every floor is ice (CoreMovement.GroundGripCeiling = ice's grip), and challenge and
     ///     pickup points are doubled (PlayerScore.SetPointsMultiplier).
     ///   - Magnet Boots: no floor is slippery - ice (or any low-grip floor) handles like normal ground
@@ -153,6 +154,17 @@ namespace Blocks.Gameplay.Core
                     jetpack.Equip(player);
                     Debug.Log($"[Items] {who} used {item.displayName}: hold Jump in the air to fly for {item.durationSeconds:0.#} s.", player);
                     return;
+
+                case ItemId.Glider:
+                    GlideAbility glide = GlideAbility.For(player);
+                    if (glide == null)
+                    {
+                        Debug.LogWarning($"[Items] {who} used {item.displayName}, but the player has no CoreMovement.", player);
+                        return;
+                    }
+                    glide.Equip(player);
+                    Debug.Log($"[Items] {who} used {item.displayName}: press Jump in the air to glide for {item.durationSeconds:0.#} s.", player);
+                    return;
             }
 
             string how = item.IsTimed ? $"timed, {item.durationSeconds:0.#} s" : "single use";
@@ -172,6 +184,11 @@ namespace Blocks.Gameplay.Core
             {
                 var jetpack = player.CoreMovement.GetComponent<JetpackAbility>();
                 if (jetpack != null) jetpack.Unequip();
+            }
+            if (item.id == ItemId.Glider && player != null && player.CoreMovement != null)
+            {
+                var glide = player.CoreMovement.GetComponent<GlideAbility>();
+                if (glide != null) glide.Unequip();
             }
 
             Debug.Log($"[Items] {who}'s {item.displayName} ran out.", player);

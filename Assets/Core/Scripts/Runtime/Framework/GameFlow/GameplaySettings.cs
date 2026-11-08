@@ -30,6 +30,7 @@ namespace Blocks.Gameplay.Core
 
         public static bool ArachnophobiaMode => Current.ArachnophobiaMode;
         public static bool ArachnophiliaMode => Current.ArachnophiliaMode;
+        public static bool InvertGliderControls => Current.InvertGliderControls;
 
         /// <summary>Makes <paramref name="settings"/> current (not saved - InputBindingsStore.Save does that).</summary>
         public static void Apply(GameplaySettingsData settings)

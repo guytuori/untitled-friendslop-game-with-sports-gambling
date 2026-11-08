@@ -33,8 +33,8 @@ namespace Blocks.Gameplay.Core
         /// <summary>The Final Score screen after missing the target. Not written yet.</summary>
         public const string RoundLost = null;
 
-        /// <summary>Single Player > Practice Challenges. Not written yet.</summary>
-        public const string PracticeChallenge = null;
+        /// <summary>Single Player > Practice Challenges (2026-11-08; the How To Play song too).</summary>
+        public const string PracticeChallenge = "Preliminary_Parkour";
 
         /// <summary>The song for a map (its MapCatalog id, e.g. "LastStop"), or null.</summary>
         public static string ForMap(string mapId)

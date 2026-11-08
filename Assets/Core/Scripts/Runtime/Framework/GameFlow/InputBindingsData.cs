@@ -161,6 +161,12 @@ namespace Blocks.Gameplay.Core
         public bool ArachnophobiaMode = false;
         public bool ArachnophiliaMode = false;
 
+        /// <summary>
+        /// Glider (2026-11-08): on (the default) = forward tilts you down and back tilts you up, like a plane; off
+        /// swaps them. An older save without the field gets the default.
+        /// </summary>
+        public bool InvertGliderControls = true;
+
         /// <summary>0 Off, 1 Protanopia, 2 Deuteranopia, 3 Tritanopia (see ColorblindFilter).</summary>
         public int ColorblindMode = 0;
 

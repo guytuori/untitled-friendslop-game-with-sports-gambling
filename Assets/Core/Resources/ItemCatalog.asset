@@ -178,9 +178,10 @@ MonoBehaviour:
     points: 0
   - id: 12
     displayName: Glider
-    description: You can glide after jumping for 30 seconds.
+    description: Press Jump in the air to glide for 20 seconds. Use Item while gliding
+      for a boost (uses stamina).
     kind: 1
-    durationSeconds: 30
+    durationSeconds: 20
     boxChance: 4
     inShop: 1
     shopCost: 100
@@ -277,4 +278,4 @@ MonoBehaviour:
     color: {r: 0.15, g: 0.65, b: 0.6, a: 1}
     useSound: {fileID: 8300000, guid: d0b3ff1a82d4e2c4c8af3e1ec69659f3, type: 3}
     points: 0
-  version: 7
+  version: 10

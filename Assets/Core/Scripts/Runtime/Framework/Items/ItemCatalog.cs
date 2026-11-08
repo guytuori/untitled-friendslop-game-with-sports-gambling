@@ -119,8 +119,11 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private List<ItemDefinition> items = new List<ItemDefinition>();
 
         /// <summary>Bumped when the defaults change in a way an existing asset should pick up (see EditorTopUp).</summary>
-        public const int CurrentVersion = 7;
+        public const int CurrentVersion = 10;
 
+        private const string GliderDescription = "Press Jump in the air to glide for 20 seconds. Use Item while gliding for a boost (uses stamina).";
+        private const string GliderDescription20 = "Press Jump in the air to glide for 20 seconds. Use Item while gliding on full stamina for a boost.";
+        private const string GliderDescription30 = "Press Jump in the air to glide for 30 seconds. Use Item while gliding on full stamina for a boost.";
         private const string BigArmsDescription = "Twice the launch off poles, twice the climbing speed and stronger wall jumps for 30 seconds.";
         [SerializeField, HideInInspector] private int version = 1;
 
@@ -309,7 +312,7 @@ namespace Blocks.Gameplay.Core
                 Instant(ItemId.Teleporter, "Teleporter", "Single use: teleports you to a random challenge you haven't completed yet, or to the end if you've done them all.", 0f, 2, new Color(0.65f, 0.25f, 0.85f)),
                 Timed(ItemId.Jetpack, "Jetpack", "You get a jetpack for 20 seconds.", 20f, 0f, 3, new Color(0.55f, 0.55f, 0.60f)),
                 Timed(ItemId.SpringShoes, "Spring Shoes", "You get a high jump for 30 seconds.", 30f, 0f, 1, new Color(0.30f, 0.80f, 0.75f)),
-                Timed(ItemId.Glider, "Glider", "You can glide after jumping for 30 seconds.", 30f, 0f, 2, new Color(0.45f, 0.75f, 0.95f)),
+                Timed(ItemId.Glider, "Glider", GliderDescription, 20f, 0f, 2, new Color(0.45f, 0.75f, 0.95f)),
                 Timed(ItemId.MagnetBoots, "Magnet Boots", "You ignore slippery floors for 30 seconds.", 30f, 0f, 1, new Color(0.75f, 0.20f, 0.25f)),
                 Timed(ItemId.BigArms, "Big Arms", BigArmsDescription, 30f, 0f, 2, new Color(0.85f, 0.45f, 0.35f)),
                 Timed(ItemId.QuadrupleJumpBoots, "Quadruple Jump Boots", "Quadruple jump for 15 seconds.", 15f, 0f, 3, new Color(0.05f, 0.15f, 0.60f)),
@@ -413,6 +416,29 @@ namespace Blocks.Gameplay.Core
         public bool EditorTopUp(GameObject boxModel, Func<string, Texture2D> findIcon, Func<string, AudioClip> findSound = null)
         {
             bool changed = false;
+
+            if (version < 10)
+            {
+                // Version 10 (2026-11-08): a glide boost costs 30% stamina, not a full bar.
+                ItemDefinition glider = items.Find(i => i != null && i.id == ItemId.Glider);
+                if (glider != null && glider.description == GliderDescription20) glider.description = GliderDescription;
+            }
+
+            if (version < 9)
+            {
+                // Version 9 (2026-11-08): the Glider lasts 20 s (was 30) - only if it's still at the old default.
+                ItemDefinition glider = items.Find(i => i != null && i.id == ItemId.Glider);
+                if (glider != null && Mathf.Approximately(glider.durationSeconds, 30f)) glider.durationSeconds = 20f;
+                if (glider != null && (glider.description == GliderDescription30 || glider.description == "You can glide after jumping for 30 seconds."))
+                    glider.description = GliderDescription;
+            }
+
+            if (version < 8)
+            {
+                // Version 8 (2026-11-08): the Glider works now - say how.
+                ItemDefinition glider = items.Find(i => i != null && i.id == ItemId.Glider);
+                if (glider != null && glider.description == "You can glide after jumping for 30 seconds.") glider.description = GliderDescription;
+            }
 
             if (version < 7)
             {

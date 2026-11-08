@@ -272,7 +272,7 @@ namespace Blocks.Gameplay.Core
             title.style.marginBottom = 4;
             panel.Add(title);
 
-            var subtitle = new Label("Run the map on your own - no time limit, no wagers. Pickups still score.");
+            var subtitle = new Label("Run the map on your own - no time limit, no predictions. Pickups still score.");
             subtitle.style.fontSize = 14;
             subtitle.style.color = new Color(0.7f, 0.7f, 0.7f);
             subtitle.style.marginBottom = 12;

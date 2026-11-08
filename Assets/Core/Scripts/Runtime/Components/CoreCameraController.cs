@@ -350,6 +350,7 @@ namespace Blocks.Gameplay.Core
 
             // Always instantiate the prefab to avoid modifying the original asset.
             CoreCameraMode modeToRegister = Instantiate(cameraModePrefab);
+            AddWallGuard(modeToRegister);
 
             // Set up targets and add to the registered list.
             modeToRegister.SetTargets(lookTarget);
@@ -501,6 +502,16 @@ namespace Blocks.Gameplay.Core
         /// frame so a change from Esc > Settings shows immediately. While MatchIntro has Cinemachine paused the
         /// lens isn't output to the camera, so the flyover keeps whatever the camera last had.
         /// </summary>
+        /// <summary>
+        /// Camera modes that avoid walls (they have a CinemachineDeoccluder) also get a <see cref="CameraWallGuard"/>,
+        /// which stops the camera going through a wall the player is standing right against (2026-11-08).
+        /// </summary>
+        private static void AddWallGuard(CoreCameraMode mode)
+        {
+            if (mode == null || mode.GetComponent<CinemachineDeoccluder>() == null) return;
+            if (mode.GetComponent<CameraWallGuard>() == null) mode.gameObject.AddComponent<CameraWallGuard>();
+        }
+
         private void ApplyFieldOfView()
         {
             CinemachineCamera cam = ActiveCameraMode != null ? ActiveCameraMode.CinemachineCamera : null;
@@ -648,6 +659,7 @@ namespace Blocks.Gameplay.Core
                 }
 
                 CoreCameraMode instance = Instantiate(prefab);
+                AddWallGuard(instance);
                 instance.SetTargets(lookTarget);
                 m_RegisteredCameraModes.Add(instance);
                 m_InstantiatedCameraModes.Add(instance);

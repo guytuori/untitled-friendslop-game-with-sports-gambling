@@ -83,6 +83,8 @@ namespace Blocks.Gameplay.Core
         {
             var modifier = new MovementModifier();
             if (m_Motor.MovementAbilityActive()) { m_CarriedSpeed = 0f; m_DashUntil = 0f; return modifier; }
+            // Gliding (GlideAbility) moves the player itself; it hands its speed back with CarryMomentum when it ends.
+            if (m_Motor.IsGliding) { m_CarriedSpeed = 0f; m_DashUntil = 0f; return modifier; }
 
             // Dash panel boost: leaving the ground during it keeps the speed in the air (CarryMomentum) - a jump
             // with the limited air control, running off an edge with the normal one.

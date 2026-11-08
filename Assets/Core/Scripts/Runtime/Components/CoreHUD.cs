@@ -1349,7 +1349,7 @@ namespace Blocks.Gameplay.Core
                 && ChallengeManager.Instance.IsBettingWindowActive)
             {
                 m_ChallengeBetStatusLabel.style.display = DisplayStyle.Flex;
-                m_ChallengeBetStatusLabel.text = "You've finished this round - no more wagers.";
+                m_ChallengeBetStatusLabel.text = "You've finished this round - no more predictions.";
             }
         }
 

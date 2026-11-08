@@ -281,11 +281,11 @@ namespace Blocks.Gameplay.Core
             if (bettor == 0) bettor = NetworkPlayers.ToClientId(Runner.LocalPlayer);
 
             int slot = FindSlot(wagerId);
-            if (slot < 0) { BetRejectedRpc((int)bettor, wagerId, "That wager has already settled."); return; }
+            if (slot < 0) { BetRejectedRpc((int)bettor, wagerId, "That prediction has already settled."); return; }
 
             WagerState s = NetWagers[slot];
-            if (s.BetWindow.ExpiredOrNotRunning(Runner)) { BetRejectedRpc((int)bettor, wagerId, "Betting on that wager has closed."); return; }
-            if (!ChallengeManager.IsRoundOpenFor(bettor)) { BetRejectedRpc((int)bettor, wagerId, "You've finished this round - no more wagers."); return; }
+            if (s.BetWindow.ExpiredOrNotRunning(Runner)) { BetRejectedRpc((int)bettor, wagerId, "Predictions on that have closed."); return; }
+            if (!ChallengeManager.IsRoundOpenFor(bettor)) { BetRejectedRpc((int)bettor, wagerId, "You've finished this round - no more predictions."); return; }
             if (!CanBetOnSubject(bettor, (ulong)s.SubjectId)) return;
 
             if (!m_Bets.TryGetValue(wagerId, out var bets))

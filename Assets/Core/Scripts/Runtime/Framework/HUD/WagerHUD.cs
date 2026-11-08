@@ -352,7 +352,7 @@ namespace Blocks.Gameplay.Core
         private void HandleBetAccepted(int wagerId, bool yes, int cost)
         {
             m_AnsweredText.TryGetValue(wagerId, out string text);
-            m_PhoneEntries.Add(new PhoneEntry { WagerId = wagerId, Text = text ?? "Wager", Yes = yes, Cost = cost });
+            m_PhoneEntries.Add(new PhoneEntry { WagerId = wagerId, Text = text ?? "Prediction", Yes = yes, Cost = cost });
             RefreshPhone();
         }
 
@@ -405,7 +405,7 @@ namespace Blocks.Gameplay.Core
             list.Clear();
             if (m_PhoneEntries.Count == 0)
             {
-                var empty = new Label("No active wagers");
+                var empty = new Label("No active predictions");
                 empty.style.color = new Color(0.6f, 0.6f, 0.65f);
                 empty.style.fontSize = 11;
                 empty.style.unityTextAlign = TextAnchor.MiddleCenter;

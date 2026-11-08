@@ -16,6 +16,7 @@ namespace Blocks.Gameplay.Core
     ///   - MATURE LANGUAGE FILTER: on by default; bad words in player names show as *** (NameFilter.Mask).
     ///   - ARACHNOPHOBIA MODE / ARACHNOPHILIA MODE: off by default, and never both on - ticking one unticks
     ///     the other. Nothing uses them yet (see GameplaySettingsData).
+    ///   - INVERT GLIDER CONTROLS (2026-11-08): on by default - forward dives, back climbs (GlideAbility).
     /// Saved with the other settings in settings.json (<see cref="GameplaySettingsData"/>) and applied through
     /// <see cref="GameplaySettings"/>.
     ///
@@ -54,6 +55,7 @@ namespace Blocks.Gameplay.Core
         private Toggle m_FilterToggle;
         private Toggle m_PhobiaToggle;
         private Toggle m_PhiliaToggle;
+        private Toggle m_GliderToggle;
         private readonly List<VisualElement> m_Rows = new List<VisualElement>();
 
         private DropdownField m_EditingDropdown; // the dropdown in edit mode (A pressed on it), if any
@@ -125,6 +127,8 @@ namespace Blocks.Gameplay.Core
                     m_Settings.ArachnophiliaMode = value;
                     if (value && m_PhobiaToggle.value) m_PhobiaToggle.value = false; // never both on
                 });
+            m_GliderToggle = AddToggleRow(column, "INVERT GLIDER CONTROLS", "Forward dives, back climbs",
+                m_Settings.InvertGliderControls, value => m_Settings.InvertGliderControls = value);
 
             // Restore Defaults / Save Changes / Back, bottom right like the other settings screens.
             VisualElement buttons = MenuUI.AddBottomRightColumn(root);
@@ -376,6 +380,7 @@ namespace Blocks.Gameplay.Core
             m_FilterToggle.SetValueWithoutNotify(m_Settings.MatureLanguageFilter);
             m_PhobiaToggle.SetValueWithoutNotify(m_Settings.ArachnophobiaMode);
             m_PhiliaToggle.SetValueWithoutNotify(m_Settings.ArachnophiliaMode);
+            m_GliderToggle.SetValueWithoutNotify(m_Settings.InvertGliderControls);
             ClearStatus();
         }
 

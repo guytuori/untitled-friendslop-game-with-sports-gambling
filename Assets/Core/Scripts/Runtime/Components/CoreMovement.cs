@@ -238,6 +238,13 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public bool IsSprinting { get; private set; }
         public bool IsGrinding { get; private set; }
+
+        /// <summary>
+        /// Gliding (the Glider item, GlideAbility - 2026-11-08): WalkAbility stands aside, as it does for a
+        /// rail, wall or pole. Not counted by <see cref="MovementAbilityActive"/>, so the glide can still hand
+        /// over to a rail, wall or pole grabbed mid-air.
+        /// </summary>
+        public bool IsGliding { get; private set; }
         public bool IsClimbing { get; private set; }
         public bool IsPoleGrabbing { get; private set; }
 
@@ -406,6 +413,7 @@ namespace Blocks.Gameplay.Core
         /// <param name="isSprinting">True to enable sprinting, false otherwise.</param>
         public void SetSprintState(bool isSprinting) => IsSprinting = isSprinting;
         public void SetGrindState(bool isGrinding) => IsGrinding = isGrinding;
+        public void SetGlideState(bool isGliding) => IsGliding = isGliding;
         public void SetClimbState(bool isClimbing) => IsClimbing = isClimbing;
         public void SetPoleGrabState(bool isPoleGrabbing) => IsPoleGrabbing = isPoleGrabbing;
         /// <summary>
@@ -655,6 +663,9 @@ namespace Blocks.Gameplay.Core
             // teleport or Retry stops that too (2026-11-05: respawning mid-fall kept the old momentum).
             if (m_Walk == null) m_Walk = GetComponent<WalkAbility>();
             if (m_Walk != null) m_Walk.ResetMomentum();
+
+            // A glide stops dead too (2026-11-08).
+            if (TryGetComponent(out GlideAbility glide)) glide.Cancel();
         }
 
         private WalkAbility m_Walk;
