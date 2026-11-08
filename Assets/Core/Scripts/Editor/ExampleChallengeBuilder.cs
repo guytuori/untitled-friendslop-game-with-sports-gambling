@@ -45,6 +45,7 @@ namespace Blocks.Gameplay.Core
         private const string SceneFolder = "Assets/Core/Scenes/Challenges";
         private const string DefinitionFolder = "Assets/Core/Data/Challenges";
         private const string PoleGlb = "pole_4";
+        private const string RingGlb = "grind_rail_small_ring";
 
         private sealed class Piece
         {
@@ -65,10 +66,29 @@ namespace Blocks.Gameplay.Core
             public string Name;
             public Vector3 A, B; // top centre at each end, Total Editor metres (x, y, z)
             public float Speed, Pause, Phase;
-            public PlatformPath(string name, Vector3 a, Vector3 b, float speed, float pause, float phase)
+            /// <summary>Stood on edge (turned 90 degrees about x): a 4 m wide x 4 m tall wall, A / B its centre (2026-11-07 doors).</summary>
+            public bool StandUp;
+            public PlatformPath(string name, Vector3 a, Vector3 b, float speed, float pause, float phase, bool standUp = false)
             {
-                Name = name; A = a; B = b; Speed = speed; Pause = pause; Phase = phase;
+                Name = name; A = a; B = b; Speed = speed; Pause = pause; Phase = phase; StandUp = standUp;
             }
+        }
+
+        /// <summary>A dash panel glb (dash_panel_1x1 / dash_panel_2x2): its centre (Total Editor x, z; the top stays at y 2)
+        /// and the way its arrows point, in degrees from -z (towards the finish) round towards +x.</summary>
+        private sealed class PanelSpot
+        {
+            public string Glb;
+            public float X, Z, Heading;
+            public PanelSpot(string glb, float x, float z, float heading) { Glb = glb; X = x; Z = z; Heading = heading; }
+        }
+
+        /// <summary>A ring (grind_rail_small_ring, plain Regular collision - not a rail) stood upright across the z axis, centred at Centre (TE metres).</summary>
+        private sealed class RingSpot
+        {
+            public string Name;
+            public Vector3 Centre;
+            public RingSpot(string name, Vector3 centre) { Name = name; Centre = centre; }
         }
 
         private sealed class RollerRun
@@ -91,6 +111,10 @@ namespace Blocks.Gameplay.Core
             public PoleLine[] Poles;
             public PlatformPath[] Platforms = new PlatformPath[0];
             public RollerRun[] Rollers = new RollerRun[0];
+            public PanelSpot[] Panels = new PanelSpot[0];
+            /// <summary>Grind rails along straight lines (pole_4 stretched onto the line, then set to Grind Rail), TE metres.</summary>
+            public PoleLine[] Rails = new PoleLine[0];
+            public RingSpot[] Rings = new RingSpot[0];
         }
 
         // ---- Challenge_32_09 "Head-On" / Challenge_32_10 "Tailgate" (2026-11-01) ----
@@ -365,6 +389,181 @@ namespace Blocks.Gameplay.Core
             },
         };
 
+        // ---- 2026-11-07: dash panel challenges (16_19, 16_20, 32_11 - 32_13) and alternating poles (16_21, 32_14) ----
+        // Ground glbs written by Claude (Claude outputs/challenge_generator/design_1107.py); dash panels, poles, rails, rings
+        // and doors placed here. Player numbers used: run 9 m/s, dash panel 13.5 m/s (1.5x), jump 17.3 m/s up (5 m), gravity
+        // 30 -> a running jump carries ~10.4 m on the flat, a dash jump ~15.6 m.
+
+        /// <summary>Doors for "Door Dash": each side is two moving platforms stood on edge, one above the other (4 m wide,
+        /// y 2..10). Closed they meet at x 15; open they're at x 7 / 23. Speed 3, pause 1 (a 6 s cycle).</summary>
+        private static PlatformPath[] Doors(string set, float z, float phase)
+        {
+            var doors = new List<PlatformPath>();
+            foreach ((string side, float closed, float open) in new[] { ("left", 13f, 7f), ("right", 17f, 23f) })
+            {
+                foreach ((string level, float y) in new[] { ("bottom", 4f), ("top", 8f) })
+                {
+                    doors.Add(new PlatformPath($"{set} door {side} {level}", new Vector3(closed, y, z), new Vector3(open, y, z), 3f, 1f, phase, standUp: true));
+                }
+            }
+            return doors.ToArray();
+        }
+
+        /// <summary>
+        /// "Door Dash": a dash panel on the start pad, then a gap only a dash jump clears (pad edge z 26, landing pad from
+        /// z 14), with two sets of sliding doors in the way at z 21 and z 16. The back set runs 0.4 of a cycle behind the
+        /// front one: about a 1.7 s window every 6 s to go through both.
+        /// </summary>
+        private static readonly Spec DoorDashChallenge = new Spec
+        {
+            Name = "Challenge_16_19", Size = 16, Title = "Door Dash", Points = 100,
+            Pieces = new[] { new Piece("challenge_16_19", MapObjectPropertyType.Regular) },
+            Poles = new PoleLine[0],
+            Panels = new[] { new PanelSpot("dash_panel_1x1", 15f, 29f, 0f) },
+            Platforms = Concat(Doors("front", 21f, 0f), Doors("back", 16f, 0.4f)),
+        };
+
+        /// <summary>
+        /// "Dash &amp; Swing": a dash panel on the start pad; the dash jump reaches bar 1 (10 m out, y 8) - a running jump's
+        /// hands are 3 m too low there - then bars 2 and 3 every 6 m, and a swing off bar 3 over the finish onto the rim.
+        /// </summary>
+        private static readonly Spec DashSwingChallenge = new Spec
+        {
+            Name = "Challenge_16_20", Size = 16, Title = "Dash & Swing", Points = 100,
+            Pieces = new[] { new Piece("challenge_16_20", MapObjectPropertyType.Regular) },
+            Panels = new[] { new PanelSpot("dash_panel_1x1", 15f, 29f, 0f) },
+            Poles = new[]
+            {
+                new PoleLine("bar 1", new Vector3(11f, 8f, 16f), new Vector3(19f, 8f, 16f)),
+                new PoleLine("bar 2", new Vector3(11f, 8f, 10f), new Vector3(19f, 8f, 10f)),
+                new PoleLine("bar 3", new Vector3(11f, 8f, 4f), new Vector3(19f, 8f, 4f)),
+            },
+        };
+
+        /// <summary>
+        /// "Island Hopper": seven 2x2 dash panels floating over the pit, about 15 m apart centre to centre, each turned to
+        /// point at the next (not on the grid), so it's a chain of angled dash jumps: land, get turned, jump again. A dash
+        /// jump from anywhere between a panel's back edge and a little past its middle lands on the next one.
+        /// </summary>
+        private static readonly Spec IslandHopperChallenge = new Spec
+        {
+            Name = "Challenge_32_11", Size = 32, Title = "Island Hopper", Points = 250,
+            Pieces = new[] { new Piece("challenge_32_11", MapObjectPropertyType.Regular) },
+            Poles = new PoleLine[0],
+            Panels = new[]
+            {
+                new PanelSpot("dash_panel_2x2", 16f, 55f, -28.3f),
+                new PanelSpot("dash_panel_2x2", 9f, 42f, 72.2f),
+                new PanelSpot("dash_panel_2x2", 23f, 37.5f, 103.1f),
+                new PanelSpot("dash_panel_2x2", 38f, 41f, 36.9f),
+                new PanelSpot("dash_panel_2x2", 47f, 29f, -61.7f),
+                new PanelSpot("dash_panel_2x2", 34f, 22f, -27.4f),
+                new PanelSpot("dash_panel_2x2", 27f, 8.5f, 0f),
+            },
+        };
+
+        /// <summary>
+        /// "The Big Jump": three 1x1 dash panels (13.5 m/s) into an 8-block grind rail that ramps up 15 degrees (z 50 -> 34.5,
+        /// y 2 -> 6.1). Grind Rail 2 has no top speed, so a dash entry leaves the top at ~23 m/s; jumping at the very top
+        /// flies ~40 m (apex ~15 m up) through three upright rings on the arc and lands on the rim ~5 m past the finish
+        /// (jumping up to ~2 m early still makes it). Riding off the top without jumping drops short into the pit.
+        /// </summary>
+        private static readonly Spec BigJumpChallenge = new Spec
+        {
+            Name = "Challenge_32_12", Size = 32, Title = "The Big Jump", Points = 250,
+            Pieces = new[] { new Piece("challenge_32_12", MapObjectPropertyType.Regular) },
+            Poles = new PoleLine[0],
+            Panels = new[]
+            {
+                new PanelSpot("dash_panel_1x1", 31f, 55f, 0f),
+                new PanelSpot("dash_panel_1x1", 31f, 53f, 0f),
+                new PanelSpot("dash_panel_1x1", 31f, 51f, 0f),
+            },
+            Rails = new[] { new PoleLine("ramp rail", new Vector3(31f, 2f, 50f), new Vector3(31f, 6.141f, 34.545f)) },
+            Rings = new[]
+            {
+                new RingSpot("ring 1", new Vector3(31f, 13.37f, 26.92f)),
+                new RingSpot("ring 2", new Vector3(31f, 16.01f, 16.53f)),
+                new RingSpot("ring 3", new Vector3(31f, 12.52f, 6.14f)),
+            },
+        };
+
+        /// <summary>
+        /// "Split Fast Ice": two 2x2 dash panels shoot you onto an ice wishbone. Either arm (8 m wide, bending out 25 degrees
+        /// and back, all on ice) goes to the finish; or jump the gap down the middle onto a grind rail (z 34 -> 22, y 2.9),
+        /// off it onto four more dash panels (z 12..20) and an ice runway to the finish.
+        /// </summary>
+        private static readonly Spec SplitFastIceChallenge = new Spec
+        {
+            Name = "Challenge_32_13", Size = 32, Title = "Split Fast Ice", Points = 250,
+            Pieces = new[]
+            {
+                new Piece("challenge_32_13", MapObjectPropertyType.Regular),
+                new Piece("challenge_32_13_ice", MapObjectPropertyType.Ice),
+            },
+            Poles = new PoleLine[0],
+            Panels = new[]
+            {
+                new PanelSpot("dash_panel_2x2", 30f, 54f, 0f),
+                new PanelSpot("dash_panel_2x2", 34f, 54f, 0f),
+                new PanelSpot("dash_panel_2x2", 30f, 18f, 0f),
+                new PanelSpot("dash_panel_2x2", 34f, 18f, 0f),
+                new PanelSpot("dash_panel_2x2", 30f, 14f, 0f),
+                new PanelSpot("dash_panel_2x2", 34f, 14f, 0f),
+            },
+            Rails = new[] { new PoleLine("middle rail", new Vector3(32f, 2.9f, 34f), new Vector3(32f, 2.9f, 22f)) },
+        };
+
+        /// <summary>
+        /// "Pole Position": upright, bar, upright, bar (Pole Swing 2 all the way). Uprights are 12 m tall (y 2..14) -
+        /// shimmy to the height of the next bar before letting go; bars are at y 8. Upright -> bar 6.5 m, bar -> upright 8 m.
+        /// </summary>
+        private static readonly Spec PolePositionChallenge = new Spec
+        {
+            Name = "Challenge_16_21", Size = 16, Title = "Pole Position", Points = 100,
+            Pieces = new[] { new Piece("challenge_16_21", MapObjectPropertyType.Regular) },
+            Poles = new[]
+            {
+                new PoleLine("upright 1", new Vector3(13f, 2f, 25f), new Vector3(13f, 14f, 25f)),
+                new PoleLine("bar 1", new Vector3(11f, 8f, 18.5f), new Vector3(21f, 8f, 18.5f)),
+                new PoleLine("upright 2", new Vector3(19f, 2f, 10.5f), new Vector3(19f, 14f, 10.5f)),
+                new PoleLine("bar 2", new Vector3(11f, 8f, 4f), new Vector3(21f, 8f, 4f)),
+            },
+        };
+
+        /// <summary>
+        /// "Swing Vote": upright, bar, upright, bar ... with a split. Bar 1 is 24 m long: shimmy left or right, then
+        /// left (upright, bar at y 8, upright) or right (taller uprights and a bar at y 10.5 - climb before letting go).
+        /// Both land on the 28 m bar 3 (shimmy back to the middle), then upright 4 and bar 4 over the finish.
+        /// </summary>
+        private static readonly Spec SwingVoteChallenge = new Spec
+        {
+            Name = "Challenge_32_14", Size = 32, Title = "Swing Vote", Points = 250,
+            Pieces = new[] { new Piece("challenge_32_14", MapObjectPropertyType.Regular) },
+            Poles = new[]
+            {
+                new PoleLine("upright 1", new Vector3(32f, 2f, 55f), new Vector3(32f, 14f, 55f)),
+                new PoleLine("bar 1 (pick a side)", new Vector3(20f, 8f, 48.5f), new Vector3(44f, 8f, 48.5f)),
+                new PoleLine("left upright 2", new Vector3(24f, 2f, 40.5f), new Vector3(24f, 14f, 40.5f)),
+                new PoleLine("left bar 2", new Vector3(18f, 8f, 34f), new Vector3(30f, 8f, 34f)),
+                new PoleLine("left upright 3", new Vector3(22f, 2f, 26f), new Vector3(22f, 14f, 26f)),
+                new PoleLine("right upright 2", new Vector3(40f, 2f, 40.5f), new Vector3(40f, 16f, 40.5f)),
+                new PoleLine("right bar 2 (high)", new Vector3(34f, 10.5f, 34f), new Vector3(46f, 10.5f, 34f)),
+                new PoleLine("right upright 3", new Vector3(42f, 2f, 26f), new Vector3(42f, 16f, 26f)),
+                new PoleLine("bar 3 (both sides)", new Vector3(18f, 8f, 19.5f), new Vector3(46f, 8f, 19.5f)),
+                new PoleLine("upright 4", new Vector3(32f, 2f, 11.5f), new Vector3(32f, 14f, 11.5f)),
+                new PoleLine("bar 4", new Vector3(26f, 8f, 5f), new Vector3(38f, 8f, 5f)),
+            },
+        };
+
+        private static T[] Concat<T>(T[] a, T[] b)
+        {
+            var all = new T[a.Length + b.Length];
+            a.CopyTo(all, 0);
+            b.CopyTo(all, a.Length);
+            return all;
+        }
+
         private static readonly Spec[] Specs =
         {
             new Spec
@@ -429,6 +628,15 @@ namespace Blocks.Gameplay.Core
         private static void BuildPlatform16Challenges() =>
             BuildSpecs(new[] { RelayChallenge, DiamondChallenge, RowsChallenge }, "Build Challenge_16_11-13");
 
+        [MenuItem("Friendslop/Challenges/Build Challenge_16_19-20, 32_11-13 (Dash Panels)")]
+        private static void BuildDashPanelChallenges() =>
+            BuildSpecs(new[] { DoorDashChallenge, DashSwingChallenge, IslandHopperChallenge, BigJumpChallenge, SplitFastIceChallenge },
+                "Build Dash Panel Challenges");
+
+        [MenuItem("Friendslop/Challenges/Build Challenge_16_21, 32_14 (Alternating Poles)")]
+        private static void BuildAlternatingPoleChallenges() =>
+            BuildSpecs(new[] { PolePositionChallenge, SwingVoteChallenge }, "Build Alternating Pole Challenges");
+
         [MenuItem("Friendslop/Challenges/Build Challenge_32_07 (Moving Platforms)")]
         private static void BuildMovingPlatformChallenge() =>
             BuildSpecs(new[] { MovingPlatformChallenge }, "Build Challenge_32_07");
@@ -490,7 +698,9 @@ namespace Blocks.Gameplay.Core
             yield return $"challenge_{spec.Size}_start";
             yield return $"challenge_{spec.Size}_end";
             foreach (Piece piece in spec.Pieces) yield return piece.Glb;
-            if (spec.Poles.Length > 0) yield return PoleGlb;
+            if (spec.Poles.Length > 0 || spec.Rails.Length > 0) yield return PoleGlb;
+            foreach (PanelSpot panel in spec.Panels) yield return panel.Glb;
+            if (spec.Rings.Length > 0) yield return RingGlb;
             if (spec.Platforms.Length > 0) yield return "moving_platform";
             if (spec.Rollers.Length > 0) yield return "roller";
         }
@@ -527,7 +737,14 @@ namespace Blocks.Gameplay.Core
                 // Total Editor metres -> challenge space (the glb import mirrors x).
                 Vector3 a = new Vector3(-path.A.x, path.A.y, path.A.z);
                 Vector3 b = new Vector3(-path.B.x, path.B.y, path.B.z);
-                if (MovingPlatformBuilder.Place(root.transform, path.Name, a, b, path.Speed, path.Pause, path.Phase) == null) problems++;
+                MovingPlatform mover = MovingPlatformBuilder.Place(root.transform, path.Name, a, b, path.Speed, path.Pause, path.Phase);
+                if (mover == null) { problems++; continue; }
+                if (path.StandUp)
+                {
+                    // On edge: the 4 x 4 m top turns to face along z, centred on the node (the thickness goes behind it).
+                    mover.PlatformTransform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(mover.PlatformTransform);
+                }
             }
 
             foreach (RollerRun run in spec.Rollers)
@@ -545,13 +762,40 @@ namespace Blocks.Gameplay.Core
                 if (RollerBuilder.Place(root.transform, run.Name, a, mids, b, run.Speed, run.Pause, run.Phase) == null) problems++;
             }
 
+            int panelNumber = 0;
+            foreach (PanelSpot spot in spec.Panels)
+            {
+                // Named dash_panel... so DashPanel finds it at runtime; solid like any floor.
+                GameObject panel = Place(spot.Glb, root);
+                panel.name = $"{spot.Glb} ({++panelNumber})";
+                PlaceDashPanel(panel, spot);
+                if (!MapObjectPropertySetup.ApplyProperty(panel, MapObjectPropertyType.Regular)) problems++;
+            }
+
+            foreach (PoleLine line in spec.Rails)
+            {
+                GameObject rail = Place(PoleGlb, root);
+                rail.name = line.Name;
+                FitPole(rail, line.From, line.To);
+                if (!MapObjectPropertySetup.ApplyProperty(rail, MapObjectPropertyType.GrindRail)) problems++;
+            }
+
+            foreach (RingSpot spot in spec.Rings)
+            {
+                GameObject ring = Place(RingGlb, root);
+                ring.name = spot.Name;
+                ring.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // stood up, facing along z
+                CentreOn(ring, new Vector3(-spot.Centre.x, spot.Centre.y, spot.Centre.z));
+                if (!MapObjectPropertySetup.ApplyProperty(ring, MapObjectPropertyType.Regular)) problems++; // a hoop to fly through, not a rail
+            }
+
             AddZone(root, spec);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAssetAndConnect(root, PrefabPath(spec), InteractionMode.AutomatedAction, out bool saved);
             if (!saved || prefab == null) return $"{spec.Name}: couldn't save {PrefabPath(spec)}";
 
             EditorSceneManager.SaveScene(scene, ScenePath(spec));
-            return $"{spec.Name} \"{spec.Title}\": built ({spec.Pieces.Length} pieces, {spec.Poles.Length} poles, {spec.Platforms.Length} moving platforms, {spec.Rollers.Length} rollers)" +
+            return $"{spec.Name} \"{spec.Title}\": built ({spec.Pieces.Length} pieces, {spec.Poles.Length} poles, {spec.Platforms.Length} moving platforms, {spec.Rollers.Length} rollers, {spec.Panels.Length} dash panels, {spec.Rails.Length} rails, {spec.Rings.Length} rings)" +
                    (problems > 0 ? $" - {problems} piece(s) couldn't be set up, see the Console" : "");
         }
 
@@ -591,6 +835,33 @@ namespace Blocks.Gameplay.Core
             // The challenge root sits at the scene origin, so world and challenge space are the same here.
             Vector3 centreNow = filter.transform.TransformPoint(bounds.center);
             t.localPosition = (a + b) * 0.5f - centreNow;
+        }
+
+        /// <summary>
+        /// Turns a dash panel about y so its arrows (the model's -z) point along <see cref="PanelSpot.Heading"/>, and moves
+        /// it so its middle is at the spot (its top stays at y 2). Total Editor x is mirrored on import.
+        /// </summary>
+        private static void PlaceDashPanel(GameObject panel, PanelSpot spot)
+        {
+            float rad = spot.Heading * Mathf.Deg2Rad;
+            Vector3 aim = new Vector3(-Mathf.Sin(rad), 0f, -Mathf.Cos(rad)); // TE (sin, -cos) with x mirrored
+            float yaw = Mathf.Atan2(-aim.x, -aim.z) * Mathf.Rad2Deg;         // local -z onto aim
+            panel.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            CentreOn(panel, new Vector3(-spot.X, float.NaN, spot.Z));
+        }
+
+        /// <summary>Moves <paramref name="obj"/> so its renderers' middle is at <paramref name="target"/> (challenge space; a NaN y keeps the height).</summary>
+        private static void CentreOn(GameObject obj, Vector3 target)
+        {
+            Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return;
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+
+            // The challenge root sits at the scene origin, so world and challenge space are the same here.
+            Vector3 shift = target - bounds.center;
+            if (float.IsNaN(target.y)) shift.y = 0f;
+            obj.transform.localPosition += shift;
         }
 
         private static void AddZone(GameObject root, Spec spec)

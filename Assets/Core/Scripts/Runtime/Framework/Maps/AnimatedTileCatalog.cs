@@ -40,6 +40,41 @@ namespace Blocks.Gameplay.Core
         /// The second frame for a tile's first frame (the texture itself, or a copy of it with the same name),
         /// or false if this texture isn't an animated tile's _1.
         /// </summary>
+        /// <summary>
+        /// Both frames for a texture that is either frame of an animated tile (a model can be exported showing
+        /// its _2, like the dash panels - 2026-11-07), or false.
+        /// </summary>
+        public bool TryGetFrames(Texture texture, out Texture first, out Texture second)
+        {
+            first = second = null;
+            if (texture == null) return false;
+            if (TryGetSecondFrame(texture, out second))
+            {
+                first = texture;
+                return true;
+            }
+
+            // A _2: find its entry by texture, or by name.
+            string name = texture.name.Replace('\\', '/');
+            int slash = name.LastIndexOf('/');
+            if (slash >= 0) name = name.Substring(slash + 1);
+            int dot = name.LastIndexOf('.');
+            if (dot > 0) name = name.Substring(0, dot);
+            string id = name.Length > 2 && name.EndsWith("_2", StringComparison.Ordinal) ? name.Substring(0, name.Length - 2) : null;
+
+            foreach (Entry entry in tiles)
+            {
+                if (entry == null || entry.first == null || entry.second == null) continue;
+                if (entry.second == texture || (id != null && string.Equals(entry.id, id, StringComparison.OrdinalIgnoreCase)))
+                {
+                    first = entry.first;
+                    second = entry.second;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public bool TryGetSecondFrame(Texture first, out Texture second)
         {
             second = null;

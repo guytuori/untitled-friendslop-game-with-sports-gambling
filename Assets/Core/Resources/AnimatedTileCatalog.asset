@@ -13,6 +13,9 @@ MonoBehaviour:
   m_Name: AnimatedTileCatalog
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.AnimatedTileCatalog
   tiles:
+  - id: dash_panel
+    first: {fileID: 2800000, guid: b14668c834a360143bf68abd00594136, type: 3}
+    second: {fileID: 2800000, guid: a0f036671b7d4664d83ea7ebf02739ca, type: 3}
   - id: water
     first: {fileID: 2800000, guid: 2ae38caaf61861043945f5e6bf4d5b66, type: 3}
     second: {fileID: 2800000, guid: 018d61f63adfdba4dbba40fd626d4ef7, type: 3}

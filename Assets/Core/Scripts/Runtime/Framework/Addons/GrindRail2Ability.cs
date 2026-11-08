@@ -13,7 +13,9 @@ namespace Blocks.Gameplay.Core
     ///     along it. No balance - you're on the rail and you stay on it.
     ///   - Grinding burns stamina, fast: a full bar lasts <see cref="fullTankBlocks"/> (8) blocks of rail starting
     ///     at the normal grind speed. Run out, or let go of Parkour, and you fall off.
-    ///   - You speed up the longer you grind, up to a top speed that carries a jump from the rail about
+    ///   - You speed up the longer you grind (2026-11-07: with no cap - only stamina limits it, so hitting a rail
+    ///     fast, e.g. off a dash panel, ends up faster still), reaching after a full tank the speed that carries a
+    ///     jump from the rail about
     ///     <see cref="topSpeedJumpBlocks"/> (12) blocks. The two numbers set the acceleration and the stamina
     ///     drain (see <see cref="Tuning"/>), so they can be tuned in blocks.
     ///   - The speed you start at depends on how fast you hit the rail: grind speed x (your speed / run speed),
@@ -52,8 +54,10 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float grindSpeedMultiplier = 1f;
         [Tooltip("Blocks of rail a full stamina bar lasts from the normal grind speed (also how far it takes to reach top speed).")]
         [SerializeField] private float fullTankBlocks = 8f;
-        [Tooltip("Top grind speed, given as how far (in blocks, along flat ground) a jump off the rail at that speed carries.")]
+        [Tooltip("The speed a full tank of grinding builds up to from the normal grind speed, given as how far (in blocks, along flat ground) a jump off the rail at that speed carries.")]
         [SerializeField] private float topSpeedJumpBlocks = 12f;
+        [Tooltip("Safety cap: never faster than this many times that full-tank speed (hitting rails fast keeps adding speed; stamina is the real limit).")]
+        [SerializeField] private float speedCapMultiplier = 3f;
 
         [Header("Jumping Off")]
         [Tooltip("Height of the jump off a rail, as a multiple of the normal jump height (CoreMovement.jumpHeight).")]
@@ -96,7 +100,7 @@ namespace Blocks.Gameplay.Core
         private float m_Arc;
         private float m_Direction = 1f; // +1 along the rail's arc length, -1 against it
         private float m_Speed;
-        private float m_TopSpeed;       // this ride's cap: the top speed, or the entry speed if that was faster
+        private float m_TopSpeed;       // this ride's safety cap (speedCapMultiplier x the full-tank speed)
         private float m_Distance;       // ridden on this rail (for the log)
         private float m_Cooldown;
 
@@ -274,7 +278,7 @@ namespace Blocks.Gameplay.Core
             m_Arc = arc;
             m_Direction = direction;
             m_Speed = entry;
-            m_TopSpeed = Mathf.Max(top, entry);
+            m_TopSpeed = Mathf.Max(top * Mathf.Max(1f, speedCapMultiplier), entry);
             m_Distance = 0f;
 
             m_Motor.SetVerticalVelocity(0f);

@@ -23,6 +23,13 @@ namespace Blocks.Gameplay.Core
         private float m_ReducedControlUntil;
         private float m_ReducedControlScale = 1f;
 
+        // A dash panel's boost (DashPanel, 2026-11-07) - see Dash.
+        private float m_DashSpeed;
+        private float m_DashUntil;
+        private float m_DashJumpControlSeconds;
+        private float m_DashJumpControlScale = 1f;
+        private bool m_WasGrounded;
+
         /// <summary>
         /// Gets the priority of the Walk ability. It is set to 0, the lowest priority, because it represents
         /// the most basic form of movement. All other abilities (like jumping or dashing) will be processed
@@ -75,7 +82,19 @@ namespace Blocks.Gameplay.Core
         public MovementModifier Process()
         {
             var modifier = new MovementModifier();
-            if (m_Motor.MovementAbilityActive()) { m_CarriedSpeed = 0f; return modifier; }
+            if (m_Motor.MovementAbilityActive()) { m_CarriedSpeed = 0f; m_DashUntil = 0f; return modifier; }
+
+            // Dash panel boost: leaving the ground during it keeps the speed in the air (CarryMomentum) - a jump
+            // with the limited air control, running off an edge with the normal one.
+            bool dashing = Time.time < m_DashUntil;
+            if (dashing && !m_Motor.IsGrounded && m_WasGrounded)
+            {
+                bool jumped = m_Motor.VerticalVelocity > 0.1f;
+                m_DashUntil = 0f;
+                dashing = false;
+                CarryMomentum(m_CurrentVelocity, jumped ? m_DashJumpControlSeconds : 0f, jumped ? m_DashJumpControlScale : 1f);
+            }
+            m_WasGrounded = m_Motor.IsGrounded;
             if (m_Motor.WalkLockedByExternalForce()) { return modifier; }
             // Determine if we should be using sprint speed
             // If we are grounded, we check the current sprint state
@@ -146,6 +165,9 @@ namespace Blocks.Gameplay.Core
                 else m_CurrentSpeed = m_CarriedSpeed;
             }
 
+            // Dash panel boost on the ground: at least the dash speed, stick or no stick.
+            if (dashing && m_Motor.IsGrounded) m_CurrentSpeed = Mathf.Max(m_CurrentSpeed, m_DashSpeed);
+
             // Convert 2D input to 3D direction
             Vector3 inputDirection = new Vector3(m_Motor.MoveInput.x, 0.0f, m_Motor.MoveInput.y).normalized;
             Vector3 targetMoveDirection = transform.forward; // Default to forward if no input
@@ -203,7 +225,14 @@ namespace Blocks.Gameplay.Core
             if (m_Motor.IsGrounded)
             {
                 bool hasFullGrip = m_Motor.GroundGrip >= 0.999f;
-                if (hasFullGrip)
+                if (hasFullGrip && dashing)
+                {
+                    // Dash panel boost: the stick steers it, but doesn't snap it round.
+                    Vector3 steered = Vector3.Lerp(m_CurrentVelocity, targetMoveDirection.normalized * m_CurrentSpeed, Time.deltaTime * airRotationSpeed);
+                    steered.y = 0f;
+                    m_CurrentVelocity = (steered.sqrMagnitude > 0.0001f ? steered.normalized : targetMoveDirection.normalized) * m_CurrentSpeed;
+                }
+                else if (hasFullGrip)
                 {
                     // Normal traction: instant direction changes are usually preferred for
                     // responsiveness. The speed lerp above handles the acceleration.
@@ -269,6 +298,27 @@ namespace Blocks.Gameplay.Core
             m_CurrentSpeed = 0f;
             m_CarriedSpeed = 0f;
             m_ReducedControlUntil = 0f;
+            m_DashUntil = 0f;
+        }
+
+        /// <summary>
+        /// A dash panel (DashPanel): running along <paramref name="direction"/> at <paramref name="speed"/>, held on the
+        /// ground for <paramref name="seconds"/> even with the stick let go (the stick steers, smoothly). Leaving the
+        /// ground during it carries the speed into the air (CarryMomentum); a jump gets
+        /// <paramref name="jumpControlScale"/> air control for <paramref name="jumpControlSeconds"/>.
+        /// </summary>
+        public void Dash(Vector3 direction, float speed, float seconds, float jumpControlSeconds, float jumpControlScale)
+        {
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 0.0001f) return;
+            m_CurrentVelocity = direction.normalized * speed;
+            m_CurrentSpeed = speed;
+            m_DashSpeed = speed;
+            m_DashUntil = Time.time + Mathf.Max(0f, seconds);
+            m_DashJumpControlSeconds = jumpControlSeconds;
+            m_DashJumpControlScale = jumpControlScale;
+            m_CarriedSpeed = 0f;
+            m_WasGrounded = true;
         }
 
         /// <summary>Air control right now: normally 1, less just after jumping off a rail (CarryMomentum).</summary>

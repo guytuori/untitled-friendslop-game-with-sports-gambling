@@ -132,13 +132,13 @@ namespace Blocks.Gameplay.Core
             foreach (int property in original.GetTexturePropertyNameIDs())
             {
                 Texture texture = original.GetTexture(property);
-                if (texture == null || !m_Catalog.TryGetSecondFrame(texture, out Texture second) || second == texture) continue;
+                if (texture == null || !m_Catalog.TryGetFrames(texture, out Texture first, out Texture second) || second == first) continue;
 
                 if (animated == null)
                 {
                     animated = new AnimatedMaterial { Copy = new Material(original) { name = original.name + " (animated)" } };
                 }
-                animated.Slots.Add((property, texture, second));
+                animated.Slots.Add((property, first, second));
             }
 
             m_ByOriginal[original] = animated;

@@ -45,6 +45,11 @@ namespace Blocks.Gameplay.Core
     ///   - releasing Grab just lets go with the speed you had.
     ///   - Either way the body is first put where the model was, so you leave from where you see yourself.
     ///
+    /// JUMP ARROW (2026-11-08): while you're on a pole, a small red arrow over your head (where the stamina bar
+    /// goes) points the way a jump would send you right now - the first <see cref="ArrowLookAheadSeconds"/> of
+    /// the jump, with the launch settings, Big Arms and gravity all counted - so it's clear when to let go.
+    /// Only you see it (<see cref="PoleJumpArrow"/>); turn it off with <see cref="showJumpArrow"/>.
+    ///
     /// A plain MonoBehaviour (no networked state of its own), found by CoreMovement (IMovementAbility) and
     /// CorePlayerManager (IPlayerAddon) like the other abilities. It only acts for this machine's own player.
     /// </summary>
@@ -90,6 +95,14 @@ namespace Blocks.Gameplay.Core
         [SerializeField] private float horizontalLaunchScale = 4f;
         [Tooltip("Extra upward speed (m/s) added to every jump off, so a jump at the bottom still lifts you a little.")]
         [SerializeField] private float launchUpBonus = 3.35f;
+        [Tooltip("Upright (climbing) poles only: the whole jump off (up and sideways) is multiplied by this. 1.1 = 10% further (added 2026-11-08 - the vertical-pole challenges felt a little short).")]
+        [SerializeField] private float uprightLaunchMultiplier = 1.1f;
+
+        [Header("Jump Arrow")]
+        [Tooltip("Show a small red arrow over your head while on a pole, pointing the way a jump would send you.")]
+        [SerializeField] private bool showJumpArrow = true;
+        [Tooltip("How far (meters) the arrow's middle sits above the top of your head (the stamina bar is 0.35 m above it).")]
+        [SerializeField] private float jumpArrowHeight = 0.85f;
 
         [Header("Input Event")]
         [Tooltip("The jump-pressed GameEvent (the same asset CoreInputHandler raises and PoleGrabAbility listens to).")]
@@ -149,6 +162,11 @@ namespace Blocks.Gameplay.Core
 
         private float m_RegrabTimer;
         private Pole m_LastPole;
+
+        /// <summary>The arrow points along the first this-many seconds of the jump (the sideways push fades fast, so
+        /// this is the direction you actually head off in, rather than the push alone).</summary>
+        private const float ArrowLookAheadSeconds = 0.25f;
+        private PoleJumpArrow m_JumpArrow;
 
         private bool IsOwner => m_Player != null && m_Player.IsOwner;
         private float BaseGravity => Mathf.Abs(m_Motor != null ? m_Motor.gravity : -15f) * Mathf.Max(0.05f, swingGravityScale);
@@ -242,6 +260,12 @@ namespace Blocks.Gameplay.Core
         private void OnDisable()
         {
             if (IsSwinging) LetGo(jumped: false, launch: false);
+            if (m_JumpArrow != null) m_JumpArrow.Hide();
+        }
+
+        private void OnDestroy()
+        {
+            if (m_JumpArrow != null) Destroy(m_JumpArrow.gameObject);
         }
 
         #endregion
@@ -466,6 +490,37 @@ namespace Blocks.Gameplay.Core
 
         #endregion
 
+        #region Jump arrow
+
+        /// <summary>Shows the jump arrow over the head while swinging (this machine's player only), hides it otherwise.</summary>
+        private void LateUpdate()
+        {
+            bool show = showJumpArrow && IsSwinging && m_IsActive && IsOwner && m_Motor != null;
+            if (!show)
+            {
+                if (m_JumpArrow != null) m_JumpArrow.Hide();
+                return;
+            }
+
+            if (m_JumpArrow == null) m_JumpArrow = PoleJumpArrow.Create();
+            if (m_JumpArrow == null) return;
+
+            // Over the head, like the stamina bar (CoreHUD), on the body - which stays put while the model spins.
+            float headTop = m_Controller != null ? m_Controller.center.y + m_Controller.height * 0.5f : 2f;
+            Vector3 centre = transform.position + Vector3.up * (headTop + jumpArrowHeight);
+
+            // Where a jump right now would take you over the next moment: the push fades at CoreMovement's
+            // forceDecayRate, and gravity pulls the rise down.
+            JumpLaunch(Tangent(m_Angle) * SpeedAt(m_Angle), out float up, out Vector3 sideways);
+            float t = ArrowLookAheadSeconds;
+            float decay = Mathf.Max(0.01f, m_Motor.forceDecayRate);
+            float gravity = m_Motor.gravity * m_Motor.GravityMultiplier;
+            Vector3 heading = sideways * ((1f - Mathf.Exp(-decay * t)) / decay) + Vector3.up * (up * t + 0.5f * gravity * t * t);
+            m_JumpArrow.Show(centre, heading);
+        }
+
+        #endregion
+
         #region Letting go
 
         private void HandleJumpPressed()
@@ -507,13 +562,23 @@ namespace Blocks.Gameplay.Core
             float up = velocity.y;
             if (jumped)
             {
-                float arms = m_Motor.PoleLaunchMultiplier; // Big Arms: x2
-                up = (up * verticalLaunchScale + launchUpBonus) * arms;
-                sideways *= horizontalLaunchScale * arms;
+                JumpLaunch(velocity, out up, out sideways);
                 PlayerActions.Report(m_Motor.gameObject, PlayerAction.PoleJump); // counted for wagers (LocalActionTracker)
             }
             m_Motor.SetVerticalVelocity(up);
             if (sideways.sqrMagnitude > 0.0001f) m_Motor.ApplyExternalForce(sideways, ForceMode.Impulse);
+        }
+
+        /// <summary>
+        /// A jump off the pole moving at <paramref name="velocity"/>: the upward speed and the sideways impulse
+        /// (launch settings, the boost up, the upright-pole buff, Big Arms). Shared by the jump itself and the jump arrow.
+        /// </summary>
+        private void JumpLaunch(Vector3 velocity, out float up, out Vector3 sideways)
+        {
+            float boost = m_Motor.PoleLaunchMultiplier; // Big Arms: x2
+            if (m_Upright) boost *= Mathf.Max(0f, uprightLaunchMultiplier);
+            up = (velocity.y * verticalLaunchScale + launchUpBonus) * boost;
+            sideways = new Vector3(velocity.x, 0f, velocity.z) * (horizontalLaunchScale * boost);
         }
 
         #endregion
