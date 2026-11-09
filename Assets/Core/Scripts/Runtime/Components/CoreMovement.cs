@@ -245,6 +245,9 @@ namespace Blocks.Gameplay.Core
         /// over to a rail, wall or pole grabbed mid-air.
         /// </summary>
         public bool IsGliding { get; private set; }
+
+        /// <summary>Riding a zoo dinosaur (DinosaurRider, 2026-11-08). Counts as a movement ability, like a rail or pole.</summary>
+        public bool IsRiding { get; private set; }
         public bool IsClimbing { get; private set; }
         public bool IsPoleGrabbing { get; private set; }
 
@@ -371,6 +374,7 @@ namespace Blocks.Gameplay.Core
 
             GroundedCheck();
             CarryWithPlatform();
+            TakeBufferedJump();
             ProcessAbilities();
         }
 
@@ -414,6 +418,7 @@ namespace Blocks.Gameplay.Core
         public void SetSprintState(bool isSprinting) => IsSprinting = isSprinting;
         public void SetGrindState(bool isGrinding) => IsGrinding = isGrinding;
         public void SetGlideState(bool isGliding) => IsGliding = isGliding;
+        public void SetRideState(bool isRiding) => IsRiding = isRiding;
         public void SetClimbState(bool isClimbing) => IsClimbing = isClimbing;
         public void SetPoleGrabState(bool isPoleGrabbing) => IsPoleGrabbing = isPoleGrabbing;
         /// <summary>
@@ -664,8 +669,11 @@ namespace Blocks.Gameplay.Core
             if (m_Walk == null) m_Walk = GetComponent<WalkAbility>();
             if (m_Walk != null) m_Walk.ResetMomentum();
 
-            // A glide stops dead too (2026-11-08).
+            m_BufferedJumpUntil = -1f;
+
+            // A glide stops dead too, and a dinosaur ride ends (2026-11-08).
             if (TryGetComponent(out GlideAbility glide)) glide.Cancel();
+            if (TryGetComponent(out DinosaurRider rider)) rider.Cancel();
         }
 
         private WalkAbility m_Walk;
@@ -861,11 +869,92 @@ namespace Blocks.Gameplay.Core
             }
         }
 
+        /// <summary>
+        /// Landing jump buffer (2026-11-08, reworked the same day): a Jump pressed up to this long (seconds) before
+        /// touching down is remembered (<see cref="BufferJump"/>) and the jump happens the moment you land - like
+        /// Kirby and the Forgotten Land, where playtesters kept pressing Jump a moment before landing. (The first
+        /// version jumped straight away from the air: free height that grew with fall speed, and a window too
+        /// tight for real timing.) The press isn't an air jump, glide or jetpack burn either.
+        /// </summary>
+        public const float LandingJumpWindow = 0.12f;
+
+        /// <summary>How much longer than predicted a buffered jump waits for the landing (the prediction ignores slopes, platforms...).</summary>
+        private const float BufferedJumpGrace = 0.08f;
+
+        private float m_BufferedJumpUntil = -1f;
+
+        /// <summary>A Jump press is waiting for the landing (<see cref="BufferJump"/>).</summary>
+        public bool HasBufferedJump => m_BufferedJumpUntil >= 0f && Time.time <= m_BufferedJumpUntil;
+
+        /// <summary>Remember a Jump press made just before landing; the jump happens on touchdown (CorePlayerManager).</summary>
+        public void BufferJump()
+        {
+            m_BufferedJumpUntil = Time.time + LandingJumpWindow + BufferedJumpGrace;
+        }
+
+        /// <summary>Landed with a jump waiting: jump now (JumpAbility does it, this frame).</summary>
+        private void TakeBufferedJump()
+        {
+            if (m_BufferedJumpUntil < 0f) return;
+            if (Time.time > m_BufferedJumpUntil || MovementAbilityActive())
+            {
+                m_BufferedJumpUntil = -1f;
+                return;
+            }
+            if (!IsGrounded) return;
+            m_BufferedJumpUntil = -1f;
+            JumpRequested = true;
+        }
+
+        /// <summary>
+        /// Coyote time (2026-11-08): a Jump pressed this soon (seconds) after running off an edge still counts as a
+        /// jump off the ground. The mirror of <see cref="LandingJumpWindow"/>; same length (about 3 frames at 60 fps).
+        /// </summary>
+        public const float CoyoteTime = 0.05f;
+
+        /// <summary>
+        /// Jump presses count as a jump off the ground: on it, coming down onto it within
+        /// <see cref="LandingJumpWindow"/> (<see cref="IsAboutToLand"/> - buffered until the landing), or just off
+        /// an edge (<see cref="InCoyoteTime"/>). CorePlayerManager and DoubleJumpAddon ask this, so those presses
+        /// are a full jump, not an air jump.
+        /// </summary>
+        public bool CanJumpFromGround => IsGrounded || IsAboutToLand() || InCoyoteTime();
+
+        /// <summary>
+        /// Left the ground less than <see cref="CoyoteTime"/> ago without jumping (not going up), and not on a rail,
+        /// wall or pole. A jump uses it up: JumpAbility's own 0.5 s cooldown stops a second one.
+        /// </summary>
+        public bool InCoyoteTime()
+        {
+            if (IsGrounded || MovementAbilityActive() || m_VerticalVelocity > 0.1f) return false;
+            return Time.time - m_TimeLastGrounded <= CoyoteTime;
+        }
+
+        /// <summary>
+        /// In the air, and the ground check (the same sphere as <see cref="IsGrounded"/>, swept straight down) would
+        /// touch ground within <see cref="LandingJumpWindow"/> - how far it drops in that time, from the current
+        /// vertical speed and gravity. Also true when it already touches: a Jump press arrives before this frame's
+        /// ground check, so <see cref="IsGrounded"/> can still be last frame's "in the air" when the body has in
+        /// fact just come down.
+        /// </summary>
+        public bool IsAboutToLand()
+        {
+            if (IsGrounded || MovementAbilityActive()) return false;
+            float t = LandingJumpWindow;
+            float g = -gravity * GravityMultiplier;
+            float drop = -m_VerticalVelocity * t + 0.5f * g * t * t;
+            if (drop <= 0f) return false; // still going up too fast to land that soon
+            Vector3 sphere = new Vector3(transform.position.x, transform.position.y + groundedOffset, transform.position.z);
+            if (Physics.CheckSphere(sphere, groundedRadius, groundLayers, QueryTriggerInteraction.Ignore)) return true;
+            return Physics.SphereCast(sphere, groundedRadius, Vector3.down, out _, drop, groundLayers, QueryTriggerInteraction.Ignore);
+        }
+
         public bool MovementAbilityActive()
         {
             if (IsGrinding) { return true; }
             if (IsClimbing) { return true; }
             if (IsPoleGrabbing) { return true; }
+            if (IsRiding) { return true; }
             return false;
         }
         [SerializeField] private float forceMagnitudeToLockWalk = 1.0f;

@@ -19,7 +19,7 @@ namespace Blocks.Gameplay.Core
     public static class WagerStats
     {
         /// <summary>One slot per WagerStat (the score and pickup slots go unused - those are read live).</summary>
-        public const int StatCount = (int)WagerStat.PoleRotations + 1;
+        public const int StatCount = (int)WagerStat.DinosaurRideSeconds + 1;
 
         /// <summary>The RPC carries two stats per int (16 bits each - up to 65535, i.e. 6553.5 seconds in tenths).</summary>
         public const int MaxStats = WagerStatsSync.PackedInts * 2;

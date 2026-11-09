@@ -64,7 +64,8 @@ namespace Blocks.Gameplay.Core
             }
 
             // Check if we can jump (grounded and passed landing cooldown)
-            bool canJump = (m_Motor.IsGrounded || Time.time < m_Motor.TimeLastGrounded)
+            // (Or just off an edge - coyote time, 2026-11-08. A buffered landing jump arrives once grounded.)
+            bool canJump = (m_Motor.IsGrounded || m_Motor.InCoyoteTime() || Time.time < m_Motor.TimeLastGrounded)
                            && m_Motor.TimeSinceLanded >= landingCooldown;
 
             // Check conditions for performing a jump:

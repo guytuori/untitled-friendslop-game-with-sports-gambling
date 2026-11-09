@@ -158,6 +158,15 @@ namespace Blocks.Gameplay.Core
 
             if (m_CoreMovement == null) return;
 
+            // About to land (CoreMovement.LandingJumpWindow) or just off an edge (CoreMovement.CoyoteTime): this
+            // press is a full jump off the ground, not an air jump - and like a landing, it gives the air jumps
+            // back (2026-11-08).
+            if (!m_CoreMovement.IsGrounded && m_CoreMovement.CanJumpFromGround)
+            {
+                ResetAirJumps();
+                return;
+            }
+
             // Out of double jumps until the player lands (maxDoubleJumps -1 = unlimited).
             if (maxDoubleJumps >= 0 && m_doubleJumpedCount >= maxDoubleJumps)
             {

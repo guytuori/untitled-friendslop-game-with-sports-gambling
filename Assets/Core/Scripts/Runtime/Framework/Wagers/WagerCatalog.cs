@@ -58,7 +58,11 @@ namespace Blocks.Gameplay.Core
         /// <summary>Complete turns round a bar (Pole Swing 2).</summary>
         HorizontalPoleRotations = 20,
         /// <summary>Complete turns round any pole.</summary>
-        PoleRotations = 21
+        PoleRotations = 21,
+        /// <summary>Times climbing onto a zoo dinosaur (DinosaurRider) - 2026-11-08.</summary>
+        DinosaurRides = 22,
+        /// <summary>Seconds riding zoo dinosaurs.</summary>
+        DinosaurRideSeconds = 23
     }
 
     /// <summary>How long a wager runs.</summary>
@@ -89,8 +93,9 @@ namespace Blocks.Gameplay.Core
         /// <summary>
         /// Bumped when the importer changes how it reads the text file, so the editor re-imports an older list by
         /// itself. 2 (2026-10-30): per-wager spans in brackets ([1-100]) and "in the next [40-90] seconds".
+        /// 3 (2026-11-08): map-only wagers (!DINOSAUR ZOO!) and the dinosaur-riding stats.
         /// </summary>
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 3;
 
         [SerializeField] private int version;
 
@@ -120,6 +125,9 @@ namespace Blocks.Gameplay.Core
             public WagerScope scope;
             public WagerStat stat;
 
+            [Tooltip("Map-only wagers (a !MAP NAME! marker in the text file, e.g. !DINOSAUR ZOO!): the map id (MapCatalog, e.g. DinosaurZoo) it's offered on. Empty = every map.")]
+            public string mapId;
+
             [Tooltip("False when the line couldn't be read properly (no number to roll) - never offered. Pickup wagers are offered whenever the map has pickups left, item wagers whenever items are on and the map has item boxes.")]
             public bool supported = true;
 
@@ -144,7 +152,8 @@ namespace Blocks.Gameplay.Core
         public static bool IsSecondsStat(WagerStat stat) =>
             stat == WagerStat.RunSeconds || stat == WagerStat.RailSeconds || stat == WagerStat.WallSeconds ||
             stat == WagerStat.PoleSeconds || stat == WagerStat.IceSeconds || stat == WagerStat.WalkSeconds ||
-            stat == WagerStat.VerticalPoleSeconds || stat == WagerStat.HorizontalPoleSeconds;
+            stat == WagerStat.VerticalPoleSeconds || stat == WagerStat.HorizontalPoleSeconds ||
+            stat == WagerStat.DinosaurRideSeconds;
 
         public static bool IsScoreStat(WagerStat stat) => stat == WagerStat.ScoreReached || stat == WagerStat.FinalScore;
 

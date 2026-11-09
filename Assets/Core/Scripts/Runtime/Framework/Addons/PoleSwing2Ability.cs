@@ -389,6 +389,9 @@ namespace Blocks.Gameplay.Core
             // The body waits under the bar; nothing else moves it (WalkAbility would otherwise nudge it).
             m_PreviousMoveOverride = m_Motor.FinalMoveCalculationOverride;
             m_Motor.FinalMoveCalculationOverride = _ => Vector3.zero;
+            // On a pole as far as everything else is concerned (CoreMovement.MovementAbilityActive): no glide, jetpack,
+            // air jump or dash panel while swinging, nor on the press that jumps off (2026-11-08 - it never said so).
+            m_Motor.SetPoleGrabState(true);
             m_Motor.SetVerticalVelocity(0f);
             // The body faces along the swing under a bar, or the pole beside an upright one.
             Vector3 face = m_Upright ? Vector3.ProjectOnPlane(-down, Vector3.up) : m_Forward;
@@ -550,6 +553,7 @@ namespace Blocks.Gameplay.Core
             }
             if (m_Motor == null) return;
 
+            m_Motor.SetPoleGrabState(false);
             m_Motor.FinalMoveCalculationOverride = m_PreviousMoveOverride;
             m_PreviousMoveOverride = null;
             m_Motor.RotationOverride = null;

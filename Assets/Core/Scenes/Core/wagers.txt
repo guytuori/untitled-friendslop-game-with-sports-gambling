@@ -48,3 +48,7 @@ Will [PLAYER] collect [1-20] pickups by the end of the game?
 Will [PLAYER] collect [1-10] pickups in the next [40-90] seconds?
 Will [PLAYER] collect [1-5] items by the end of the game?
 Will [PLAYER] collect [1-3] items in the next [40-90] seconds?
+!DINOSAUR ZOO! Will [PLAYER] ride on a dinosaur [1-3] times before the end of the game?
+!DINOSAUR ZOO! Will [PLAYER] ride on a dinosaur for [1-10] seconds before the end of the game?
+!DINOSAUR ZOO! Will [PLAYER] ride on a dinosaur [1-2] times in the next [40-90] seconds?
+!DINOSAUR ZOO! Will [PLAYER] ride on a dinosaur for [1-15] seconds in the next [40-90] seconds?

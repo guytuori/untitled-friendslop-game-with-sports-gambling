@@ -33,6 +33,14 @@ namespace Blocks.Gameplay.Core
     ///     <see cref="RoarRange"/> - first turning on the spot to face that player (shuffling its feet);
     ///   - the raptors play their Attack clip (sometimes twice).
     /// Which one is decided by the model's name (<see cref="HabitFor"/>).
+    ///
+    /// NETWORKED (2026-11-08): the session's master client walks every dinosaur and decides its habits; it
+    /// sends each one's position, facing, walking speed and current habit through MatchLayout
+    /// (<see cref="CaptureState"/> -> <see cref="DinosaurNetState"/>, 10 times a second). Everyone else's copy is a
+    /// puppet: it glides to the sent position and facing, walks while it's walking and starts each habit when
+    /// the master does (the graze pose is still worked out on each machine from the same spot). So the
+    /// dinosaurs are in the same places for everyone, and players can ride them (<see cref="DinosaurRider"/>).
+    /// If the master leaves, the next one carries on from wherever its copies are.
     /// </summary>
     public class DinosaurWander : MonoBehaviour
     {
@@ -65,6 +73,12 @@ namespace Blocks.Gameplay.Core
         private const float FaceTimeout = 4f;        // give up turning (and roar anyway) after this long
 
         private enum State { Idle, Walk, Act }
+
+        /// <summary>What the dinosaur is doing, as sent to the other machines.</summary>
+        public enum NetMode : byte { Idle = 0, Walk = 1, Facing = 2, Act = 3 }
+
+        /// <summary>How quickly a puppet catches up with the sent position and facing (per second).</summary>
+        private const float PuppetSmoothing = 8f;
 
         /// <summary>What a dinosaur does now and then: plant eaters graze, the T-rex stomps and roars, raptors lunge.</summary>
         public enum Habit { Graze, Stomp, Lunge }
@@ -130,6 +144,21 @@ namespace Blocks.Gameplay.Core
 
         private Renderer[] m_Renderers;
         private AudioSource m_Voice;
+
+        // Networking: the master's copy runs the behaviour (authority); everyone else's follows it (puppet).
+        private bool m_Authority = true;
+        private int m_ActSequence;                       // bumped with each habit (authority)
+        private byte m_ActParam;                         // the habit's one random choice: graze tugs, lunge repeats
+        private int m_SeenSequence = -1;                 // the last habit a puppet started
+        private bool m_HasNet;
+        private Vector3 m_LastNetPosition;
+        private float m_LastNetYaw;
+        private float m_NetReceivedAt;
+
+        // Riding (DinosaurRider): the point on its back, kept in the torso bone's space so it moves with the body.
+        private Transform m_SaddleBone;
+        private Vector3 m_SaddleLocal;
+        private bool m_SaddleMeasured;
 
         public int Index => m_Index;
         public Habit Kind => m_Habit;
@@ -378,6 +407,24 @@ namespace Blocks.Gameplay.Core
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
+            bool authority = Dinosaurs.HasAuthority;
+            if (authority != m_Authority) SwitchAuthority(authority);
+
+            if (m_RestoreCullingAt > 0f && Time.time >= m_RestoreCullingAt && m_State != State.Act)
+            {
+                m_RestoreCullingAt = -1f;
+                if (m_Animator != null) m_Animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            }
+
+            if (m_Authority) UpdateAuthority(dt);
+            else UpdatePuppet(dt);
+
+            UpdateAnimation(dt);
+        }
+
+        /// <summary>This machine runs the dinosaur (offline, or the session's master client).</summary>
+        private void UpdateAuthority(float dt)
+        {
             if (Time.time >= m_NextProbe)
             {
                 m_NextProbe = Time.time + ProbeInterval;
@@ -387,12 +434,6 @@ namespace Blocks.Gameplay.Core
             m_CurrentSpeed = 0f;
             m_StateTimer -= dt;
 
-            if (m_RestoreCullingAt > 0f && Time.time >= m_RestoreCullingAt && m_State != State.Act)
-            {
-                m_RestoreCullingAt = -1f;
-                if (m_Animator != null) m_Animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
-            }
-
             if (m_State != State.Act && Time.time >= m_NextHabitAt)
             {
                 StartHabit(); // stops a walk where it is
@@ -400,8 +441,8 @@ namespace Blocks.Gameplay.Core
 
             if (m_State == State.Act && m_Facing)
             {
-                // Turn on the spot towards this machine's player (following them if they move), then stomp.
-                if (TryYawToLocalPlayer(out float yaw)) m_TargetYaw = yaw;
+                // Turn on the spot towards the nearest player (following them if they move), then stomp.
+                if (TryYawToNearestPlayer(RoarRange, out float yaw)) m_TargetYaw = yaw;
                 float delta = Mathf.DeltaAngle(m_Yaw, m_TargetYaw);
                 float rate = Mathf.Max(m_TurnRate * 2f, FaceTurnRate);
                 m_Yaw += Mathf.Clamp(delta, -rate * dt, rate * dt);
@@ -411,11 +452,7 @@ namespace Blocks.Gameplay.Core
             else if (m_State == State.Act)
             {
                 m_ActTime += dt;
-                if (m_Habit == Habit.Stomp && !m_Roared && m_ActTime >= RoarDelay)
-                {
-                    m_Roared = true;
-                    if (IsLocalPlayerWithin(RoarRange)) MakeSound(Dinosaurs.Sound);
-                }
+                RoarIfDue();
                 if (m_ActTime >= m_ActLength) EndHabit();
             }
             else if (m_State == State.Idle)
@@ -447,8 +484,113 @@ namespace Blocks.Gameplay.Core
             Vector3 position = transform.position;
             position.y = Mathf.MoveTowards(position.y, m_GroundY + m_HeightOffset, Mathf.Max(2f, m_Speed) * dt);
             transform.SetPositionAndRotation(position, Quaternion.LookRotation(Direction(m_Yaw)) * m_Tilt);
+        }
 
-            UpdateAnimation(dt);
+        // =====================================================================================
+        // Networking
+        // =====================================================================================
+
+        /// <summary>What the master sends about this dinosaur (MatchLayout writes it 10 times a second).</summary>
+        public DinosaurNetState CaptureState()
+        {
+            NetMode mode = NetMode.Idle;
+            if (m_State == State.Act) mode = m_Facing ? NetMode.Facing : NetMode.Act;
+            else if (m_State == State.Walk && m_CurrentSpeed > 0.01f) mode = NetMode.Walk;
+
+            return new DinosaurNetState
+            {
+                Position = transform.position,
+                Yaw = m_Yaw,
+                Speed = mode == NetMode.Walk ? m_CurrentSpeed : 0f,
+                Mode = (byte)mode,
+                ActParam = m_ActParam,
+                ActSequence = m_ActSequence,
+                Valid = true,
+            };
+        }
+
+        /// <summary>Another machine runs this dinosaur: follow what it sends.</summary>
+        private void UpdatePuppet(float dt)
+        {
+            m_CurrentSpeed = 0f;
+            if (!Dinosaurs.TryGetNetState(m_Index, out DinosaurNetState net)) return; // nothing sent yet: stand still
+
+            // A new report: remember when, so the position can be carried on at the sent speed until the next one.
+            if (!m_HasNet || net.Position != m_LastNetPosition || !Mathf.Approximately(net.Yaw, m_LastNetYaw))
+            {
+                m_LastNetPosition = net.Position;
+                m_LastNetYaw = net.Yaw;
+                m_NetReceivedAt = Time.time;
+            }
+
+            float ahead = Mathf.Min(Time.time - m_NetReceivedAt, 0.3f);
+            Vector3 target = net.Position + Direction(net.Yaw) * (net.Speed * ahead);
+            bool snap = !m_HasNet || (target - transform.position).sqrMagnitude > 15f * 15f; // first sight, or put back home
+            float k = snap ? 1f : 1f - Mathf.Exp(-PuppetSmoothing * dt);
+            Vector3 position = Vector3.Lerp(transform.position, target, k);
+            m_Yaw = snap ? net.Yaw : Mathf.LerpAngle(m_Yaw, net.Yaw, k);
+            m_TargetYaw = m_Yaw;
+            m_HasNet = true;
+            transform.SetPositionAndRotation(position, Quaternion.LookRotation(Direction(m_Yaw)) * m_Tilt);
+
+            var mode = (NetMode)net.Mode;
+
+            // Habits: start each new one when the master does (the T-rex's after it has turned to face someone).
+            if (mode == NetMode.Act && net.ActSequence != m_SeenSequence)
+            {
+                m_SeenSequence = net.ActSequence;
+                if (m_State == State.Act) EndHabit();
+                BeginAct(net.ActParam);
+            }
+            if (m_State == State.Act)
+            {
+                if (mode != NetMode.Act)
+                {
+                    EndHabit(); // the master's has finished
+                }
+                else
+                {
+                    m_ActTime += dt;
+                    RoarIfDue();
+                    if (m_ActTime >= m_ActLength) EndHabit();
+                }
+            }
+            if (m_State == State.Act) return;
+
+            // Walking, or shuffling round to face someone (the walk, slowed).
+            if (mode == NetMode.Walk)
+            {
+                m_State = State.Walk;
+                m_CurrentSpeed = net.Speed;
+            }
+            else if (mode == NetMode.Facing)
+            {
+                m_State = State.Walk;
+                m_CurrentSpeed = 0.02f;
+            }
+            else
+            {
+                m_State = State.Idle;
+            }
+        }
+
+        /// <summary>This machine became (or stopped being) the one that runs the dinosaurs (the master client changed).</summary>
+        private void SwitchAuthority(bool authority)
+        {
+            m_Authority = authority;
+            if (authority)
+            {
+                // Carry on from wherever this copy is. Habit numbers carry on past what was seen, so the others start the next one.
+                m_ActSequence = Mathf.Max(m_ActSequence, m_SeenSequence) + 1;
+                m_Facing = false;
+                if (m_State != State.Act) StartIdle(Range(1f, 3f));
+                if (m_NextHabitAt < Time.time) m_NextHabitAt = Time.time + Range(8f, HabitMaxSeconds);
+            }
+            else
+            {
+                m_SeenSequence = m_ActSequence; // whatever's playing now isn't started again
+                m_HasNet = false;
+            }
         }
 
         /// <summary>Every <see cref="ProbeInterval"/>: re-measure the ground, run the safety net, and check the next step.</summary>
@@ -550,18 +692,40 @@ namespace Blocks.Gameplay.Core
         // Habits
         // =====================================================================================
 
+        /// <summary>The master's copy: time for a habit - make its one random choice, start it, and tell the others.</summary>
         private void StartHabit()
         {
             m_NextHabitAt = Time.time + Range(HabitMinSeconds, HabitMaxSeconds);
+            byte param = m_Habit == Habit.Graze
+                ? (byte)(Range(0f, 1f) < 0.5f ? 2 : 3)                          // tugs at the grass
+                : (byte)(m_Habit == Habit.Lunge && Range(0f, 1f) < 0.4f ? 2 : 1); // lunges
+            if (!BeginAct(param)) return;
+            m_ActSequence++;
+
+            // The T-rex faces whoever it's about to roar at (the nearest player in range).
+            if (m_Habit == Habit.Stomp && TryYawToNearestPlayer(RoarRange, out float yaw))
+            {
+                m_Facing = true;
+                m_FaceTimeLeft = FaceTimeout;
+                m_TargetYaw = yaw;
+            }
+        }
+
+        /// <summary>Starts the habit itself (on every machine): <paramref name="param"/> = graze tugs, or lunge / stomp repeats.</summary>
+        private bool BeginAct(byte param)
+        {
             m_ActTime = 0f;
             m_Roared = false;
             m_Facing = false;
+            m_ActParam = param;
 
             if (m_Habit == Habit.Graze)
             {
-                if (m_BendBones == null) return;
+                if (m_BendBones == null) return false;
+                // The graze pose reaches for the ground right here (a puppet doesn't keep track of the ground otherwise).
+                if (TryGround(transform.position, transform.position.y - m_HeightOffset, out float ground)) m_GroundY = ground;
                 m_ActLength = GrazeSeconds;
-                m_Tugs = Range(0f, 1f) < 0.5f ? 2 : 3;
+                m_Tugs = Mathf.Max(1, (int)param);
                 SolveGrazePose();
                 m_BendApplied = false;
                 // Bones are bent on top of the animation every frame, so they must be animated every frame too.
@@ -569,21 +733,21 @@ namespace Blocks.Gameplay.Core
             }
             else
             {
-                if (m_ActClip == null || m_ActClip.length <= 0.01f) return;
-                int repeats = m_Habit == Habit.Lunge && Range(0f, 1f) < 0.4f ? 2 : 1;
-                m_ActLength = m_ActClip.length * repeats;
-
-                // The T-rex faces whoever it's about to roar at.
-                if (m_Habit == Habit.Stomp && IsLocalPlayerWithin(RoarRange) && TryYawToLocalPlayer(out float yaw))
-                {
-                    m_Facing = true;
-                    m_FaceTimeLeft = FaceTimeout;
-                    m_TargetYaw = yaw;
-                }
+                if (m_ActClip == null || m_ActClip.length <= 0.01f) return false;
+                m_ActLength = m_ActClip.length * Mathf.Max(1, (int)param);
             }
 
             m_State = State.Act;
             m_Blocked = false;
+            return true;
+        }
+
+        /// <summary>The T-rex's roar, a moment into its stomp - heard on each machine whose player is close enough.</summary>
+        private void RoarIfDue()
+        {
+            if (m_Habit != Habit.Stomp || m_Roared || m_ActTime < RoarDelay) return;
+            m_Roared = true;
+            if (IsLocalPlayerWithin(RoarRange)) MakeSound(Dinosaurs.Sound);
         }
 
         private void EndHabit()
@@ -602,13 +766,22 @@ namespace Blocks.Gameplay.Core
             StartIdle(Range(1.5f, 4f));
         }
 
-        /// <summary>The flat direction (yaw) from the dinosaur to this machine's player, if there is one.</summary>
-        private bool TryYawToLocalPlayer(out float yaw)
+        /// <summary>The flat direction (yaw) to the nearest player within <paramref name="range"/> (of its bounding box), if any.</summary>
+        private bool TryYawToNearestPlayer(float range, out float yaw)
         {
             yaw = m_Yaw;
-            CorePlayerManager local = NetworkPlayers.Local;
-            if (local == null) return false;
-            Vector3 to = Flat(local.transform.position - transform.position);
+            CorePlayerManager nearest = null;
+            float best = range;
+            foreach (CorePlayerManager player in NetworkPlayers.All)
+            {
+                if (player == null || !player.IsSpawned) continue;
+                float distance = DistanceTo(player.transform.position + Vector3.up * 0.9f);
+                if (distance <= best) { best = distance; nearest = player; }
+            }
+            if (nearest == null && NetworkPlayers.Local != null && IsLocalPlayerWithin(range)) nearest = NetworkPlayers.Local;
+            if (nearest == null) return false;
+
+            Vector3 to = Flat(nearest.transform.position - transform.position);
             if (to.sqrMagnitude < 0.01f) return false;
             yaw = YawOf(to);
             return true;
@@ -935,6 +1108,132 @@ namespace Blocks.Gameplay.Core
             m_Voice.clip = clip;
             m_Voice.volume = AudioVolumeService.GetMultiplier(AudioCategory.SoundEffects);
             m_Voice.Play();
+        }
+
+        /// <summary>The way the dinosaur faces (flat).</summary>
+        public Vector3 Facing => Direction(m_Yaw);
+
+        /// <summary>
+        /// The middle of its back, where a rider sits (DinosaurRider). Measured the first time from the posed mesh: where
+        /// a vertical line through the torso bone leaves the top of the body, kept in that bone's space so it moves
+        /// with the body. (2026-11-08: it used the highest nearby vertex at first - the meshes are so low-poly that on
+        /// the Stegosaurus and Apatosaurus the nearest vertices were under the belly.)
+        /// </summary>
+        public Vector3 SaddlePoint
+        {
+            get
+            {
+                if (!m_SaddleMeasured) MeasureSaddle();
+                return m_SaddleBone != null ? m_SaddleBone.TransformPoint(m_SaddleLocal) : transform.position + Vector3.up * m_Height * 0.6f;
+            }
+        }
+
+        private void MeasureSaddle()
+        {
+            m_SaddleMeasured = true;
+            foreach (Transform t in GetComponentsInChildren<Transform>(true))
+            {
+                if (string.Equals(t.name, "Torso", System.StringComparison.OrdinalIgnoreCase)) { m_SaddleBone = t; break; }
+                if (m_SaddleBone == null && string.Equals(t.name, "Hips", System.StringComparison.OrdinalIgnoreCase)) m_SaddleBone = t;
+            }
+            if (m_SaddleBone == null)
+            {
+                Debug.LogWarning($"[Dinosaurs] '{name}' has no Torso or Hips bone - riders sit at a guessed height.", this);
+                return;
+            }
+
+            // The posed body, in world space.
+            var points = new System.Collections.Generic.List<Vector3>();
+            var triangles = new System.Collections.Generic.List<int>();
+            var baked = new Mesh();
+            foreach (Renderer r in m_Renderers)
+            {
+                if (!(r is SkinnedMeshRenderer skin) || skin.sharedMesh == null) continue;
+                skin.BakeMesh(baked, false);
+                Vector3[] local = baked.vertices;
+                Matrix4x4 toWorld = BakedToWorld(skin, local);
+                int first = points.Count;
+                for (int i = 0; i < local.Length; i++) points.Add(toWorld.MultiplyPoint3x4(local[i]));
+                foreach (int index in baked.triangles) triangles.Add(first + index);
+            }
+            Destroy(baked);
+            if (points.Count == 0) return;
+
+            var body = new Bounds(points[0], Vector3.zero);
+            foreach (Vector3 p in points) body.Encapsulate(p);
+
+            // A vertical line through the bone (or through the middle of the body, if the bone is somehow outside it
+            // seen from above): the highest place it crosses the body is the top of the back.
+            Vector3 bone = m_SaddleBone.position;
+            bool boneOverBody = bone.x >= body.min.x && bone.x <= body.max.x && bone.z >= body.min.z && bone.z <= body.max.z;
+            Vector3 line = boneOverBody ? bone : body.center;
+            float top = float.MinValue;
+            for (int t = 0; t + 2 < triangles.Count; t += 3)
+            {
+                Vector3 a = points[triangles[t]], b = points[triangles[t + 1]], c = points[triangles[t + 2]];
+                float denom = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
+                if (Mathf.Abs(denom) < 1e-8f) continue; // edge-on from above (e.g. the Stegosaurus's plates)
+                float w1 = ((b.z - c.z) * (line.x - c.x) + (c.x - b.x) * (line.z - c.z)) / denom;
+                float w2 = ((c.z - a.z) * (line.x - c.x) + (a.x - c.x) * (line.z - c.z)) / denom;
+                float w3 = 1f - w1 - w2;
+                if (w1 < 0f || w2 < 0f || w3 < 0f) continue;
+                top = Mathf.Max(top, w1 * a.y + w2 * b.y + w3 * c.y);
+            }
+
+            string how = "the line through the body";
+            if (top == float.MinValue)
+            {
+                // Missed (a gap in the mesh?): the highest point close by.
+                float radius = Mathf.Max(0.5f, m_HalfWidth * 0.6f);
+                foreach (Vector3 p in points)
+                {
+                    float dx = p.x - line.x, dz = p.z - line.z;
+                    if (dx * dx + dz * dz <= radius * radius) top = Mathf.Max(top, p.y);
+                }
+                how = "the highest point nearby";
+            }
+            if (top == float.MinValue)
+            {
+                top = body.center.y + body.extents.y * 0.5f;
+                how = "a guess";
+            }
+
+            var surface = new Vector3(line.x, top, line.z);
+            m_SaddleLocal = m_SaddleBone.InverseTransformPoint(surface);
+            Debug.Log($"[Dinosaurs] '{name}': riders sit {top - transform.position.y:0.0} m up ({how}; body {body.min.y - transform.position.y:0.0}-{body.max.y - transform.position.y:0.0} m, {m_SaddleBone.name} bone {bone.y - transform.position.y:0.0} m{(boneOverBody ? "" : ", not over the body")}).", this);
+        }
+
+        /// <summary>
+        /// BakeMesh (without scale) gives the posed mesh in the renderer's own space; which matrix turns that into world
+        /// space depends on how the model's scale is set up (the FBX's own scale, the map's, the size change in
+        /// Dinosaurs). So try the likely ones and keep the one whose result matches the renderer's own world bounds.
+        /// </summary>
+        private static Matrix4x4 BakedToWorld(SkinnedMeshRenderer skin, Vector3[] local)
+        {
+            Transform t = skin.transform;
+            Matrix4x4[] candidates =
+            {
+                t.localToWorldMatrix,
+                Matrix4x4.TRS(t.position, t.rotation, Vector3.one),
+                Matrix4x4.TRS(t.position, t.rotation, t.localScale),
+                Matrix4x4.TRS(t.position, t.rotation, t.lossyScale),
+            };
+            Bounds target = skin.bounds;
+            Matrix4x4 best = candidates[0];
+            float bestScore = float.MaxValue;
+            foreach (Matrix4x4 m in candidates)
+            {
+                if (local.Length == 0) break;
+                var b = new Bounds(m.MultiplyPoint3x4(local[0]), Vector3.zero);
+                for (int i = 1; i < local.Length; i++) b.Encapsulate(m.MultiplyPoint3x4(local[i]));
+                float score = (b.center - target.center).magnitude + (b.size - target.size).magnitude;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = m;
+                }
+            }
+            return best;
         }
 
         /// <summary>Distance from <paramref name="point"/> to the dinosaur's bounding box (0 inside it).</summary>

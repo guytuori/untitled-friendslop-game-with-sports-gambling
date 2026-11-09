@@ -280,7 +280,8 @@ namespace Blocks.Gameplay.Core
         {
             if (!m_Equipped || !IsAlive) return false;
             // A press on the ground is a normal jump; the press that jumps off a rail, wall or pole isn't a glide.
-            if (m_Motor.IsGrounded || m_Motor.JumpRequested) return false;
+            // (A press just before landing is a buffered ground jump - CoreMovement.BufferJump.)
+            if (m_Motor.IsGrounded || m_Motor.JumpRequested || m_Motor.HasBufferedJump) return false;
             if (abilityActive || Time.frameCount - m_LastAbilityFrame <= 1) return false;
             return true;
         }

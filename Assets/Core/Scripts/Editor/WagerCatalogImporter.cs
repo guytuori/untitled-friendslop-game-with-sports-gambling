@@ -17,6 +17,7 @@ namespace Blocks.Gameplay.Core
     ///   Will [PLAYER] jump [1-100] times before the end of the game?  &lt;- a wager, with its own number span
     ///   Will [PLAYER] jump [1-50] times in the next [40-90] seconds?  &lt;- a window wager (its own window span)
     ///   !CHALLENGE! Will [PLAYER] jump [1-15] times before ...        &lt;- challenge-only (the marker isn't shown in game)
+    ///   !DINOSAUR ZOO! Will [PLAYER] ride on a dinosaur [1-3] ...      &lt;- map-only (any other !NAME!: that map, e.g. DinosaurZoo)
     ///
     /// Every wager has its own [min-max] span (since 2026-10-30), so each one can be tuned on its own. A
     /// second span right after "in the next" makes it a window wager: the window's length in seconds is rolled
@@ -48,6 +49,9 @@ namespace Blocks.Gameplay.Core
         public const string TextFilePath = "Assets/Core/Scenes/Core/wagers.txt";
         private const string CatalogPath = "Assets/Core/Resources/" + WagerCatalog.ResourcePath + ".asset";
         private const string ChallengeMarker = "!CHALLENGE!";
+
+        /// <summary>A map-only wager: !DINOSAUR ZOO! -> offered only on DinosaurZoo (2026-11-08). Any marker but !CHALLENGE!.</summary>
+        private static readonly Regex MapMarker = new Regex(@"^!\s*([A-Za-z0-9 ]+?)\s*!");
         private const string SpansHeader = "RANDOM SPANS";
         private const string WindowPlaceholder = "WINDOW_SECONDS";
 
@@ -118,7 +122,8 @@ namespace Blocks.Gameplay.Core
                 string span = string.IsNullOrEmpty(t.numberPlaceholder) ? "" : $" {t.minNumber}-{t.maxNumber}{(t.IsSeconds ? " s" : "")},";
                 string window = t.scope == WagerScope.Window ? $" window {t.minWindowSeconds}-{t.maxWindowSeconds} s," : "";
                 string missing = Loc.HasEntry(t.text) ? "" : "(no translations yet) ";
-                summary.AppendLine($"- [{t.trigger}, {t.scope}] {t.stat},{span}{window} {(t.supported ? "" : "(can't be offered) ")}{missing}{t.text}");
+                string map = string.IsNullOrEmpty(t.mapId) ? "" : $", {t.mapId} only";
+                summary.AppendLine($"- [{t.trigger}, {t.scope}{map}] {t.stat},{span}{window} {(t.supported ? "" : "(can't be offered) ")}{missing}{t.text}");
             }
             if (problems.Length > 0) summary.AppendLine().AppendLine("Problems:").Append(problems);
 
@@ -189,10 +194,18 @@ namespace Blocks.Gameplay.Core
 
                 var template = new WagerCatalog.Template { trigger = trigger, scope = WagerScope.Round };
                 string text = line;
-                if (text.StartsWith(ChallengeMarker, StringComparison.OrdinalIgnoreCase))
+                // Markers in front, in any order: !CHALLENGE! (challenge-only) and/or a map's name (map-only).
+                for (Match marker = MapMarker.Match(text); marker.Success; marker = MapMarker.Match(text))
                 {
-                    template.scope = WagerScope.Challenge;
-                    text = text.Substring(ChallengeMarker.Length).Trim();
+                    if (text.StartsWith(ChallengeMarker, StringComparison.OrdinalIgnoreCase))
+                    {
+                        template.scope = WagerScope.Challenge;
+                    }
+                    else
+                    {
+                        template.mapId = MapIdFromMarker(marker.Groups[1].Value);
+                    }
+                    text = text.Substring(marker.Length).Trim();
                 }
 
                 WagerStat? stat = null;
@@ -314,6 +327,18 @@ namespace Blocks.Gameplay.Core
             return result.ToString();
         }
 
+        /// <summary>"DINOSAUR ZOO" -> "DinosaurZoo" (map ids are compared ignoring case).</summary>
+        private static string MapIdFromMarker(string name)
+        {
+            var id = new StringBuilder();
+            foreach (string word in name.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                id.Append(char.ToUpperInvariant(word[0]));
+                if (word.Length > 1) id.Append(word.Substring(1).ToLowerInvariant());
+            }
+            return id.ToString();
+        }
+
         /// <summary>Same names as the old RANDOM SPANS placeholders, so existing LocStrings rows still match.</summary>
         private static string NumberPlaceholderFor(WagerStat stat)
         {
@@ -352,6 +377,8 @@ namespace Blocks.Gameplay.Core
             bool pole = t.Contains("pole");
             bool rotations = Regex.IsMatch(t, @"\brotations?\b|\bspins?\b|\bturns?\b");
 
+            // Riding the zoo dinosaurs: "ride on a dinosaur for [1-10] seconds" is time, "... [1-3] times" is rides.
+            if (t.Contains("dinosaur")) return Regex.IsMatch(t, @"dinosaurs?\s+for\b") ? WagerStat.DinosaurRideSeconds : WagerStat.DinosaurRides;
             if (jump && t.Contains("grind")) return WagerStat.RailJumps;
             if (jump && pole) return vertical ? WagerStat.VerticalPoleJumps : horizontal ? WagerStat.HorizontalPoleJumps : WagerStat.PoleJumps;
             if (rotations && pole) return vertical ? WagerStat.VerticalPoleRotations : horizontal ? WagerStat.HorizontalPoleRotations : WagerStat.PoleRotations;

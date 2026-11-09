@@ -43,7 +43,8 @@ namespace Blocks.Gameplay.Core
         private bool m_Dirty;
         private float m_LastSendTime = float.NegativeInfinity;
 
-        private bool m_WasRunning, m_WasWalking, m_WasOnRail, m_WasOnWall, m_WasOnPole;
+        private bool m_WasRunning, m_WasWalking, m_WasOnRail, m_WasOnWall, m_WasOnPole, m_WasRiding;
+        private DinosaurRider m_Rider; // added at runtime the first time the player tries to ride (DinosaurInteract)
         private bool m_PoleHorizontal; // the pole the player is on, or was on last (pole jumps are reported just after letting go)
         private int m_LastRotations;
 
@@ -141,6 +142,17 @@ namespace Blocks.Gameplay.Core
             Track(WagerStat.VerticalPoleSeconds, onPole && !m_PoleHorizontal, dt);
             Track(WagerStat.HorizontalPoleSeconds, onPole && m_PoleHorizontal, dt);
             Track(WagerStat.IceSeconds, onIce, dt);
+
+            // Riding a zoo dinosaur (2026-11-08): each climb onto one, and the time on its back.
+            if (m_Rider == null && m_Movement != null) m_Rider = m_Movement.GetComponent<DinosaurRider>();
+            bool riding = m_Rider != null && m_Rider.IsRiding;
+            if (riding && !m_WasRiding)
+            {
+                m_Values[(int)WagerStat.DinosaurRides]++;
+                m_Dirty = true;
+            }
+            Track(WagerStat.DinosaurRideSeconds, riding, dt);
+            m_WasRiding = riding;
 
             // Complete turns round a pole (Pole Swing 2 counts them).
             if (m_Swing2 != null && m_Swing2.CompletedRotations != m_LastRotations)

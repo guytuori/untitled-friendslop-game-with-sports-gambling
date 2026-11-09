@@ -2,7 +2,11 @@ using UnityEngine;
 
 namespace Blocks.Gameplay.Core
 {
-    /// <summary>Listens for the Interact button next to a dinosaur (added to the map by <see cref="Dinosaurs"/>).</summary>
+    /// <summary>
+    /// Listens for the Interact button for the zoo dinosaurs (added to the map by <see cref="Dinosaurs"/>): next to a
+    /// dinosaur it climbs on for a ride and the dinosaur roars (<see cref="DinosaurRider"/>, 2026-11-08 - it used to
+    /// just roar); while riding, it lets go.
+    /// </summary>
     public class DinosaurInteract : MonoBehaviour
     {
         private InputBindingsData m_Bindings;
@@ -22,16 +26,24 @@ namespace Blocks.Gameplay.Core
 
         private void Update()
         {
-            if (InGameMenu.IsOpen || m_Bindings == null) return;
+            if (InGameMenu.IsOpen || CoreInputHandler.GameplayInputBlocked || m_Bindings == null) return;
             if (!BoundControls.WasPressed(m_Bindings.Keyboard.Interact, m_Bindings.Gamepad.Interact)) return;
 
             CorePlayerManager local = NetworkPlayers.Local;
             if (local == null) return;
+            DinosaurRider rider = DinosaurRider.For(local);
+            if (rider == null) return;
+
+            if (rider.IsRiding)
+            {
+                rider.Dismount();
+                return;
+            }
 
             // Middle of the body rather than the feet, so a dinosaur's bounding box is reachable from either side.
             Vector3 point = local.transform.position + Vector3.up * 0.9f;
             int index = Dinosaurs.FindNear(point);
-            if (index >= 0) Dinosaurs.RequestSound(index);
+            if (index >= 0) rider.Mount(index);
         }
     }
 }

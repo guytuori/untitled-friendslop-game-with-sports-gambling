@@ -422,11 +422,18 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>
         /// Whether the game can track this wager here: pickup wagers only on maps with pickups left, item wagers
-        /// only with items on and item boxes on the map.
+        /// only with items on and item boxes on the map, map-only wagers only on their map, dinosaur ones only
+        /// where there are dinosaurs.
         /// </summary>
         private static bool IsOfferable(WagerCatalog.Template template)
         {
             if (!template.supported) return false;
+            if (!string.IsNullOrEmpty(template.mapId) &&
+                !string.Equals(template.mapId, MusicTracks.MapIdOf(MatchLayout.Current), System.StringComparison.OrdinalIgnoreCase)) return false;
+            if (template.stat == WagerStat.DinosaurRides || template.stat == WagerStat.DinosaurRideSeconds)
+            {
+                return Dinosaurs.All.Count > 0;
+            }
             if (template.stat == WagerStat.Pickups)
             {
                 return PickupManager.Instance != null && PickupManager.Instance.RemainingCount > 0;

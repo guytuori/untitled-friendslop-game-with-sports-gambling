@@ -299,10 +299,12 @@ namespace Blocks.Gameplay.Core
                 return;
             }
 
-            if (!coreMovement.IsGrounded) return;
             if (coreMovement.MovementAbilityActive()) return;
 
-            coreMovement.PerformJump();
+            // On the ground, or just off an edge (CoreMovement.CoyoteTime): jump now. About to land
+            // (CoreMovement.LandingJumpWindow): jump the moment you touch down (2026-11-08).
+            if (coreMovement.IsGrounded || coreMovement.InCoyoteTime()) coreMovement.PerformJump();
+            else if (coreMovement.IsAboutToLand()) coreMovement.BufferJump();
         }
 
         private void HandleMoveInput(Vector2 input)

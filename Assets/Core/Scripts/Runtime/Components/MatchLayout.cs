@@ -25,6 +25,22 @@ namespace Blocks.Gameplay.Core
     /// GameManager waits for <see cref="IsBuilt"/> before spawning the local player, so nobody spawns before
     /// the map (and its spawn points) exist. Added to [BB] Core by Friendslop > Refresh Everything From Assets.
     /// </summary>
+    /// <summary>One zoo dinosaur as the master client last sent it (see DinosaurWander's networking notes).</summary>
+    public struct DinosaurNetState : INetworkStruct
+    {
+        public Vector3 Position;
+        public float Yaw;
+        /// <summary>Walking speed (m/s) while walking, else 0.</summary>
+        public float Speed;
+        /// <summary>A DinosaurWander.NetMode.</summary>
+        public byte Mode;
+        /// <summary>The current habit's random choice (graze tugs, lunge repeats).</summary>
+        public byte ActParam;
+        /// <summary>Goes up by one with every habit, so the others start each one once.</summary>
+        public int ActSequence;
+        public NetworkBool Valid;
+    }
+
     [RequireComponent(typeof(NetworkObject))]
     public class MatchLayout : CoreNetworkBehaviour, ISceneSingleton
     {
@@ -49,6 +65,15 @@ namespace Blocks.Gameplay.Core
         [Networked] private NetworkString<_64> NetMapPrefab { get; set; }
         [Networked] private int NetSocketCount { get; set; }
         [Networked, Capacity(MaxSockets)] private NetworkArray<int> NetPicks => default;
+
+        /// <summary>Most zoo dinosaurs a map can have in step for everyone (Dinosaurs); any more are left out of the sync.</summary>
+        public const int MaxDinosaurs = 16;
+
+        /// <summary>How often (seconds) the master sends the dinosaurs.</summary>
+        private const float DinosaurSendInterval = 0.1f;
+
+        [Networked, Capacity(MaxDinosaurs)] private NetworkArray<DinosaurNetState> NetDinosaurs => default;
+        private float m_NextDinosaurSend;
 
         private GameObject m_MapInstance;
         private string m_MapInstanceId;
@@ -88,6 +113,8 @@ namespace Blocks.Gameplay.Core
             {
                 ChooseLayout();
             }
+
+            if (IsOwner && m_Built) SendDinosaurs();
         }
 
         public override void Render()
@@ -108,6 +135,30 @@ namespace Blocks.Gameplay.Core
         public void RPC_PlayDinosaurSound(int dinosaur)
         {
             Dinosaurs.PlaySound(dinosaur);
+        }
+
+        /// <summary>True on the machine that runs the dinosaurs: this object's state authority (the master client), or not networked yet.</summary>
+        public bool HasDinosaurAuthority => !IsSpawned || IsOwner;
+
+        /// <summary>What the master last sent about dinosaur <paramref name="index"/>.</summary>
+        public bool TryGetDinosaurState(int index, out DinosaurNetState state)
+        {
+            state = default;
+            if (!IsSpawned || index < 0 || index >= MaxDinosaurs) return false;
+            state = NetDinosaurs[index];
+            return state.Valid;
+        }
+
+        /// <summary>Master client: where every dinosaur is and what it's doing, 10 times a second.</summary>
+        private void SendDinosaurs()
+        {
+            IReadOnlyList<DinosaurWander> all = Dinosaurs.All;
+            if (all.Count == 0 || Time.unscaledTime < m_NextDinosaurSend) return;
+            m_NextDinosaurSend = Time.unscaledTime + DinosaurSendInterval;
+            for (int i = 0; i < all.Count && i < MaxDinosaurs; i++)
+            {
+                if (all[i] != null) NetDinosaurs.Set(i, all[i].CaptureState());
+            }
         }
 
         #endregion

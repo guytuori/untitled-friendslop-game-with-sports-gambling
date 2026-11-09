@@ -144,7 +144,8 @@ namespace Blocks.Gameplay.Core
             // (a normal jump) doesn't, even if Jump is held on into the air.
             // (Judged on IsGrounded alone, and not on a frame with a normal jump requested: JumpAbility runs first
             // and has already set the take-off speed, so "landed" would read false on the jump's own frame.)
-            if (newPress) m_Armed = m_Equipped && !m_Motor.IsGrounded && !m_Motor.JumpRequested && !blocked;
+            // (A press just before landing or just off an edge is a ground jump - CoreMovement.CanJumpFromGround.)
+            if (newPress) m_Armed = m_Equipped && !m_Motor.IsGrounded && !m_Motor.JumpRequested && !m_Motor.HasBufferedJump && !blocked;
             if (!held || landed || !m_Equipped) m_Armed = false;
 
             bool canBurn = m_Armed && !blocked;

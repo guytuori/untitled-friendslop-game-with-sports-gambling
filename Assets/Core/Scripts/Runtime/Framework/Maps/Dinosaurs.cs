@@ -14,17 +14,25 @@ namespace Blocks.Gameplay.Core
     /// challenge was dropped into it, plus <see cref="HoleMargin"/>). If one ends up somewhere it shouldn't
     /// anyway, it's put back where it was placed.
     ///
-    /// Interact (E / R1 by default) within <see cref="InteractRange"/> of a dinosaur plays dinosaur.mp3 from it,
-    /// for everyone (through MatchLayout's RPC), unless it's already making that sound. Each one has an
-    /// InteractMarker (a spinning arrow over its head) to show it can be interacted with.
+    /// Interact (E / R1 by default) within <see cref="InteractRange"/> of a dinosaur climbs onto its back for a
+    /// ride (<see cref="DinosaurRider"/>, 2026-11-08) and it roars (dinosaur.mp3, for everyone through MatchLayout's
+    /// RPC). Each one has an InteractMarker (a spinning arrow over its head) to show it can be interacted with -
+    /// hidden on the one this machine's player is riding.
     ///
-    /// Not networked: each machine walks its own copy of each dinosaur, so they won't be in the same spots
-    /// on everyone's screen. Since they're only scenery that doesn't matter.
+    /// Networked (2026-11-08): the session's master client walks them all and MatchLayout sends where each one is
+    /// and what it's doing (<see cref="DinosaurNetState"/>); everyone else's copies follow (<see cref="HasAuthority"/>).
+    /// Before that, each machine walked its own copies and they were in different places for everyone.
     /// </summary>
     public static class Dinosaurs
     {
         /// <summary>How close (meters, to the dinosaur's bounding box) a player has to be for Interact.</summary>
         public const float InteractRange = 3f;
+
+        /// <summary>
+        /// The dinosaurs are shrunk to this size as the map is built (2026-11-08: at their modelled size they were about
+        /// twice as big as real ones next to a person; the user wanted them a quarter smaller but still big).
+        /// </summary>
+        public const float SizeScale = 0.75f;
 
         /// <summary>Extra keep-out space around each challenge hole, in meters.</summary>
         public const float HoleMargin = 3f;
@@ -73,12 +81,15 @@ namespace Blocks.Gameplay.Core
             s_All.Clear();
             for (int i = 0; i < found.Count; i++)
             {
+                // Smaller first, so everything DinosaurWander measures (body, stride, saddle) is at the new size.
+                found[i].Root.localScale *= SizeScale;
                 var wander = found[i].Root.gameObject.AddComponent<DinosaurWander>();
                 wander.Init(i, found[i].Entry);
                 s_All.Add(wander);
 
                 // "This can be interacted with": an arrow over its head, following it around.
-                if (InteractMarker.TryGetRendererBounds(found[i].Root, out Bounds bounds)) InteractMarker.Add(found[i].Root, bounds);
+                DinosaurWander dinosaur = wander;
+                if (InteractMarker.TryGetRendererBounds(found[i].Root, out Bounds bounds)) InteractMarker.Add(found[i].Root, bounds, () => !DinosaurRider.IsLocalPlayerRiding(dinosaur));
             }
 
             // One listener for the Interact button, living (and dying) with the map.
@@ -134,6 +145,30 @@ namespace Blocks.Gameplay.Core
             }
             return false;
         }
+
+        /// <summary>
+        /// True on the machine that runs the dinosaurs: offline / before the match is networked, or the session's
+        /// master client (MatchLayout's state authority). Everyone else's dinosaurs follow MatchLayout's state.
+        /// </summary>
+        public static bool HasAuthority
+        {
+            get
+            {
+                MatchLayout layout = MatchLayout.Current;
+                return layout == null || layout.HasDinosaurAuthority;
+            }
+        }
+
+        /// <summary>What the master last sent about dinosaur <paramref name="index"/> (false if nothing yet).</summary>
+        public static bool TryGetNetState(int index, out DinosaurNetState state)
+        {
+            MatchLayout layout = MatchLayout.Current;
+            state = default;
+            return layout != null && layout.TryGetDinosaurState(index, out state);
+        }
+
+        /// <summary>The dinosaur at <paramref name="index"/> in <see cref="All"/>, or null.</summary>
+        public static DinosaurWander Get(int index) => index >= 0 && index < s_All.Count ? s_All[index] : null;
 
         /// <summary>The nearest dinosaur within Interact range of <paramref name="point"/>, or -1.</summary>
         public static int FindNear(Vector3 point)

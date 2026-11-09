@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31229a700ee04ccab8cedbca1ed8cf33, type: 3}
   m_Name: WagerCatalog
   m_EditorClassIdentifier: Blocks.Gameplay.Core::Blocks.Gameplay.Core.WagerCatalog
-  version: 2
+  version: 3
   templates:
   - text: Will [PLAYER] jump [NUMBER] times before the end of the game?
     numberPlaceholder: NUMBER
@@ -24,6 +24,7 @@ MonoBehaviour:
     trigger: 1
     scope: 0
     stat: 0
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times in the next [WINDOW_SECONDS] seconds?
     numberPlaceholder: NUMBER
@@ -35,6 +36,7 @@ MonoBehaviour:
     trigger: 1
     scope: 2
     stat: 0
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times before the end of his current challenge?
     numberPlaceholder: NUMBER
@@ -46,6 +48,7 @@ MonoBehaviour:
     trigger: 1
     scope: 1
     stat: 0
+    mapId: 
     supported: 1
   - text: Will [PLAYER] walk for [SECONDS_NUMBER] seconds before the end of the game?
     numberPlaceholder: SECONDS_NUMBER
@@ -57,6 +60,7 @@ MonoBehaviour:
     trigger: 9
     scope: 0
     stat: 14
+    mapId: 
     supported: 1
   - text: Will [PLAYER] walk for [SECONDS_NUMBER] seconds in the next [WINDOW_SECONDS]
       seconds?
@@ -69,6 +73,7 @@ MonoBehaviour:
     trigger: 9
     scope: 2
     stat: 14
+    mapId: 
     supported: 1
   - text: Will [PLAYER] walk for [SECONDS_NUMBER] seconds before the end of his current
       challenge?
@@ -81,6 +86,7 @@ MonoBehaviour:
     trigger: 9
     scope: 1
     stat: 14
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on grind rails before the
       end of the game?
@@ -93,6 +99,7 @@ MonoBehaviour:
     trigger: 3
     scope: 0
     stat: 2
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on grind rails in the next
       [WINDOW_SECONDS] seconds?
@@ -105,6 +112,7 @@ MonoBehaviour:
     trigger: 3
     scope: 2
     stat: 2
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times from a grind rail before the end of the
       game?
@@ -117,6 +125,7 @@ MonoBehaviour:
     trigger: 3
     scope: 0
     stat: 3
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times from a grind rail in the next [WINDOW_SECONDS]
       seconds?
@@ -129,6 +138,7 @@ MonoBehaviour:
     trigger: 3
     scope: 2
     stat: 3
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times from a grind rail before the end of his
       current challenge?
@@ -141,6 +151,7 @@ MonoBehaviour:
     trigger: 3
     scope: 1
     stat: 3
+    mapId: 
     supported: 1
   - text: Will [PLAYER] perform [NUMBER] wall jumps before the end of the game?
     numberPlaceholder: NUMBER
@@ -152,6 +163,7 @@ MonoBehaviour:
     trigger: 4
     scope: 0
     stat: 4
+    mapId: 
     supported: 1
   - text: Will [PLAYER] perform [NUMBER] wall jumps in the next [WINDOW_SECONDS]
       seconds?
@@ -164,6 +176,7 @@ MonoBehaviour:
     trigger: 4
     scope: 2
     stat: 4
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a wall before the end of
       the game?
@@ -176,6 +189,7 @@ MonoBehaviour:
     trigger: 4
     scope: 0
     stat: 5
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a wall in the next [WINDOW_SECONDS]
       seconds?
@@ -188,6 +202,7 @@ MonoBehaviour:
     trigger: 4
     scope: 2
     stat: 5
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a wall before the end of
       his current challenge?
@@ -200,6 +215,7 @@ MonoBehaviour:
     trigger: 4
     scope: 1
     stat: 5
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a vertical pole before
       the end of the game?
@@ -212,6 +228,7 @@ MonoBehaviour:
     trigger: 7
     scope: 0
     stat: 15
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a vertical pole in the
       next [WINDOW_SECONDS] seconds?
@@ -224,6 +241,7 @@ MonoBehaviour:
     trigger: 7
     scope: 2
     stat: 15
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times from a vertical pole before the end of
       the game?
@@ -236,6 +254,7 @@ MonoBehaviour:
     trigger: 7
     scope: 0
     stat: 16
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times from a vertical pole in the next [WINDOW_SECONDS]
       seconds?
@@ -248,6 +267,7 @@ MonoBehaviour:
     trigger: 7
     scope: 2
     stat: 16
+    mapId: 
     supported: 1
   - text: Will [PLAYER] swing [NUMBER] complete rotations on a vertical pole before
       the end of the game?
@@ -260,6 +280,7 @@ MonoBehaviour:
     trigger: 7
     scope: 0
     stat: 17
+    mapId: 
     supported: 1
   - text: Will [PLAYER] swing [NUMBER] complete rotations on a vertical pole in the
       next [WINDOW_SECONDS] seconds?
@@ -272,6 +293,7 @@ MonoBehaviour:
     trigger: 7
     scope: 2
     stat: 17
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a vertical pole before
       the end of his current challenge?
@@ -284,6 +306,7 @@ MonoBehaviour:
     trigger: 7
     scope: 1
     stat: 15
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times from a vertical pole before the end of
       his current challenge?
@@ -296,6 +319,7 @@ MonoBehaviour:
     trigger: 7
     scope: 1
     stat: 16
+    mapId: 
     supported: 1
   - text: Will [PLAYER] swing [NUMBER] complete rotations on a vertical pole before
       the end of his current challenge?
@@ -308,6 +332,7 @@ MonoBehaviour:
     trigger: 7
     scope: 1
     stat: 17
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a horizontal pole before
       the end of the game?
@@ -320,6 +345,7 @@ MonoBehaviour:
     trigger: 8
     scope: 0
     stat: 18
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a horizontal pole in the
       next [WINDOW_SECONDS] seconds?
@@ -332,6 +358,7 @@ MonoBehaviour:
     trigger: 8
     scope: 2
     stat: 18
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times from a horizontal pole before the end
       of the game?
@@ -344,6 +371,7 @@ MonoBehaviour:
     trigger: 8
     scope: 0
     stat: 19
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times from a horizontal pole in the next [WINDOW_SECONDS]
       seconds?
@@ -356,6 +384,7 @@ MonoBehaviour:
     trigger: 8
     scope: 2
     stat: 19
+    mapId: 
     supported: 1
   - text: Will [PLAYER] swing [NUMBER] complete rotations on a horizontal pole before
       the end of the game?
@@ -368,6 +397,7 @@ MonoBehaviour:
     trigger: 8
     scope: 0
     stat: 20
+    mapId: 
     supported: 1
   - text: Will [PLAYER] swing [NUMBER] complete rotations on a horizontal pole in
       the next [WINDOW_SECONDS] seconds?
@@ -380,6 +410,7 @@ MonoBehaviour:
     trigger: 8
     scope: 2
     stat: 20
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on a horizontal pole before
       the end of his current challenge?
@@ -392,6 +423,7 @@ MonoBehaviour:
     trigger: 8
     scope: 1
     stat: 18
+    mapId: 
     supported: 1
   - text: Will [PLAYER] jump [NUMBER] times from a horizontal pole before the end
       of his current challenge?
@@ -404,6 +436,7 @@ MonoBehaviour:
     trigger: 8
     scope: 1
     stat: 19
+    mapId: 
     supported: 1
   - text: Will [PLAYER] swing [NUMBER] complete rotations on a horizontal pole before
       the end of his current challenge?
@@ -416,6 +449,7 @@ MonoBehaviour:
     trigger: 8
     scope: 1
     stat: 20
+    mapId: 
     supported: 1
   - text: Will [PLAYER] die [NUMBER] times before the end of the game?
     numberPlaceholder: NUMBER
@@ -427,6 +461,7 @@ MonoBehaviour:
     trigger: 0
     scope: 0
     stat: 8
+    mapId: 
     supported: 1
   - text: Will [PLAYER] achieve a score of [SCORE_NUMBER] before the end of the game?
     numberPlaceholder: SCORE_NUMBER
@@ -438,6 +473,7 @@ MonoBehaviour:
     trigger: 0
     scope: 0
     stat: 10
+    mapId: 
     supported: 1
   - text: Will [PLAYER] achieve a score of [SCORE_NUMBER] in the next [WINDOW_SECONDS]
       seconds?
@@ -450,6 +486,7 @@ MonoBehaviour:
     trigger: 0
     scope: 2
     stat: 10
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on slippery floors before
       the end of the game?
@@ -462,6 +499,7 @@ MonoBehaviour:
     trigger: 0
     scope: 0
     stat: 9
+    mapId: 
     supported: 1
   - text: Will [PLAYER] spend [SECONDS_NUMBER] seconds on slippery floors in the
       next [WINDOW_SECONDS] seconds?
@@ -474,6 +512,7 @@ MonoBehaviour:
     trigger: 0
     scope: 2
     stat: 9
+    mapId: 
     supported: 1
   - text: Will [PLAYER] collect [NUMBER] pickups by the end of the game?
     numberPlaceholder: NUMBER
@@ -485,6 +524,7 @@ MonoBehaviour:
     trigger: 0
     scope: 0
     stat: 12
+    mapId: 
     supported: 1
   - text: Will [PLAYER] collect [NUMBER] pickups in the next [WINDOW_SECONDS] seconds?
     numberPlaceholder: NUMBER
@@ -496,6 +536,7 @@ MonoBehaviour:
     trigger: 0
     scope: 2
     stat: 12
+    mapId: 
     supported: 1
   - text: Will [PLAYER] collect [NUMBER] items by the end of the game?
     numberPlaceholder: NUMBER
@@ -507,6 +548,7 @@ MonoBehaviour:
     trigger: 0
     scope: 0
     stat: 13
+    mapId: 
     supported: 1
   - text: Will [PLAYER] collect [NUMBER] items in the next [WINDOW_SECONDS] seconds?
     numberPlaceholder: NUMBER
@@ -518,4 +560,56 @@ MonoBehaviour:
     trigger: 0
     scope: 2
     stat: 13
+    mapId: 
+    supported: 1
+  - text: Will [PLAYER] ride on a dinosaur [NUMBER] times before the end of the game?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 3
+    windowPlaceholder: 
+    minWindowSeconds: 0
+    maxWindowSeconds: 0
+    trigger: 0
+    scope: 0
+    stat: 22
+    mapId: DinosaurZoo
+    supported: 1
+  - text: Will [PLAYER] ride on a dinosaur for [SECONDS_NUMBER] seconds before the
+      end of the game?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 10
+    windowPlaceholder: 
+    minWindowSeconds: 0
+    maxWindowSeconds: 0
+    trigger: 0
+    scope: 0
+    stat: 23
+    mapId: DinosaurZoo
+    supported: 1
+  - text: Will [PLAYER] ride on a dinosaur [NUMBER] times in the next [WINDOW_SECONDS]
+      seconds?
+    numberPlaceholder: NUMBER
+    minNumber: 1
+    maxNumber: 2
+    windowPlaceholder: WINDOW_SECONDS
+    minWindowSeconds: 40
+    maxWindowSeconds: 90
+    trigger: 0
+    scope: 2
+    stat: 22
+    mapId: DinosaurZoo
+    supported: 1
+  - text: Will [PLAYER] ride on a dinosaur for [SECONDS_NUMBER] seconds in the next
+      [WINDOW_SECONDS] seconds?
+    numberPlaceholder: SECONDS_NUMBER
+    minNumber: 1
+    maxNumber: 15
+    windowPlaceholder: WINDOW_SECONDS
+    minWindowSeconds: 40
+    maxWindowSeconds: 90
+    trigger: 0
+    scope: 2
+    stat: 23
+    mapId: DinosaurZoo
     supported: 1
