@@ -113,8 +113,29 @@ namespace Blocks.Gameplay.Core
             return position;
         }
 
-        /// <summary>"Challenge 16.3": size.number (see <see cref="NumberOf"/>).</summary>
-        public string DisplayName(Entry entry) => entry == null ? "" : Loc.F("Challenge {0}.{1}", entry.size, NumberOf(entry));
+        /// <summary>
+        /// "Challenge 16.3: Slush Rush" - size.number (see <see cref="NumberOf"/>) and, if it has one, the challenge's name
+        /// (its ChallengeZone's ChallengeDefinition, added 2026-11-11). Just "Challenge 16.3" without a name.
+        /// </summary>
+        public string DisplayName(Entry entry)
+        {
+            if (entry == null) return "";
+            string title = TitleOf(entry);
+            return string.IsNullOrEmpty(title)
+                ? Loc.F("Challenge {0}.{1}", entry.size, NumberOf(entry))
+                : Loc.F("Challenge {0}.{1}: {2}", entry.size, NumberOf(entry), title);
+        }
+
+        /// <summary>The challenge's own name (ChallengeDefinition.challengeName), or null if it has none (or the default).</summary>
+        public static string TitleOf(Entry entry)
+        {
+            if (entry == null || entry.prefab == null) return null;
+            ChallengeZone zone = entry.prefab.GetComponent<ChallengeZone>();
+            if (zone == null) zone = entry.prefab.GetComponentInChildren<ChallengeZone>(true);
+            string title = zone != null && zone.Definition != null ? zone.Definition.challengeName : null;
+            if (string.IsNullOrWhiteSpace(title) || title == "New Challenge") return null;
+            return title.Trim();
+        }
 
         /// <summary>Indices of every challenge that fits a hole of this size.</summary>
         public List<int> IndicesForSize(int size)

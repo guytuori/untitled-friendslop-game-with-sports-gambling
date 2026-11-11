@@ -46,6 +46,7 @@ namespace Blocks.Gameplay.Core
         private const string DefinitionFolder = "Assets/Core/Data/Challenges";
         private const string PoleGlb = "pole_4";
         private const string RingGlb = "grind_rail_small_ring";
+        private const string SpikeGlb = "spikes";
 
         private sealed class Piece
         {
@@ -115,7 +116,41 @@ namespace Blocks.Gameplay.Core
             /// <summary>Grind rails along straight lines (pole_4 stretched onto the line, then set to Grind Rail), TE metres.</summary>
             public PoleLine[] Rails = new PoleLine[0];
             public RingSpot[] Rings = new RingSpot[0];
+            /// <summary>Spike challenge (2026-11-11): a SpikeField on the root turns the spikesup / spikesdown entities into spikes.</summary>
+            public bool Spikes;
         }
+
+        // ---- Spike challenges (2026-11-11): the user's glbs, all Regular (the spikes_down ones have a separate _ice
+        // floor). The spikes come from the spikesup / spikesdown entities at runtime (SpikeField), so re-exporting a glb
+        // with spikes moved needs no rebuild. ----
+
+        // The spike mazes get a brick ceiling (challenge_NN_spikes_ceiling, 14 x 14 / 30 x 30 blocks, 3 blocks above the
+        // floor - added 2026-11-11 after playing), so nobody can jump high enough to clear a spike at run speed.
+        private static Spec SpikeSpec(string name, int size, string title, string glb, bool ice) => new Spec
+        {
+            Name = name, Size = size, Title = title, Points = size >= 32 ? 250 : 100,
+            Pieces = ice
+                ? new[] { new Piece(glb, MapObjectPropertyType.Regular), new Piece(glb + "_ice", MapObjectPropertyType.Ice) }
+                : new[] { new Piece(glb, MapObjectPropertyType.Regular), new Piece($"challenge_{size}_spikes_ceiling", MapObjectPropertyType.Regular) },
+            Poles = new PoleLine[0],
+            Spikes = true,
+        };
+
+        private static Spec[] SpikeChallenges => new[]
+        {
+            // Spike mazes: keep to the turned (safe) floor tiles - or go 1.5x run speed and run straight over them.
+            SpikeSpec("Challenge_16_22", 16, "Pins and Needles", "challenge_16_spikes_1", false),
+            SpikeSpec("Challenge_16_23", 16, "Tread Lightly", "challenge_16_spikes_2", false),
+            SpikeSpec("Challenge_16_24", 16, "Minefield", "challenge_16_spikes_3", false),
+            SpikeSpec("Challenge_32_15", 32, "Bed of Nails", "challenge_32_spikes_1", false),
+            SpikeSpec("Challenge_32_16", 32, "D\u00E9j\u00E0 Vu", "challenge_32_spikes_2", false), // starts like 32.15, then doesn't
+            // Spikes from the ceiling over ice: keep running, round the slippery turns or jump the pits.
+            SpikeSpec("Challenge_16_25", 16, "Ice Pick", "challenge_16_spikes_down_1", true),
+            SpikeSpec("Challenge_32_17", 32, "Damocles", "challenge_32_spikes_down_1", true),
+        };
+
+        [MenuItem("Friendslop/Challenges/Build Challenge_16_22-25, 32_15-17 (Spikes)")]
+        private static void BuildSpikeChallenges() => BuildSpecs(SpikeChallenges, "Build Spike Challenges");
 
         // ---- Challenge_32_09 "Head-On" / Challenge_32_10 "Tailgate" (2026-11-01) ----
         // Both on the user's challenge_32_roller_2.glb (bricks + black blocks, all Regular): a 4 m brick walkway (top y 2)
@@ -703,6 +738,7 @@ namespace Blocks.Gameplay.Core
             if (spec.Rings.Length > 0) yield return RingGlb;
             if (spec.Platforms.Length > 0) yield return "moving_platform";
             if (spec.Rollers.Length > 0) yield return "roller";
+            if (spec.Spikes) yield return SpikeGlb;
         }
 
         private static string GlbPath(string glb) => $"{GlbFolder}/{glb}.glb";
@@ -787,6 +823,14 @@ namespace Blocks.Gameplay.Core
                 ring.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // stood up, facing along z
                 CentreOn(ring, new Vector3(-spot.Centre.x, spot.Centre.y, spot.Centre.z));
                 if (!MapObjectPropertySetup.ApplyProperty(ring, MapObjectPropertyType.Regular)) problems++; // a hoop to fly through, not a rail
+            }
+
+            if (spec.Spikes)
+            {
+                var field = root.AddComponent<SpikeField>();
+                var serializedField = new SerializedObject(field);
+                serializedField.FindProperty("spikeModel").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>(GlbPath(SpikeGlb));
+                serializedField.ApplyModifiedPropertiesWithoutUndo();
             }
 
             AddZone(root, spec);

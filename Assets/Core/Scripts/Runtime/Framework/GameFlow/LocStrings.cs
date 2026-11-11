@@ -315,6 +315,7 @@ namespace Blocks.Gameplay.Core
             ["16x16 CHALLENGES"] = new[] { "DESAFÍOS 16x16", "SFIDE 16x16", "DÉFIS 16x16", "16x16-HERAUSFORDERUNGEN", "DESAFIOS 16x16" },
             ["32x32 CHALLENGES"] = new[] { "DESAFÍOS 32x32", "SFIDE 32x32", "DÉFIS 32x32", "32x32-HERAUSFORDERUNGEN", "DESAFIOS 32x32" },
             ["Challenge {0}.{1}"] = new[] { "Desafío {0}.{1}", "Sfida {0}.{1}", "Défi {0}.{1}", "Herausforderung {0}.{1}", "Desafio {0}.{1}" },
+            ["Challenge {0}.{1}: {2}"] = new[] { "Desafío {0}.{1}: {2}", "Sfida {0}.{1}: {2}", "Défi {0}.{1} : {2}", "Herausforderung {0}.{1}: {2}", "Desafio {0}.{1}: {2}" },
             ["Retry"] = new[] { "Reintentar", "Riprova", "Réessayer", "Nochmal", "Tentar de novo" },
             ["Change Challenge"] = new[] { "Cambiar desafío", "Cambia sfida", "Changer de défi", "Herausforderung wechseln", "Trocar desafio" },
             ["Return to Menu"] = new[] { "Volver al menú", "Torna al menu", "Retour au menu", "Zurück zum Menü", "Voltar ao menu" },

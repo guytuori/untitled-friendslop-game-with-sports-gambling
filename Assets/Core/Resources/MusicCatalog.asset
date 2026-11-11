@@ -41,10 +41,10 @@ MonoBehaviour:
     clip: {fileID: 8300000, guid: 064789f4ef2570e479a94b8b61ec9932, type: 3}
     loops: 1
     loopStartSeconds: 28.571
-    musicalSamples: 8739628
+    musicalSamples: 16219277
     sourceSampleRate: 44100
     encoderDelay: 576
-    encoderPadding: 1172
+    encoderPadding: 1459
   - id: Of_Ninjas_and_Pirates
     clip: {fileID: 8300000, guid: 107f08d89285a944b97e1e915dc961e8, type: 3}
     loops: 1
@@ -150,4 +150,4 @@ MonoBehaviour:
   - number: 16
     title: Credits
     id: Credits
-  sourceStamp: Banking_on_Victory.mp3|115392|270CAA159252;Credits.mp3|1005212|764279B94DBD;Dinosaur_Country.mp3|2849776|2D491743476C;Last_Stop.mp3|3125490|D9178081E852;Of_Ninjas_and_Pirates.mp3|1875765|18347584F766;Parkour_Parley.mp3|2810777|EDA31F774D08;Parkour_Part_Ways.mp3|2524835|560312676595;Parkour_Predictions.mp3|636841|13CE0A2C404A;Preliminary_Parkour.mp3|3746392|BFC3ADE76280;Ready_to_Run.mp3|2301894|7C422C21C656;Twenty_Thousand_Inches_Over_the_Sea.mp3|3584618|58B6F27BEA7E;music_info.txt|1173|9D56E35932B6
+  sourceStamp: Banking_on_Victory.mp3|115392|270CAA159252;Credits.mp3|1005212|764279B94DBD;Dinosaur_Country.mp3|2849776|2D491743476C;Last_Stop.mp3|5787427|06A0A06BFBDF;Of_Ninjas_and_Pirates.mp3|1875765|18347584F766;Parkour_Parley.mp3|2810777|EDA31F774D08;Parkour_Part_Ways.mp3|2524835|560312676595;Parkour_Predictions.mp3|636841|13CE0A2C404A;Preliminary_Parkour.mp3|3746392|BFC3ADE76280;Ready_to_Run.mp3|2301894|7C422C21C656;Twenty_Thousand_Inches_Over_the_Sea.mp3|3584618|58B6F27BEA7E;music_info.txt|1173|9D56E35932B6

@@ -97,6 +97,22 @@ MonoBehaviour:
     size: 16
     prefab: {fileID: 4235281469585400777, guid: e7f2460e75eaa2046847ab7eaf8c29ce, type: 3}
     thumbnail: {fileID: 2800000, guid: ecd8e5336bbf3ca4c80203419966f15b, type: 3}
+  - id: Challenge_16_22
+    size: 16
+    prefab: {fileID: 2287347000954985975, guid: 2fad5d66a596ef9408d7a62441ae35ca, type: 3}
+    thumbnail: {fileID: 2800000, guid: 14d0212a4e8286b40990356a502b0b78, type: 3}
+  - id: Challenge_16_23
+    size: 16
+    prefab: {fileID: 6631880439292986749, guid: 6ab39eb73058fa544bce618281c98bc9, type: 3}
+    thumbnail: {fileID: 2800000, guid: 74cc0e33e9f28864e9a20c8f7d2dd605, type: 3}
+  - id: Challenge_16_24
+    size: 16
+    prefab: {fileID: 3295372538733689750, guid: 811103809506e394aa44a4b3c17a8277, type: 3}
+    thumbnail: {fileID: 2800000, guid: 2ec6774f250a67b4388a29b335065b17, type: 3}
+  - id: Challenge_16_25
+    size: 16
+    prefab: {fileID: 7868339533988367010, guid: dbae37081785aee4aa23a0afb4200b9c, type: 3}
+    thumbnail: {fileID: 2800000, guid: 27eb426368fcef8488f47d985ae77fbc, type: 3}
   - id: Challenge_32_01
     size: 32
     prefab: {fileID: 4009937417778457704, guid: 1706642b7dbf80a47913948eea8c7b85, type: 3}
@@ -153,6 +169,18 @@ MonoBehaviour:
     size: 32
     prefab: {fileID: 2853407089346066479, guid: e5bd43ceff2671b479d4c773bb1e5e6a, type: 3}
     thumbnail: {fileID: 2800000, guid: 845adc8796e1adf4abb9f11031a9fe14, type: 3}
+  - id: Challenge_32_15
+    size: 32
+    prefab: {fileID: 7394567820290710649, guid: 423d38dd8a9da4947bf4f418ca223aaa, type: 3}
+    thumbnail: {fileID: 2800000, guid: 7939715ee2596d5459e7ef162b45397f, type: 3}
+  - id: Challenge_32_16
+    size: 32
+    prefab: {fileID: 4134566232110327948, guid: 35b2363eb0caf104cbdf3906aebabe2b, type: 3}
+    thumbnail: {fileID: 2800000, guid: fac9c19aca06e5f4b89401ae3644476d, type: 3}
+  - id: Challenge_32_17
+    size: 32
+    prefab: {fileID: 8962877279759680046, guid: 69481169f88d5b34aa831c1f13d723b6, type: 3}
+    thumbnail: {fileID: 2800000, guid: 184442f9d34ee3f4f8f12c0db97b94bf, type: 3}
   practice16: {fileID: 7995870167889056463, guid: 69a3b2a870c642f4b8a5a12d17563556, type: 3}
   practice32: {fileID: 915372512405286612, guid: d87f519ff8386404e86f17c21c89662b, type: 3}
   startFlag16: {fileID: 4288283407821777295, guid: 946ca866a4852be419b54ede9c8ac0de, type: 3}
