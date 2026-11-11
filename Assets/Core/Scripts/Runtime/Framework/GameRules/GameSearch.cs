@@ -38,6 +38,10 @@ namespace Blocks.Gameplay.Core
 
         public bool Matches(HostGameRulesData game)
         {
+            // Settings > Gameplay > Message Builder Chat Only (2026-11-10): only games whose host has it on too.
+            // Not on any search screen - it applies to every search, presets and Custom alike.
+            if (GameplaySettings.Current.MessageBuilderChatOnly && !game.MessageBuilderOnly) return false;
+
             if (!AllMaps && game.MapName != Values.MapName) return false;
             if (!AllMaxPlayers && game.MaxPlayers != Values.MaxPlayers) return false;
             if (!AllRoundTimes && game.RoundTimeSeconds != Values.RoundTimeSeconds) return false;

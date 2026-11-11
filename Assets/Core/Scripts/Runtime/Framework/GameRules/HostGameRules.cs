@@ -53,6 +53,13 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public string MapPrefab = "";
 
+        /// <summary>
+        /// Message Builder Chat Only (2026-11-10): nobody types in this game's chat - everything goes through the
+        /// message builder (ChatOverlay). Not on the Host Game screen: it's the host's own Settings > Gameplay
+        /// choice, copied in when the game is hosted (FusionSessionService.HostGameAsync). Not part of any preset.
+        /// </summary>
+        public bool MessageBuilderOnly;
+
         public HostGameRulesData Clone() => (HostGameRulesData)MemberwiseClone();
 
         /// <summary>Copies every field from <paramref name="other"/>, including IsPublic.</summary>

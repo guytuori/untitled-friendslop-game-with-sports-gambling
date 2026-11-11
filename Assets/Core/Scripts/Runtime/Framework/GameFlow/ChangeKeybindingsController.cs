@@ -252,6 +252,9 @@ namespace Blocks.Gameplay.Core
             AddRow(list, "OPEN ITEM MENU (PRACTICE MODE)", "OpenItemMenu");
             AddRow(list, "CAMERA ZOOM IN", "CameraZoomIn");
             AddRow(list, "CAMERA ZOOM OUT", "CameraZoomOut");
+            AddRow(list, "OPEN CHAT", "OpenChat");                                            // 2026-11-10
+            AddRow(list, "VIEW PREVIOUS PLAYER'S PREDICTIONS", "ViewPreviousPredictions");
+            AddRow(list, "VIEW NEXT PLAYER'S PREDICTIONS", "ViewNextPredictions");
             if (m_UseGamepad) AddRumbleRow(list);
 
             // Same absolutely-positioned bottom-right column as the other GameFlow screens, with Restore
@@ -316,6 +319,7 @@ namespace Blocks.Gameplay.Core
             commandLabel.style.fontSize = 15;
             commandLabel.style.width = 300;
             commandLabel.style.flexShrink = 0;
+            commandLabel.style.whiteSpace = WhiteSpace.Normal; // the longer names (and translations) wrap
             row.Add(commandLabel);
 
             var bindingButton = new Button(() => BeginRebind(commandKey))
@@ -768,6 +772,9 @@ namespace Blocks.Gameplay.Core
                     "OpenItemMenu" => pad.OpenItemMenu,
                     "CameraZoomIn" => pad.CameraZoomIn,
                     "CameraZoomOut" => pad.CameraZoomOut,
+                    "OpenChat" => pad.OpenChat,
+                    "ViewPreviousPredictions" => pad.ViewPreviousPredictions,
+                    "ViewNextPredictions" => pad.ViewNextPredictions,
                     _ => "?"
                 };
             }
@@ -784,6 +791,9 @@ namespace Blocks.Gameplay.Core
                 "OpenItemMenu" => keys.OpenItemMenu,
                 "CameraZoomIn" => keys.CameraZoomIn,
                 "CameraZoomOut" => keys.CameraZoomOut,
+                "OpenChat" => keys.OpenChat,
+                "ViewPreviousPredictions" => keys.ViewPreviousPredictions,
+                "ViewNextPredictions" => keys.ViewNextPredictions,
                 _ => "?"
             };
         }
@@ -804,6 +814,9 @@ namespace Blocks.Gameplay.Core
                     case "OpenItemMenu": pad.OpenItemMenu = rawValue; break;
                     case "CameraZoomIn": pad.CameraZoomIn = rawValue; break;
                     case "CameraZoomOut": pad.CameraZoomOut = rawValue; break;
+                    case "OpenChat": pad.OpenChat = rawValue; break;
+                    case "ViewPreviousPredictions": pad.ViewPreviousPredictions = rawValue; break;
+                    case "ViewNextPredictions": pad.ViewNextPredictions = rawValue; break;
                 }
                 return;
             }
@@ -820,6 +833,9 @@ namespace Blocks.Gameplay.Core
                 case "OpenItemMenu": keys.OpenItemMenu = rawValue; break;
                 case "CameraZoomIn": keys.CameraZoomIn = rawValue; break;
                 case "CameraZoomOut": keys.CameraZoomOut = rawValue; break;
+                case "OpenChat": keys.OpenChat = rawValue; break;
+                case "ViewPreviousPredictions": keys.ViewPreviousPredictions = rawValue; break;
+                case "ViewNextPredictions": keys.ViewNextPredictions = rawValue; break;
             }
         }
 

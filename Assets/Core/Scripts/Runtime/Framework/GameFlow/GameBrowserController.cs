@@ -59,6 +59,8 @@ namespace Blocks.Gameplay.Core
             new Column { Header = "PAYOUT", Weight = 0.8f, Value = s => GameRulesFormat.Payout(s.Rules.WagerPayout) },
             new Column { Header = "ITEMS", Weight = 0.7f, Value = s => GameRulesFormat.OnOff(s.Rules.ItemsEnabled) },
             new Column { Header = "PICKUPS", Weight = 0.8f, Value = s => GameRulesFormat.OnOff(s.Rules.PickupsEnabled) },
+            // Message Builder Chat Only games (2026-11-10): "Builder" - only the message builder; "Typed" - anything goes.
+            new Column { Header = "CHAT", Weight = 0.8f, Value = s => Loc.T(s.Rules.MessageBuilderOnly ? "Builder" : "Typed") },
         };
 
         private static readonly Color RowText = new Color(0.85f, 0.85f, 0.85f);

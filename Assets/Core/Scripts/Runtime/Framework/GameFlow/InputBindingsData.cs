@@ -42,6 +42,14 @@ namespace Blocks.Gameplay.Core
         // The mouse wheel always zooms too (CoreCameraController); these are for holding a key instead.
         public string CameraZoomIn = "equals";
         public string CameraZoomOut = "minus";
+
+        // Chat (2026-11-10, ChatOverlay): opens the chat box - and sends what's typed.
+        public string OpenChat = "enter";
+
+        // Cycle whose predictions the phone shows (2026-11-10, WagerHUD). 5 is also the practice item menu - no
+        // predictions in practice, and no item menu in a real game.
+        public string ViewPreviousPredictions = "5";
+        public string ViewNextPredictions = "t";
     }
 
     /// <summary>
@@ -68,6 +76,13 @@ namespace Blocks.Gameplay.Core
         // Held to zoom the camera in / out (CoreCameraController). The right stick already aims.
         public string CameraZoomIn = "dpad/up";
         public string CameraZoomOut = "dpad/down";
+
+        // Chat (2026-11-10): opens the message builder. Shares Select with the practice-only item menu.
+        public string OpenChat = "select";
+
+        // Cycle whose predictions the phone shows (2026-11-10).
+        public string ViewPreviousPredictions = "dpad/left";
+        public string ViewNextPredictions = "dpad/right";
 
         /// <summary>Change Keybindings' ENABLE RUMBLE checkbox (gamepad layout only). On by default. Read at runtime through <see cref="GamepadRumble"/>.</summary>
         public bool RumbleEnabled = true;
@@ -169,6 +184,12 @@ namespace Blocks.Gameplay.Core
 
         /// <summary>0 Off, 1 Protanopia, 2 Deuteranopia, 3 Tritanopia (see ColorblindFilter).</summary>
         public int ColorblindMode = 0;
+
+        /// <summary>
+        /// Message Builder Chat Only (2026-11-10): off by default. On = this player only finds and joins games whose
+        /// host has it on too (so nobody types in their chat), and a game they host is one of those.
+        /// </summary>
+        public bool MessageBuilderChatOnly = false;
 
         public GameplaySettingsData Clone() => (GameplaySettingsData)MemberwiseClone();
     }

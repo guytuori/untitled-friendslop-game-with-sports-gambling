@@ -12,7 +12,8 @@ namespace Blocks.Gameplay.Core
     ///   - Course flyover (the intro, every map): Ready_to_Run.
     ///   - The round itself, from PARKOUR!: the map's song (<see cref="ForMap"/>). Fades out at the end of the
     ///     round, under TIME!.
-    ///   - Round won (Round Results screen): Banking_on_Victory. Target missed (Final Score): <see cref="RoundLost"/>.
+    ///   - Round won (Round Results screen): Banking_on_Victory. Target missed: <see cref="RoundLost"/>, from the
+    ///     moment the result is in, on through the Game Results screen.
     ///   - Practice Map: the map's song. Practice Challenges: <see cref="PracticeChallenge"/>.
     /// </summary>
     public static class MusicTracks
@@ -30,8 +31,8 @@ namespace Blocks.Gameplay.Core
         /// <summary>Main menu and the other menu screens.</summary>
         public const string Menu = "Parkour_Parley";
 
-        /// <summary>The Final Score screen after missing the target. Not written yet.</summary>
-        public const string RoundLost = null;
+        /// <summary>Target missed (the match is over): from the result banner on through the Game Results screen (2026-11-09).</summary>
+        public const string RoundLost = "Parkour_Part_Ways";
 
         /// <summary>Single Player > Practice Challenges (2026-11-08; the How To Play song too).</summary>
         public const string PracticeChallenge = "Preliminary_Parkour";

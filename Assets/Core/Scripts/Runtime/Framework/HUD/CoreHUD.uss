@@ -141,14 +141,15 @@
     color: rgb(255, 110, 100);
 }
 
-/* Scoreboard (left-middle) */
+/* Scoreboard (top left, 2026-11-10 - it may use the top 80% of the screen; the chat has the bottom 20%.
+   CoreHUD.FitScoreboard steps the text down when 16 players don't fit.) */
 #scoreboard-container {
     position: absolute;
-    top: 50%;
+    top: 20px;
     left: 20px;
     width: 240px;
-    margin-top: -120px;
-    max-height: 340px;
+    max-height: 78%;
+    overflow: hidden;
     background-color: rgba(0, 0, 0, 0.5);
     border-radius: 5px;
     padding: 10px;
@@ -199,10 +200,10 @@
     color: rgb(150, 150, 150);
 }
 
-/* Notification Styles */
+/* Notification Styles (top right, under LIVES since 2026-11-10) */
 .notification-container {
     position: absolute;
-    top: 20px;
+    top: 74px;
     right: 20px;
     flex-direction: column;
     min-width: 200px;

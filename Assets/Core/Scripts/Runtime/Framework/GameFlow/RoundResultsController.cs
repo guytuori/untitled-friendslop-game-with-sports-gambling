@@ -302,6 +302,8 @@ namespace Blocks.Gameplay.Core
         /// <summary>Any key, mouse button or gamepad button (same check as the title screen).</summary>
         public static bool AnyInputPressed()
         {
+            if (ChatOverlay.BlocksAnyKey) return false; // opening, typing in or closing the chat isn't "any key"
+
             if (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame) return true;
 
             if (Mouse.current != null &&

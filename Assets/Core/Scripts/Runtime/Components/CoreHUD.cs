@@ -75,6 +75,19 @@ namespace Blocks.Gameplay.Core
         // Scoreboard System
         private readonly Dictionary<ulong, ScoreboardRow> m_ScoreboardRows = new Dictionary<ulong, ScoreboardRow>();
 
+        // Scoreboard (2026-11-10): the players in the order shown, the chat builder's cursor, and the text size step.
+        private readonly List<ulong> m_ScoreboardOrder = new List<ulong>();
+        private ulong m_ScoreboardCursor;
+        private int m_ScoreboardSizeStep;
+        private static readonly float[] k_ScoreboardFontSizes = { 16f, 14f, 12f, 10f };
+        private static readonly float[] k_ScoreboardRowPadding = { 4f, 3f, 2f, 1f };
+
+        /// <summary>The local player's HUD, while it's up (the chat's message builder points at its scoreboard).</summary>
+        public static CoreHUD Local { get; private set; }
+
+        /// <summary>The players on the scoreboard, top to bottom.</summary>
+        public IReadOnlyList<ulong> ScoreboardOrder => m_ScoreboardOrder;
+
         // Scene singletons this HUD subscribed to (kept so the exact same instances are unsubscribed)
         private RoundTimer m_SubscribedRoundTimer;
         private ChallengeManager m_SubscribedChallengeManager;
@@ -170,6 +183,10 @@ namespace Blocks.Gameplay.Core
                 }
             }
 
+            Local = this;
+            // Re-checked twice a second: new players, a resized window, and one size step at a time.
+            if (m_ScoreboardContainer != null) m_ScoreboardContainer.schedule.Execute(FitScoreboard).Every(500);
+
             // Escape menu (Settings / Quit to Main Menu / Quit Game / Return to Game), drawn on this HUD's panel.
             if (m_UIDocument != null)
             {
@@ -196,7 +213,7 @@ namespace Blocks.Gameplay.Core
                     m_PracticeItemMenu.Initialize(m_UIDocument.rootVisualElement);
                 }
 
-                // LIVES: n (or infinity) in the bottom-left corner, with the 1-Up's shield glow.
+                // LIVES: n (or infinity) in the top-right corner (2026-11-10), with the 1-Up's shield glow.
                 m_LivesHUD = gameObject.AddComponent<LivesHUD>();
                 m_LivesHUD.Initialize(m_UIDocument.rootVisualElement);
             }
@@ -232,6 +249,7 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public override void OnNetworkDespawn()
         {
+            if (Local == this) Local = null;
             if (IsOwner)
             {
                 UnregisterEventListeners();
@@ -939,6 +957,7 @@ namespace Blocks.Gameplay.Core
                 row.Add(scoreLabel);
 
                 m_ScoreboardContainer.Add(row);
+                m_ScoreboardOrder.Add(clientId);
 
                 var scoreboardRow = new ScoreboardRow
                 {
@@ -952,6 +971,78 @@ namespace Blocks.Gameplay.Core
             }
 
             UpdateTeamRows();
+            ApplyScoreboardSize();
+            SetScoreboardCursor(m_ScoreboardCursor);
+        }
+
+        /// <summary>
+        /// The chat's message builder (2026-11-10): outlines this player's row as the one being picked, or none (0).
+        /// </summary>
+        public void SetScoreboardCursor(ulong clientId)
+        {
+            m_ScoreboardCursor = clientId;
+            foreach (KeyValuePair<ulong, ScoreboardRow> pair in m_ScoreboardRows)
+            {
+                VisualElement row = pair.Value.Element;
+                if (row == null) continue;
+                bool on = pair.Key == clientId && clientId != 0;
+                float width = on ? 2f : 0f;
+                row.style.borderTopWidth = row.style.borderBottomWidth = row.style.borderLeftWidth = row.style.borderRightWidth = width;
+                row.style.borderTopColor = row.style.borderBottomColor = row.style.borderLeftColor = row.style.borderRightColor = Color.white;
+                row.style.borderTopLeftRadius = row.style.borderTopRightRadius = row.style.borderBottomLeftRadius = row.style.borderBottomRightRadius = 4f;
+                row.style.backgroundColor = on ? new Color(1f, 1f, 1f, 0.15f) : new Color(0f, 0f, 0f, 0f);
+            }
+        }
+
+        /// <summary>
+        /// The scoreboard sits in the top-left and may use the top 80% of the screen (the chat has the bottom
+        /// 20%, 2026-11-10). If its rows don't fit - 16 players on a small screen - the text steps down a size
+        /// (16, 14, 12, then 10 px) until they do; and back up when there's room again.
+        /// </summary>
+        private void FitScoreboard()
+        {
+            if (m_ScoreboardContainer == null || m_ScoreboardContainer.parent == null) return;
+            float parentHeight = m_ScoreboardContainer.parent.layout.height;
+            if (float.IsNaN(parentHeight) || parentHeight <= 0f) return;
+
+            float available = parentHeight * 0.8f - m_ScoreboardContainer.layout.y - 24f; // padding and a little gap
+            float content = 0f;
+            foreach (VisualElement child in m_ScoreboardContainer.Children())
+            {
+                if (float.IsNaN(child.layout.height)) return;
+                content += child.layout.height + child.resolvedStyle.marginTop + child.resolvedStyle.marginBottom;
+            }
+            if (content <= 0f) return;
+
+            int step = m_ScoreboardSizeStep;
+            if (content > available && step < k_ScoreboardFontSizes.Length - 1)
+            {
+                step++;
+            }
+            else if (step > 0)
+            {
+                // Would the next size up still fit? (Rows scale with the text.)
+                float scale = (k_ScoreboardFontSizes[step - 1] + 2f * k_ScoreboardRowPadding[step - 1]) /
+                              (k_ScoreboardFontSizes[step] + 2f * k_ScoreboardRowPadding[step]);
+                if (content * scale <= available * 0.95f) step--;
+            }
+            if (step == m_ScoreboardSizeStep) return;
+            m_ScoreboardSizeStep = step;
+            ApplyScoreboardSize();
+        }
+
+        private void ApplyScoreboardSize()
+        {
+            if (m_ScoreboardContainer == null) return;
+            float size = k_ScoreboardFontSizes[m_ScoreboardSizeStep];
+            float padding = k_ScoreboardRowPadding[m_ScoreboardSizeStep];
+            foreach (VisualElement row in m_ScoreboardContainer.Children())
+            {
+                if (!row.ClassListContains("scoreboard-row")) continue;
+                row.style.paddingTop = padding;
+                row.style.paddingBottom = padding;
+                foreach (VisualElement cell in row.Children()) cell.style.fontSize = size;
+            }
         }
 
         /// <summary>One of the TOTAL / TARGET rows at the top of the scoreboard. Returns its value label.</summary>
@@ -1004,6 +1095,7 @@ namespace Blocks.Gameplay.Core
                 m_ScoreboardContainer?.Remove(row.Element);
             }
             m_ScoreboardRows.Clear();
+            m_ScoreboardOrder.Clear();
             m_ScoreboardContainer?.Clear();
             m_TotalScoreLabel = null;
             m_TargetScoreLabel = null;

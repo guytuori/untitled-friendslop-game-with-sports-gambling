@@ -4,7 +4,8 @@ using UnityEngine.UIElements;
 namespace Blocks.Gameplay.Core
 {
     /// <summary>
-    /// "LIVES: 3" in the bottom-left corner of the HUD (CoreHUD adds it at runtime), from this player's
+    /// "LIVES: 3" in the top-right corner of the HUD (CoreHUD adds it at runtime; it was bottom left until
+    /// 2026-11-10, when the chat took that corner - the notifications moved down under it), from this player's
     /// <see cref="PlayerScore"/>: the number of lives left, or an infinity sign with unlimited lives.
     ///
     ///   - Gaining a life (1-Up): the number pops up big and flashes green.
@@ -45,8 +46,8 @@ namespace Blocks.Gameplay.Core
         {
             m_Root = new VisualElement { name = "lives", pickingMode = PickingMode.Ignore };
             m_Root.style.position = Position.Absolute;
-            m_Root.style.left = 22;
-            m_Root.style.bottom = 20;
+            m_Root.style.right = 22;
+            m_Root.style.top = 18;
             m_Root.style.flexDirection = FlexDirection.Row;
             m_Root.style.alignItems = Align.Center;
             m_Root.style.paddingLeft = 14;

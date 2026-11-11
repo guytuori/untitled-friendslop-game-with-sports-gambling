@@ -356,6 +356,8 @@ namespace Blocks.Gameplay.Core
         /// <summary>Any key, mouse button or gamepad button - except the menu ones (Esc / Start).</summary>
         private static bool AnyStartPressed()
         {
+            if (ChatOverlay.BlocksAnyKey) return false; // opening, typing in or closing the chat isn't "any key"
+
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard.anyKey.wasPressedThisFrame && !keyboard.escapeKey.wasPressedThisFrame) return true;
 

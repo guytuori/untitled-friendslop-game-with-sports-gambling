@@ -8,30 +8,41 @@ namespace Blocks.Gameplay.Core
     /// Reads the controls that are stored as plain control names in settings.json (InputBindingsStore) rather
     /// than as Input System actions - Interact, Use Item, the bet buttons... Takes the bare control name for
     /// each device, e.g. ("e", "rightShoulder").
+    ///
+    /// While the chat is open (2026-11-10, <see cref="ChatOverlay.CapturesInput"/>) every key goes to the chat -
+    /// typing "1" mustn't buy a prediction - so WasPressed / IsHeld report nothing. The chat itself reads its
+    /// own keys with <see cref="KeyboardPressed"/> / <see cref="GamepadPressed"/>, which always work.
     /// </summary>
     public static class BoundControls
     {
-        /// <summary>The keyboard key or gamepad button was pressed this frame.</summary>
+        /// <summary>The keyboard key or gamepad button was pressed this frame (never while the chat is open).</summary>
         public static bool WasPressed(string keyboardControl, string gamepadControl)
         {
-            if (Keyboard.current != null && !string.IsNullOrEmpty(keyboardControl))
-            {
-                var key = Keyboard.current.TryGetChildControl<KeyControl>(keyboardControl);
-                if (key != null && key.wasPressedThisFrame) return true;
-            }
-
-            Gamepad pad = Gamepad.current;
-            if (pad != null && !string.IsNullOrEmpty(gamepadControl) && Application.isFocused)
-            {
-                ButtonControl button = FindButton(pad, gamepadControl);
-                if (button != null && button.wasPressedThisFrame) return true;
-            }
-            return false;
+            if (ChatOverlay.CapturesInput) return false;
+            return KeyboardPressed(keyboardControl) || GamepadPressed(gamepadControl);
         }
 
-        /// <summary>The keyboard key or gamepad button is being held down.</summary>
+        /// <summary>The keyboard key was pressed this frame - read even while the chat is open.</summary>
+        public static bool KeyboardPressed(string keyboardControl)
+        {
+            if (Keyboard.current == null || string.IsNullOrEmpty(keyboardControl)) return false;
+            var key = Keyboard.current.TryGetChildControl<KeyControl>(keyboardControl);
+            return key != null && key.wasPressedThisFrame;
+        }
+
+        /// <summary>The gamepad button was pressed this frame (and the game window has focus) - read even while the chat is open.</summary>
+        public static bool GamepadPressed(string gamepadControl)
+        {
+            Gamepad pad = Gamepad.current;
+            if (pad == null || string.IsNullOrEmpty(gamepadControl) || !Application.isFocused) return false;
+            ButtonControl button = FindButton(pad, gamepadControl);
+            return button != null && button.wasPressedThisFrame;
+        }
+
+        /// <summary>The keyboard key or gamepad button is being held down (never while the chat is open).</summary>
         public static bool IsHeld(string keyboardControl, string gamepadControl)
         {
+            if (ChatOverlay.CapturesInput) return false;
             if (Keyboard.current != null && !string.IsNullOrEmpty(keyboardControl))
             {
                 var key = Keyboard.current.TryGetChildControl<KeyControl>(keyboardControl);

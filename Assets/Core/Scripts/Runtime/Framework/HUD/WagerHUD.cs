@@ -20,6 +20,12 @@ namespace Blocks.Gameplay.Core
     /// PHONE (bottom right): this player's bets that haven't settled yet - the wager and what they bet. If
     /// they don't all fit, the list scrolls up slowly in a loop, about once every 10 seconds. A settled bet
     /// disappears and a notification says whether it won.
+    ///
+    /// OTHER PLAYERS' PREDICTIONS (2026-11-10): View Previous / Next Player's Predictions (5 / T, D-Pad Left /
+    /// Right by default) flip the phone to another player's open predictions, in scoreboard order and round
+    /// again - so nobody has to keep asking "what do you need me to do?". The phone's top line is the name of
+    /// the player it's showing, and two key badges with arrows on its top corners show the keys. It starts on
+    /// this player's own each round. Everyone's accepted bets reach every client (WagerManager.BetAccepted).
     /// </summary>
     public class WagerHUD : MonoBehaviour
     {
@@ -62,6 +68,13 @@ namespace Blocks.Gameplay.Core
         private readonly Dictionary<int, string> m_AnsweredText = new Dictionary<int, string>();
         private readonly List<PhoneEntry> m_PhoneEntries = new List<PhoneEntry>();
         private List<WagerManager.WagerView> m_Offers = new List<WagerManager.WagerView>();
+
+        // Whose predictions the phone shows (player id) and everyone's open ones (player id -> entries).
+        private readonly Dictionary<int, List<PhoneEntry>> m_PhoneByPlayer = new Dictionary<int, List<PhoneEntry>>();
+        private int m_ViewedPlayer = -1;
+        private Label m_PhoneHeader;
+        private VisualElement m_PrevBadge, m_NextBadge;
+        private Label m_PrevKey, m_NextKey;
 
         private VisualElement m_PhoneViewport;
         private VisualElement m_PhoneScroller;
@@ -188,7 +201,8 @@ namespace Blocks.Gameplay.Core
             m_PhoneViewport.style.overflow = Overflow.Hidden;
             phone.Add(m_PhoneViewport);
 
-            var header = new Label("MY WAGERS");
+            var header = new Label("");
+            m_PhoneHeader = header;
             header.style.position = Position.Absolute;
             header.style.top = Length.Percent(4.5f); // below the camera hole
             header.style.left = 0;
@@ -235,6 +249,10 @@ namespace Blocks.Gameplay.Core
                 Debug.LogWarning($"[WagerHUD] Couldn't load Resources/{PhoneTexturePath} - the phone has no frame.");
             }
 
+            // The keys that flip to another player's predictions, on the phone's top corners.
+            m_PrevBadge = MakeViewBadge(phone, left: true, out m_PrevKey);
+            m_NextBadge = MakeViewBadge(phone, left: false, out m_NextKey);
+
             // The list area is measured against the viewport, so scrolling needs it laid out.
             listArea.RegisterCallback<GeometryChangedEvent>(_ => m_ListAreaHeight = listArea.resolvedStyle.height);
         }
@@ -254,7 +272,7 @@ namespace Blocks.Gameplay.Core
             if (m_Manager == null) return;
 
             m_Manager.WagersChanged += RefreshTicker;
-            m_Manager.LocalBetAccepted += HandleBetAccepted;
+            m_Manager.BetAccepted += HandleBetAccepted;
             m_Manager.LocalBetRejected += HandleBetRejected;
             m_Manager.WagerSettled += HandleWagerSettled;
         }
@@ -263,7 +281,7 @@ namespace Blocks.Gameplay.Core
         {
             if (m_Manager == null) return;
             m_Manager.WagersChanged -= RefreshTicker;
-            m_Manager.LocalBetAccepted -= HandleBetAccepted;
+            m_Manager.BetAccepted -= HandleBetAccepted;
             m_Manager.LocalBetRejected -= HandleBetRejected;
             m_Manager.WagerSettled -= HandleWagerSettled;
             m_Manager = null;
@@ -279,7 +297,14 @@ namespace Blocks.Gameplay.Core
                 RefreshTicker();
             }
 
-            if (!InGameMenu.IsOpen && m_Offers.Count > 0)
+            if (!InGameMenu.IsOpen && !ChatOverlay.CapturesInput)
+            {
+                if (BoundControls.WasPressed(m_Bindings.Keyboard.ViewPreviousPredictions, m_Bindings.Gamepad.ViewPreviousPredictions)) CycleViewedPlayer(-1);
+                else if (BoundControls.WasPressed(m_Bindings.Keyboard.ViewNextPredictions, m_Bindings.Gamepad.ViewNextPredictions)) CycleViewedPlayer(1);
+            }
+            UpdatePhoneHeader();
+
+            if (!InGameMenu.IsOpen && !ChatOverlay.CapturesInput && m_Offers.Count > 0)
             {
                 if (Pressed(m_Bindings.Keyboard.BetYes, m_Bindings.Gamepad.BetYes)) Answer(0, AnswerKind.Yes);
                 else if (Pressed(m_Bindings.Keyboard.BetNo, m_Bindings.Gamepad.BetNo)) Answer(0, AnswerKind.No);
@@ -349,11 +374,129 @@ namespace Blocks.Gameplay.Core
             RefreshTicker();
         }
 
-        private void HandleBetAccepted(int wagerId, bool yes, int cost)
+        private void HandleBetAccepted(int playerId, int wagerId, bool yes, int cost)
         {
-            m_AnsweredText.TryGetValue(wagerId, out string text);
-            m_PhoneEntries.Add(new PhoneEntry { WagerId = wagerId, Text = text ?? "Prediction", Yes = yes, Cost = cost });
+            string text = null;
+            bool mine = (ulong)playerId == NetworkPlayers.LocalClientId;
+            if (mine) m_AnsweredText.TryGetValue(wagerId, out text);
+            if (text == null && m_Manager != null) m_Manager.TryGetWagerText(wagerId, out text);
+
+            var entry = new PhoneEntry { WagerId = wagerId, Text = text ?? Loc.T("Prediction"), Yes = yes, Cost = cost };
+            if (mine) m_PhoneEntries.Add(entry);
+            EntriesOf(playerId).Add(entry);
+            if (playerId == ViewedPlayer) RefreshPhone();
+        }
+
+        private List<PhoneEntry> EntriesOf(int playerId)
+        {
+            if (!m_PhoneByPlayer.TryGetValue(playerId, out List<PhoneEntry> list))
+            {
+                list = new List<PhoneEntry>();
+                m_PhoneByPlayer[playerId] = list;
+            }
+            return list;
+        }
+
+        /// <summary>The player whose predictions the phone shows (this player unless flipped).</summary>
+        private int ViewedPlayer => m_ViewedPlayer >= 0 ? m_ViewedPlayer : (int)NetworkPlayers.LocalClientId;
+
+        /// <summary>The players to flip through: scoreboard order (join order without a HUD).</summary>
+        private static List<ulong> PlayerOrder()
+        {
+            var order = new List<ulong>();
+            if (CoreHUD.Local != null && CoreHUD.Local.ScoreboardOrder.Count > 0) order.AddRange(CoreHUD.Local.ScoreboardOrder);
+            else order.AddRange(NetworkPlayers.Ids);
+            return order;
+        }
+
+        private void CycleViewedPlayer(int step)
+        {
+            List<ulong> order = PlayerOrder();
+            if (order.Count < 2) return;
+            int index = order.IndexOf((ulong)ViewedPlayer);
+            if (index < 0) index = 0;
+            index = ((index + step) % order.Count + order.Count) % order.Count;
+            m_ViewedPlayer = (int)order[index];
             RefreshPhone();
+        }
+
+        private void UpdatePhoneHeader()
+        {
+            if (m_PhoneHeader == null) return;
+
+            // Someone left: back to this player's own.
+            List<ulong> order = PlayerOrder();
+            if (m_ViewedPlayer >= 0 && !order.Contains((ulong)m_ViewedPlayer))
+            {
+                m_ViewedPlayer = -1;
+                RefreshPhone();
+            }
+
+            string name = NetworkPlayers.GetDisplayName((ulong)ViewedPlayer);
+            if (m_PhoneHeader.text != name) m_PhoneHeader.text = name;
+            m_PhoneHeader.style.color = ViewedPlayer == (int)NetworkPlayers.LocalClientId ? new Color(1f, 0.8f, 0.3f) : new Color(0.55f, 0.85f, 1f);
+
+            bool show = order.Count > 1;
+            DisplayStyle display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            m_PrevBadge.style.display = display;
+            m_NextBadge.style.display = display;
+            if (!show || m_Bindings == null) return;
+
+            bool gamepad = UsingGamepad();
+            SetBadgeKey(m_PrevKey, gamepad ? m_Bindings.Gamepad.ViewPreviousPredictions : m_Bindings.Keyboard.ViewPreviousPredictions, gamepad);
+            SetBadgeKey(m_NextKey, gamepad ? m_Bindings.Gamepad.ViewNextPredictions : m_Bindings.Keyboard.ViewNextPredictions, gamepad);
+        }
+
+        private static void SetBadgeKey(Label label, string control, bool gamepad)
+        {
+            // The arrow beside the badge gives the direction, so a d-pad button just says D-Pad.
+            string text = gamepad
+                ? (control != null && control.StartsWith("dpad/") ? Loc.T("D-Pad") : ControlNames.Gamepad(control))
+                : ControlNames.Keyboard(control);
+            text ??= "";
+            if (label.text != text) label.text = text;
+            label.style.fontSize = text.Length <= 2 ? 16 : text.Length <= 5 ? 11 : 9;
+        }
+
+        /// <summary>A white key badge (like the item slot's) hanging off a top corner of the phone, with an arrow.</summary>
+        private static VisualElement MakeViewBadge(VisualElement phone, bool left, out Label key)
+        {
+            var holder = new VisualElement { pickingMode = PickingMode.Ignore };
+            holder.style.position = Position.Absolute;
+            holder.style.top = -12;
+            if (left) holder.style.left = -12; else holder.style.right = -12;
+            holder.style.flexDirection = left ? FlexDirection.Row : FlexDirection.RowReverse;
+            holder.style.alignItems = Align.Center;
+
+            var badge = new VisualElement { pickingMode = PickingMode.Ignore };
+            badge.style.minWidth = 34;
+            badge.style.height = 34;
+            badge.style.paddingLeft = 4;
+            badge.style.paddingRight = 4;
+            badge.style.alignItems = Align.Center;
+            badge.style.justifyContent = Justify.Center;
+            badge.style.backgroundColor = Color.white;
+            ItemTile.SetRadius(badge, 17);
+            ItemTile.SetBorder(badge, 2.5f, Color.black);
+            key = new Label { pickingMode = PickingMode.Ignore };
+            key.style.color = Color.black;
+            key.style.unityFontStyleAndWeight = FontStyle.Bold;
+            key.style.unityTextAlign = TextAnchor.MiddleCenter;
+            badge.Add(key);
+            holder.Add(badge);
+
+            var arrow = new Label(left ? "<" : ">") { pickingMode = PickingMode.Ignore };
+            arrow.style.fontSize = 22;
+            arrow.style.color = Color.white;
+            arrow.style.unityFontStyleAndWeight = FontStyle.Bold;
+            arrow.style.unityTextOutlineWidth = 2f;
+            arrow.style.unityTextOutlineColor = Color.black;
+            arrow.style.marginLeft = 3;
+            arrow.style.marginRight = 3;
+            holder.Add(arrow);
+
+            phone.Add(holder);
+            return holder;
         }
 
         private void HandleBetRejected(int wagerId, string reason)
@@ -368,10 +511,12 @@ namespace Blocks.Gameplay.Core
             m_Answered.Remove(wagerId);
             m_AnsweredText.Remove(wagerId);
 
+            foreach (List<PhoneEntry> list in m_PhoneByPlayer.Values) list.RemoveAll(e => e.WagerId == wagerId);
+            RefreshPhone();
+
             PhoneEntry entry = m_PhoneEntries.Find(e => e.WagerId == wagerId);
             if (entry == null) return;
             m_PhoneEntries.Remove(entry);
-            RefreshPhone();
 
             if (refunded)
             {
@@ -403,7 +548,8 @@ namespace Blocks.Gameplay.Core
         private void FillPhoneList(VisualElement list)
         {
             list.Clear();
-            if (m_PhoneEntries.Count == 0)
+            List<PhoneEntry> entries = EntriesOf(ViewedPlayer);
+            if (entries.Count == 0)
             {
                 var empty = new Label("No active predictions");
                 empty.style.color = new Color(0.6f, 0.6f, 0.65f);
@@ -414,7 +560,7 @@ namespace Blocks.Gameplay.Core
                 return;
             }
 
-            foreach (PhoneEntry entry in m_PhoneEntries)
+            foreach (PhoneEntry entry in entries)
             {
                 var item = new VisualElement();
                 item.style.marginBottom = 8;

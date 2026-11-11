@@ -110,6 +110,12 @@ namespace Blocks.Gameplay.Core
         /// <summary>Raised on this client when the master accepted one of this player's bets (wager id, yes?, cost).</summary>
         public event Action<int, bool, int> LocalBetAccepted;
 
+        /// <summary>
+        /// Raised on every client when the master accepted anyone's bet (player id, wager id, yes?, cost) - so each
+        /// phone can show other players' predictions too (2026-11-10, WagerHUD).
+        /// </summary>
+        public event Action<int, int, bool, int> BetAccepted;
+
         /// <summary>Raised on this client when the master turned down one of this player's bets (wager id, reason).</summary>
         public event Action<int, string> LocalBetRejected;
 
@@ -308,6 +314,21 @@ namespace Blocks.Gameplay.Core
         private void BetAcceptedRpc(int playerId, int wagerId, NetworkBool yes, int cost)
         {
             if ((ulong)playerId == NetworkPlayers.LocalClientId) LocalBetAccepted?.Invoke(wagerId, yes, cost);
+            BetAccepted?.Invoke(playerId, wagerId, yes, cost);
+        }
+
+        /// <summary>An open wager's text as this player sees it (false once it has settled).</summary>
+        public bool TryGetWagerText(int wagerId, out string text)
+        {
+            text = null;
+            if (!IsSpawned || Catalog == null) return false;
+            int slot = FindSlot(wagerId);
+            if (slot < 0) return false;
+            WagerState s = NetWagers[slot];
+            WagerCatalog.Template template = Catalog.Get(s.TemplateIndex);
+            if (template == null) return false;
+            text = WagerCatalog.Format(template, NetworkPlayers.GetDisplayName((ulong)s.SubjectId), s.Target, s.WindowSeconds);
+            return true;
         }
 
         [Rpc(RpcSources.StateAuthority, RpcTargets.All)]

@@ -18,7 +18,9 @@ namespace Blocks.Gameplay.Core
     /// (which kind of pole it's on is then taken from the nearest pole). Rotations only come from Pole Swing 2.
     ///
     /// Added at runtime to the local player's avatar by NetworkPlayers.Register (no prefab setup), and
-    /// starts from zero with each new avatar, i.e. each round.
+    /// starts from zero with each new avatar, i.e. each round. Stops counting once the round is over (from
+    /// TIME! on) - a player left standing on ice or riding a dinosaur doesn't add to the totals the Game Results
+    /// screen shows (2026-11-09); whatever was counted before still gets sent.
     /// </summary>
     public class LocalActionTracker : MonoBehaviour
     {
@@ -118,6 +120,11 @@ namespace Blocks.Gameplay.Core
         private void Update()
         {
             if (m_Player == null || !m_Player.IsSpawned) return;
+            if (RoundIsOver())
+            {
+                SendIfDue();
+                return;
+            }
             float dt = Time.deltaTime;
 
             bool grounded = m_Movement != null && m_Movement.IsGrounded;
@@ -179,10 +186,24 @@ namespace Blocks.Gameplay.Core
             m_WasOnWall = onWall;
             m_WasOnPole = onPole;
 
+            SendIfDue();
+        }
+
+        private void SendIfDue()
+        {
             float now = Time.unscaledTime;
             bool due = m_Dirty && now - m_LastSendTime >= SendInterval;
             bool triggerDue = m_TriggerMask != 0 && now - m_LastSendTime >= MinTriggerSendInterval;
             if (due || triggerDue) Send(now);
+        }
+
+        /// <summary>From TIME! on (Tallying, Ended, GameOver) nothing more counts.</summary>
+        private static bool RoundIsOver()
+        {
+            RoundTimer round = RoundTimer.Instance;
+            if (round == null || !round.IsSpawned) return false;
+            RoundTimer.RoundPhase phase = round.Phase;
+            return phase == RoundTimer.RoundPhase.Tallying || phase == RoundTimer.RoundPhase.Ended || phase == RoundTimer.RoundPhase.GameOver;
         }
 
         /// <summary>Whether the pole nearest the player's hands is a bar (for Dan's PoleGrabAbility, which doesn't say).</summary>

@@ -11,13 +11,14 @@ namespace Blocks.Gameplay.Core
     ///
     /// WHAT PLAYS WHEN (all automatic - nothing in any scene needs setting up):
     ///   - On each full scene load: TitleScreen -> the title song; RoundResults -> the round-won song;
-    ///     FinalScore -> the round-lost song (none yet, so it fades out); [BB] Core -> whatever was playing fades
+    ///     FinalScore (the old game-over scene, no longer loaded) -> the round-lost song; [BB] Core -> whatever was playing fades
     ///     out (the match takes over, below); SplashScreen -> nothing; any other scene is a menu -> the menu song
     ///     if there is one, else the title song is left to finish, else silence. Additive loads (the in-game
     ///     settings screens) don't count.
     ///   - In a match it follows RoundTimer's phase: Intro (the flyover) -> the flyover song; Countdown -> fades
     ///     out; Playing -> the map's song (practice too; a practice challenge gets its own, none yet);
-    ///     Tallying / Ended -> fades out under TIME! and the result banner.
+    ///     Tallying -> fades out under TIME!; Ended -> the target missed: the round-lost song starts right away
+    ///     and carries on through the Game Results screen (GameOver); target reached: silence until Round Results.
     ///
     /// LOOPING: a song jumps from the end of its music back to its loop point with no gap. Two AudioSources take
     /// turns: each plays one pass (start->end, then loopStart->end, ...) scheduled on the audio clock with
@@ -58,6 +59,7 @@ namespace Blocks.Gameplay.Core
         private string m_CurrentId;
         private bool m_InMatch;
         private string m_PreloadedMapTrack;
+        private bool m_PreloadedRoundLost;
         private bool m_Held;
 
         // ----- public API -----
@@ -165,6 +167,7 @@ namespace Blocks.Gameplay.Core
             player.ForgetWanted();
             player.m_InMatch = scene.name == MatchScene;
             player.m_PreloadedMapTrack = null;
+            player.m_PreloadedRoundLost = false;
 
             switch (scene.name)
             {
@@ -226,8 +229,21 @@ namespace Blocks.Gameplay.Core
                         else if (m_CurrentId != null) Stop(0.8f);
                     }
                     break;
-                default: // Tallying, Ended
+                case RoundTimer.RoundPhase.Ended:
+                case RoundTimer.RoundPhase.GameOver:
+                    if (!round.TargetReached && !string.IsNullOrEmpty(MusicTracks.RoundLost))
+                    {
+                        if (!Same(m_CurrentId, MusicTracks.RoundLost)) Play(MusicTracks.RoundLost, 0.5f);
+                    }
+                    else if (m_CurrentId != null) Stop(1.5f);
+                    break;
+                default: // Tallying
                     if (m_CurrentId != null) Stop(1.5f);
+                    if (!m_PreloadedRoundLost && !string.IsNullOrEmpty(MusicTracks.RoundLost))
+                    {
+                        m_PreloadedRoundLost = true; // ready for the moment the result is in
+                        Preload(MusicTracks.RoundLost);
+                    }
                     break;
             }
         }

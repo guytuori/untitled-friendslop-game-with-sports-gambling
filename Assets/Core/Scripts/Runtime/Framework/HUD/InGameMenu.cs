@@ -284,6 +284,7 @@ namespace Blocks.Gameplay.Core
         private void HandleMenuPressed(InputControl control)
         {
             if (m_Leaving) return;
+            if (ChatOverlay.SwallowsMenu) return; // the chat is open, or that Esc / Start just closed it
             if (Suppressed && !IsOpen) return; // the round's countdown
             if (m_Finished || (m_Picker != null && m_Picker.IsOpen)) return; // pick something (or B / Esc out of the list)
             if (SettingsOverlay.IsOpen) return; // a settings screen is up - its own Back closes it

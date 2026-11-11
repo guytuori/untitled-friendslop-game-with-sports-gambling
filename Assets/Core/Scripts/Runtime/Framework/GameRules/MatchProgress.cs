@@ -26,6 +26,7 @@ namespace Blocks.Gameplay.Core
     ///   (CarryOverPercent, 5% by default). PlayerScore adds it to Starting Points at the next spawn.
     /// - <see cref="LastResults"/> etc.: the finished round, for the Round Results screen.
     /// - Who's ready on the Round Results screen (<see cref="MatchFlowSync.ReadyRpc"/>).
+    /// - Every round's stats live next door in <see cref="MatchStats"/> (the Game Results screen), cleared here too.
     ///
     /// Reset when a session starts or ends, and when the host starts a match from the lobby.
     /// </summary>
@@ -131,6 +132,7 @@ namespace Blocks.Gameplay.Core
             LastTeamTarget = 0;
             NextTeamTarget = 0;
             s_LastResults.Clear();
+            MatchStats.Clear();
             ClearReady();
         }
 

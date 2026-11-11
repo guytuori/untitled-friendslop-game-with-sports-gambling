@@ -36,8 +36,10 @@ namespace Blocks.Gameplay.Core
     ///
     /// ROUND END: Playing -> Tallying (a short pause so the last bonus points reach everyone's score) ->
     /// Ended (the result: everyone's scores added up against the target, shown for a few seconds; every
-    /// client records the results in MatchProgress at this point) -> the master client loads the Round
-    /// Results scene if the team hit the target, or the Final Score scene if not.
+    /// client records the results in MatchProgress, and every player's stats in MatchStats, at this point) ->
+    /// the master client loads the Round Results scene if the team hit the target. If not, the match is over:
+    /// the master switches to GameOver and every client opens the Game Results screen over this scene
+    /// (<see cref="GameResults"/>, 2026-11-09 - it used to load the Final Score scene).
     /// </summary>
     [RequireComponent(typeof(NetworkObject))]
     public class RoundTimer : CoreNetworkBehaviour, ISceneSingleton
@@ -50,7 +52,8 @@ namespace Blocks.Gameplay.Core
             Tallying = 1,
             Ended = 2,
             Intro = 3,     // before Playing: the course flyover, waiting for everyone to press a key (see MatchIntro)
-            Countdown = 4  // after the intro, before Playing: "3, 2, 1, PARKOUR!" (see RoundAnnouncer)
+            Countdown = 4, // after the intro, before Playing: "3, 2, 1, PARKOUR!" (see RoundAnnouncer)
+            GameOver = 5   // after Ended when the target was missed: the match is over (see GameResults)
         }
 
         private const int MaxPlayers = 32;
@@ -121,7 +124,7 @@ namespace Blocks.Gameplay.Core
         public int PerPlayerTarget => IsSpawned ? NetPerPlayerTarget : 0;
 
         /// <summary>The team's target: per-player target x players in the game (fixed once the round has ended).</summary>
-        public int TeamTarget => IsSpawned && NetPhase == (int)RoundPhase.Ended ? NetFinalTeamTarget : PerPlayerTarget * Mathf.Max(1, CountPlayers());
+        public int TeamTarget => IsSpawned && (NetPhase == (int)RoundPhase.Ended || NetPhase == (int)RoundPhase.GameOver) ? NetFinalTeamTarget : PerPlayerTarget * Mathf.Max(1, CountPlayers());
 
         /// <summary>Only meaningful once <see cref="Phase"/> is Ended: whether the team hit the target.</summary>
         public bool TargetReached => IsSpawned && NetPassed;
@@ -258,8 +261,16 @@ namespace Blocks.Gameplay.Core
                 case RoundPhase.Ended:
                     if (!m_LoadRequested && NetPhaseTimer.ExpiredOrNotRunning(Runner))
                     {
+                        if (!NetPassed)
+                        {
+                            // Target missed: the match is over - everyone gets the Game Results screen, here.
+                            NetPhase = (int)RoundPhase.GameOver;
+                            Debug.Log($"[Round] Game over after round {NetRoundNumber}.", this);
+                            break;
+                        }
+
                         m_LoadRequested = true;
-                        string next = NetPassed ? FusionSessionService.RoundResultsSceneName : FusionSessionService.FinalScoreSceneName;
+                        string next = FusionSessionService.RoundResultsSceneName;
                         if (!FusionSessionService.HasInstance || !FusionSessionService.Instance.LoadSceneForEveryone(next))
                         {
                             Debug.LogError($"[Round] Couldn't load '{next}' - is it in the Build Settings?", this);
@@ -561,7 +572,9 @@ namespace Blocks.Gameplay.Core
             CorePlayerManager local = NetworkPlayers.Local;
             if (local != null) local.SetInputLock(RoundOverInputLock, true);
 
-            if (phase == RoundPhase.Ended) RecordResults();
+            // (GameOver too, in case this machine never saw Ended - only the first call records anything.)
+            if (phase == RoundPhase.Ended || phase == RoundPhase.GameOver) RecordResults();
+            if (phase == RoundPhase.GameOver) GameResults.Begin(this);
         }
 
         /// <summary>Every client writes the same results into MatchProgress before the scene changes.</summary>
@@ -592,6 +605,7 @@ namespace Blocks.Gameplay.Core
             int players = Mathf.Max(1, CountPlayers());
             int nextTarget = MatchProgress.PerPlayerTarget(Rules, round + 1) * players;
 
+            MatchStats.Capture(round, NetPassed, NetFinalTeamTotal, NetFinalTeamTarget); // for the Game Results screen
             MatchProgress.RecordRoundEnd(round, NetPassed, NetFinalTeamTotal, NetFinalTeamTarget, nextTarget,
                 results, localScore, Rules.CarryOverPercent);
         }

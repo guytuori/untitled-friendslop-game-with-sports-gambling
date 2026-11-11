@@ -313,6 +313,10 @@ namespace Blocks.Gameplay.Core
             if (m_GameRunner != null) return "Already in a game.";
             await ShutdownLobbyAsync();
 
+            // The host's Message Builder Chat Only setting decides the game's (2026-11-10).
+            rules = rules.Clone();
+            rules.MessageBuilderOnly = GameplaySettings.Current.MessageBuilderChatOnly;
+
             for (int attempt = 0; attempt < MaxHostAttempts; attempt++)
             {
                 string code = NewRoomCode();
@@ -391,6 +395,14 @@ namespace Blocks.Gameplay.Core
                 await LeaveGameAsync();
                 if (wasInLobby && rejoinLobbyOnFailure) EnsureInLobby();
                 return DescribeFailure(ShutdownReason.GameNotFound);
+            }
+
+            // Message Builder Chat Only (2026-11-10): no games with typed chat, even by room code.
+            if (GameplaySettings.Current.MessageBuilderChatOnly && !ReadRules(info).MessageBuilderOnly)
+            {
+                await LeaveGameAsync();
+                if (wasInLobby && rejoinLobbyOnFailure) EnsureInLobby();
+                return "That game allows typed chat. Turn off Message Builder Chat Only (Settings > Gameplay) to join it.";
             }
 
             RoomCode = code;
@@ -869,7 +881,8 @@ namespace Blocks.Gameplay.Core
                 rules.AverageTargetScore,
                 Mathf.RoundToInt(rules.TargetScoreGrowth * 100f), // stored as hundredths: 1.05 -> 105
                 rules.BonusPointsPerSecond,
-                rules.CarryOverPercent);
+                rules.CarryOverPercent,
+                rules.MessageBuilderOnly ? 1 : 0); // 2026-11-10
         }
 
         /// <summary>Reads PackRules' string back. Missing or unreadable values keep their current (default) value.</summary>
@@ -892,6 +905,7 @@ namespace Blocks.Gameplay.Core
             rules.TargetScoreGrowth = Get(9, Mathf.RoundToInt(rules.TargetScoreGrowth * 100f)) / 100f;
             rules.BonusPointsPerSecond = Get(10, rules.BonusPointsPerSecond);
             rules.CarryOverPercent = Get(11, rules.CarryOverPercent);
+            rules.MessageBuilderOnly = Get(12, rules.MessageBuilderOnly ? 1 : 0) != 0;
         }
 
         // =====================================================================================

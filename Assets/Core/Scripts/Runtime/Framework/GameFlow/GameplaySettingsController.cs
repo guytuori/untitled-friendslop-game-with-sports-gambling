@@ -17,6 +17,8 @@ namespace Blocks.Gameplay.Core
     ///   - ARACHNOPHOBIA MODE / ARACHNOPHILIA MODE: off by default, and never both on - ticking one unticks
     ///     the other. Nothing uses them yet (see GameplaySettingsData).
     ///   - INVERT GLIDER CONTROLS (2026-11-08): on by default - forward dives, back climbs (GlideAbility).
+    ///   - MESSAGE BUILDER CHAT ONLY (2026-11-10): off by default - only find / join games where chat is message
+    ///     builder only (and host them that way). See ChatLog / GameSearchFilter.Matches.
     /// Saved with the other settings in settings.json (<see cref="GameplaySettingsData"/>) and applied through
     /// <see cref="GameplaySettings"/>.
     ///
@@ -56,6 +58,7 @@ namespace Blocks.Gameplay.Core
         private Toggle m_PhobiaToggle;
         private Toggle m_PhiliaToggle;
         private Toggle m_GliderToggle;
+        private Toggle m_BuilderChatToggle;
         private readonly List<VisualElement> m_Rows = new List<VisualElement>();
 
         private DropdownField m_EditingDropdown; // the dropdown in edit mode (A pressed on it), if any
@@ -113,7 +116,7 @@ namespace Blocks.Gameplay.Core
             // Checkboxes
             m_ShowNamesToggle = AddToggleRow(column, "SHOW DISPLAY NAMES", "Off shows other players as Player 1, Player 2, ...",
                 m_Settings.ShowDisplayNames, value => m_Settings.ShowDisplayNames = value);
-            m_FilterToggle = AddToggleRow(column, "MATURE LANGUAGE FILTER", "Bad words in player names show as ***",
+            m_FilterToggle = AddToggleRow(column, "MATURE LANGUAGE FILTER", "Bad words in player names and chat show as ***",
                 m_Settings.MatureLanguageFilter, value => m_Settings.MatureLanguageFilter = value);
             m_PhobiaToggle = AddToggleRow(column, "ARACHNOPHOBIA MODE", "Swaps spiders for something else",
                 m_Settings.ArachnophobiaMode, value =>
@@ -129,6 +132,8 @@ namespace Blocks.Gameplay.Core
                 });
             m_GliderToggle = AddToggleRow(column, "INVERT GLIDER CONTROLS", "Forward dives, back climbs",
                 m_Settings.InvertGliderControls, value => m_Settings.InvertGliderControls = value);
+            m_BuilderChatToggle = AddToggleRow(column, "MESSAGE BUILDER CHAT ONLY", "Only join games where chat uses the message builder",
+                m_Settings.MessageBuilderChatOnly, value => m_Settings.MessageBuilderChatOnly = value);
 
             // Restore Defaults / Save Changes / Back, bottom right like the other settings screens.
             VisualElement buttons = MenuUI.AddBottomRightColumn(root);
@@ -381,6 +386,7 @@ namespace Blocks.Gameplay.Core
             m_PhobiaToggle.SetValueWithoutNotify(m_Settings.ArachnophobiaMode);
             m_PhiliaToggle.SetValueWithoutNotify(m_Settings.ArachnophiliaMode);
             m_GliderToggle.SetValueWithoutNotify(m_Settings.InvertGliderControls);
+            m_BuilderChatToggle.SetValueWithoutNotify(m_Settings.MessageBuilderChatOnly);
             ClearStatus();
         }
 
