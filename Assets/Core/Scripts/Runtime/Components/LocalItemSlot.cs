@@ -216,6 +216,7 @@ namespace Blocks.Gameplay.Core
             if (State != SlotState.Holding) return;
             ItemDefinition item = Definition;
             ItemEffects.Used(item, m_Player);
+            PracticeMode.ReportItemUsed(); // Practice Challenges: no record for this run (2026-11-11)
 
             if (item != null && item.IsTimed)
             {

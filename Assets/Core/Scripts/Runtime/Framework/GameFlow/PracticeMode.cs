@@ -29,6 +29,11 @@ namespace Blocks.Gameplay.Core
     /// against the player's best time for that challenge (<see cref="BestTime"/>, saved on this computer): a
     /// new record plays the "new_record" voice clip, otherwise "complete". Practice Map's stopwatch still just
     /// counts whole seconds from arrival.
+    ///
+    /// ITEMS DON'T SET RECORDS (2026-11-11): the practice item menu works in Practice Challenges too, which is fine
+    /// for practising with an item - but a run where an item was used (from the start flag on), or that started
+    /// with a timed item still running (Rocket Shoes used just before the flag), is timed and shown as usual and
+    /// never saved as a best time (<see cref="RunUsedItem"/>). The HUD's stopwatch says ITEM USED meanwhile.
     /// </summary>
     public static class PracticeMode
     {
@@ -52,6 +57,7 @@ namespace Blocks.Gameplay.Core
         private static float s_RunStart = -1f;   // -1 = not running (waiting for the start flag)
         private static float s_RunEnd = -1f;     // -1 = not stopped
         private static bool s_ReachedEnd;
+        private static bool s_RunUsedItem;
 
         /// <summary>Raised once when the player reaches the end point in Practice Challenges.</summary>
         public static event Action ChallengeFinished;
@@ -68,7 +74,20 @@ namespace Blocks.Gameplay.Core
             s_RunStart = IsChallenge ? -1f : Time.time;
             s_RunEnd = -1f;
             s_ReachedEnd = false;
+            s_RunUsedItem = false;
             LastRunWasRecord = false;
+        }
+
+        /// <summary>
+        /// The current (or last completed) Practice Challenges run used an item - it can't be a record. Also true
+        /// when a timed item was still running as the run started.
+        /// </summary>
+        public static bool RunUsedItem => IsChallenge && s_RunStart >= 0f && s_RunUsedItem;
+
+        /// <summary>LocalItemSlot: this player used an item. Spoils the run's record if one is being timed.</summary>
+        public static void ReportItemUsed()
+        {
+            if (IsChallenge && RunRunning) s_RunUsedItem = true;
         }
 
         /// <summary>True once the end point has been reached (the "Retry Challenge?" question is up).</summary>
@@ -102,6 +121,8 @@ namespace Blocks.Gameplay.Core
             s_RunStart = Time.time;
             s_RunEnd = -1f;
             LastRunWasRecord = false;
+            // Rocket Shoes (or any timed item) used just before the start flag still count against the run.
+            s_RunUsedItem = LocalItemSlot.Local != null && LocalItemSlot.Local.State == LocalItemSlot.SlotState.Active;
         }
 
         /// <summary>LocalChallengeTracker: the run ended - completed (stop the clock, check the record) or not (back to 0).</summary>
@@ -116,12 +137,13 @@ namespace Blocks.Gameplay.Core
 
             s_RunEnd = Time.time;
             float time = RunSeconds;
-            LastRunWasRecord = TryRecord(ChallengeId, time);
+            LastRunWasRecord = !s_RunUsedItem && TryRecord(ChallengeId, time);
 
             AudioClip clip = VoiceCatalog.Get(LastRunWasRecord ? "new_record" : "complete");
             if (clip != null) AudioVolumeService.PlayOneShot(clip, AudioCategory.Voice, Vector3.zero);
             Debug.Log($"[Practice] {ChallengeId} completed in {FormatRunTime(time)}" +
-                      (LastRunWasRecord ? " - new record!" : $" (best {FormatRunTime(BestTime(ChallengeId))})."));
+                      (LastRunWasRecord ? " - new record!" : $" (best {FormatRunTime(BestTime(ChallengeId))})") +
+                      (s_RunUsedItem ? " - an item was used, so it can't be a record." : "."));
             RunTimed?.Invoke(time, LastRunWasRecord);
         }
 

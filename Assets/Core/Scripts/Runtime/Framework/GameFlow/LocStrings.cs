@@ -433,6 +433,10 @@ namespace Blocks.Gameplay.Core
             ["That was fun."] = new[] { "Eso fue divertido.", "È stato divertente.", "C'était amusant.", "Das hat Spaß gemacht.", "Foi divertido." },
             ["That was tough."] = new[] { "Eso fue difícil.", "È stata dura.", "C'était dur.", "Das war hart.", "Foi difícil." },
             ["Good bye!"] = new[] { "¡Adiós!", "Ciao ciao!", "Au revoir !", "Tschüss!", "Tchau!" },
+            // Practice Challenges: runs that used an item aren't records (2026-11-11).
+            ["ITEM USED"] = new[] { "OBJETO USADO", "OGGETTO USATO", "OBJET UTILISÉ", "ITEM BENUTZT", "ITEM USADO" },
+            ["Time: {0} - item used, not a record"] = new[] { "Tiempo: {0} - se usó un objeto, no cuenta como récord", "Tempo: {0} - oggetto usato, non vale come record", "Temps : {0} - objet utilisé, pas de record", "Zeit: {0} - Item benutzt, kein Rekord", "Tempo: {0} - item usado, não vale recorde" },
+            ["Item used - this time can't be a record"] = new[] { "Se usó un objeto: este tiempo no puede ser récord", "Oggetto usato: questo tempo non può essere un record", "Objet utilisé : ce temps ne peut pas être un record", "Item benutzt - diese Zeit zählt nicht als Rekord", "Item usado: este tempo não pode ser recorde" },
             ["(out)"] = new[] { "(fuera)", "(fuori)", "(éliminé)", "(raus)", "(fora)" },
         };
     }

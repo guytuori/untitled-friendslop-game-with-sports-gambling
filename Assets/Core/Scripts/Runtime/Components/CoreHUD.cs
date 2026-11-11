@@ -1152,11 +1152,19 @@ namespace Blocks.Gameplay.Core
             // PracticeMode); Practice Map counts whole seconds from arrival.
             bool hundredths = PracticeMode.IsChallenge;
             m_RoundTimerLabel.text = hundredths ? "0:00.00" : "0:00";
+            bool shownItemUsed = false;
             m_RoundTimerLabel.schedule.Execute(() =>
             {
                 float elapsed = PracticeMode.RunSeconds;
                 int seconds = Mathf.FloorToInt(elapsed);
                 m_RoundTimerLabel.text = hundredths ? PracticeMode.FormatRunTime(elapsed) : $"{seconds / 60}:{seconds % 60:00}";
+
+                // Practice Challenges: a run that used an item can't be a record - say so on the stopwatch (2026-11-11).
+                bool itemUsed = hundredths && PracticeMode.RunUsedItem;
+                if (itemUsed == shownItemUsed) return;
+                shownItemUsed = itemUsed;
+                if (m_RoundTimerCaption != null) m_RoundTimerCaption.text = Loc.T(itemUsed ? "ITEM USED" : "PRACTICE");
+                m_RoundTimerLabel.style.color = itemUsed ? new StyleColor(new Color(1f, 0.6f, 0.2f)) : new StyleColor(StyleKeyword.Null);
             }).Every(hundredths ? 30 : 250);
         }
 
@@ -1224,7 +1232,9 @@ namespace Blocks.Gameplay.Core
                 if (PracticeMode.IsChallenge && PracticeMode.RunCompleted)
                 {
                     string time = PracticeMode.FormatRunTime(PracticeMode.RunSeconds);
-                    AddNotification(PracticeMode.LastRunWasRecord ? Loc.F("New record! {0}", time) : Loc.F("Time: {0}", time));
+                    AddNotification(PracticeMode.LastRunWasRecord ? Loc.F("New record! {0}", time)
+                        : PracticeMode.RunUsedItem ? Loc.F("Time: {0} - item used, not a record", time)
+                        : Loc.F("Time: {0}", time));
                 }
             }
             else

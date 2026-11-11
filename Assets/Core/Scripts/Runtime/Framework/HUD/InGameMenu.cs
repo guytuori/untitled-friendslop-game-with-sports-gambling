@@ -496,7 +496,8 @@ namespace Blocks.Gameplay.Core
             m_ConfirmPanel.style.display = DisplayStyle.None;
             m_FinishTimeLabel.text = Loc.F("Time: {0}", PracticeMode.FormatRunTime(PracticeMode.RunSeconds)) + "\n" +
                 (PracticeMode.LastRunWasRecord ? Loc.F("New record! {0}", PracticeMode.BestTimeText(PracticeMode.ChallengeId))
-                                               : Loc.F("Best Time: {0}", PracticeMode.BestTimeText(PracticeMode.ChallengeId)));
+                                               : Loc.F("Best Time: {0}", PracticeMode.BestTimeText(PracticeMode.ChallengeId))) +
+                (PracticeMode.RunUsedItem ? "\n" + Loc.T("Item used - this time can't be a record") : "");
             m_FinishStatusLabel.text = "";
             m_FinishPanel.style.display = DisplayStyle.Flex;
             m_Overlay.style.display = DisplayStyle.Flex;
