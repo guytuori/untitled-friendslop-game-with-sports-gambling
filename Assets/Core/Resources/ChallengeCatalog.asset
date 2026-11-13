@@ -113,6 +113,10 @@ MonoBehaviour:
     size: 16
     prefab: {fileID: 7868339533988367010, guid: dbae37081785aee4aa23a0afb4200b9c, type: 3}
     thumbnail: {fileID: 2800000, guid: 27eb426368fcef8488f47d985ae77fbc, type: 3}
+  - id: Challenge_16_26
+    size: 16
+    prefab: {fileID: 8767988505568360635, guid: f817ce914e1cc254aa45bd176e3c7471, type: 3}
+    thumbnail: {fileID: 2800000, guid: 58ec867656323c74b9816c7e2b8e2069, type: 3}
   - id: Challenge_32_01
     size: 32
     prefab: {fileID: 4009937417778457704, guid: 1706642b7dbf80a47913948eea8c7b85, type: 3}

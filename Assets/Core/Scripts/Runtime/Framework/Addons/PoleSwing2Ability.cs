@@ -571,6 +571,17 @@ namespace Blocks.Gameplay.Core
             }
             m_Motor.SetVerticalVelocity(up);
             if (sideways.sqrMagnitude > 0.0001f) m_Motor.ApplyExternalForce(sideways, ForceMode.Impulse);
+
+            // Face the way you're launched (2026-11-13). The body used to keep facing the pole, then turn to
+            // WalkAbility's last FacingDirectionOverride: the input from before the grab, left stale because Walk
+            // doesn't run on a pole or while the launch push locks it. So you flew off sideways or backwards.
+            // Clearing it lets CoreMovement keep facing along the velocity until you steer again.
+            m_Motor.FacingDirectionOverride = null;
+            if (sideways.sqrMagnitude > 0.01f)
+            {
+                Transform body = m_Motor.RotationTransform != null ? m_Motor.RotationTransform : m_Motor.transform;
+                body.rotation = Quaternion.LookRotation(sideways.normalized, Vector3.up);
+            }
         }
 
         /// <summary>

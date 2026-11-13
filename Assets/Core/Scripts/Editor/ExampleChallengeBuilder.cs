@@ -36,6 +36,9 @@ namespace Blocks.Gameplay.Core
     /// moving-platform 16s on the user's challenge_16_platforms.glb, built together by Friendslop > Challenges >
     /// Build Challenge_16_11-13 (Moving Platforms).
     ///
+    /// Challenge_16_26 "Hand Over Hand" (2026-11-12, poles in the user's brick room) has its own menu too:
+    /// Friendslop > Challenges > Build Challenge_16_26 (Shimmy).
+    ///
     /// Once you're happy with them this file can be deleted - the prefabs and scenes don't need it.
     /// </summary>
     public static class ExampleChallengeBuilder
@@ -591,6 +594,46 @@ namespace Blocks.Gameplay.Core
             },
         };
 
+        /// <summary>
+        /// "Hand Over Hand" (2026-11-12): the user's brick room (challenge_16_shimmy_1) over the pit, all shimmying on Pole
+        /// Swing 2 poles, laid out from the user's sketch. Up the outside pole, through the high hole in the front wall
+        /// onto the first inside pole, down it and across onto the front bar, shimmy right, onto the right pole, down it
+        /// and through the low hole in the inner wall onto the far right pole, up it onto the back bar, shimmy left,
+        /// onto the last pole, down it and out through the exit hole onto the finish ledge (challenge_16_shimmy_1_ledge,
+        /// Claude's, top flush with the rim). The exit hole is meant to be one block up (rim level to 4 m above): with
+        /// it at layers 0-1 only 2 m of it is above the rim.
+        ///
+        /// Simulated with the CorePlayer values (spin 6-10 m/s):
+        ///   - pole to pole through a hole: outside -> first inside ~21 degree release window (let go with hands 10-12 m);
+        ///     right -> far right ~15-18 degrees (hands 1-2 m, through the 0-4 m hole);
+        ///   - pole -> bar and bar -> pole are short hand-offs at the bar ends (bars stop 1.5 m short of the pole they
+        ///     start from and 1 m short of the pole they lead to; a bar launch has no sideways push along the bar, so
+        ///     the pole it leads to has to be within grab reach of the bar's end): let go from the pole with your feet
+        ///     over the bar (hands ~2 m below it), or from the bar's end swinging past the pole;
+        ///   - last pole -> exit: ~27-42 degrees, hands 2-4 m.
+        /// Each pole's line keeps the 2 m swing (plus the body) off the walls where it matters, and each hole is on the
+        /// line between the poles either side of it, so both spin directions have a way through.
+        /// </summary>
+        private static readonly Spec HandOverHandChallenge = new Spec
+        {
+            Name = "Challenge_16_26", Size = 16, Title = "Hand Over Hand", Points = 100,
+            Pieces = new[]
+            {
+                new Piece("challenge_16_shimmy_1", MapObjectPropertyType.Regular),
+                new Piece("challenge_16_shimmy_1_ledge", MapObjectPropertyType.Regular),
+            },
+            Poles = new[]
+            {
+                new PoleLine("1 outside pole (up)", new Vector3(4f, 0f, 27.6f), new Vector3(4f, 13f, 27.6f)),
+                new PoleLine("2 first inside pole (down)", new Vector3(4f, 0f, 21.8f), new Vector3(4f, 14f, 21.8f)),
+                new PoleLine("3 front bar (shimmy right)", new Vector3(5.5f, 8f, 21.8f), new Vector3(26.8f, 8f, 20.3f)),
+                new PoleLine("4 right pole (down)", new Vector3(27.8f, 0f, 20.3f), new Vector3(27.8f, 10f, 20.3f)),
+                new PoleLine("5 far right pole (up)", new Vector3(27.8f, 0f, 14.2f), new Vector3(27.8f, 11f, 14.2f)),
+                new PoleLine("6 back bar (shimmy left)", new Vector3(26.3f, 9f, 14.2f), new Vector3(5.2f, 9f, 10.3f)),
+                new PoleLine("7 last pole (down)", new Vector3(4.2f, 0f, 10.3f), new Vector3(4.2f, 11f, 10.3f)),
+            },
+        };
+
         private static T[] Concat<T>(T[] a, T[] b)
         {
             var all = new T[a.Length + b.Length];
@@ -671,6 +714,10 @@ namespace Blocks.Gameplay.Core
         [MenuItem("Friendslop/Challenges/Build Challenge_16_21, 32_14 (Alternating Poles)")]
         private static void BuildAlternatingPoleChallenges() =>
             BuildSpecs(new[] { PolePositionChallenge, SwingVoteChallenge }, "Build Alternating Pole Challenges");
+
+        [MenuItem("Friendslop/Challenges/Build Challenge_16_26 (Shimmy)")]
+        private static void BuildShimmyChallenge() =>
+            BuildSpecs(new[] { HandOverHandChallenge }, "Build Challenge_16_26");
 
         [MenuItem("Friendslop/Challenges/Build Challenge_32_07 (Moving Platforms)")]
         private static void BuildMovingPlatformChallenge() =>
