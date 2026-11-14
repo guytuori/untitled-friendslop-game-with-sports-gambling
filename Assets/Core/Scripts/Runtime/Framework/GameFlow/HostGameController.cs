@@ -21,7 +21,7 @@ namespace Blocks.Gameplay.Core
     ///
     /// Rows, top to bottom: Presets (Normal / Hard / Very Hard), Visibility (host only), Map (2x5 grid of
     /// thumbnails - see <see cref="maps"/> - with the hovered/selected map's name to the right and flavor
-    /// text underneath; unselected maps grayed out), Max Players, Round Time, Bonus Time, Average Target
+    /// text underneath; unselected maps grayed out), Max Players, Round Time, Bonus Time, Max Rounds, Average Target
     /// Score and Target Score Growth (host only - not search filters), Lives, Starting Points, Death
     /// Penalty, Wager Payout (sliders over fixed option lists, current option shown to the
     /// right), Items and Pickups (On/Off dropdowns). Back is bottom-left; B/Esc while not editing also
@@ -101,6 +101,7 @@ namespace Blocks.Gameplay.Core
         private static readonly int[] MaxPlayerOptions = BuildRange(2, 16);
         private static readonly int[] RoundTimeOptions = { 60, 90, 120, 150, 180, 240, 300, 360, 420, 480 };
         private static readonly int[] BonusTimeOptions = { 0, 30, 40, 50, 60, 70, 80, 90, 120, 180 };
+        private static readonly int[] MaxRoundsOptions = { 3, 4, 5, 6, 7, 8, 9, -1 }; // -1 = No Limit
         private static readonly int[] AverageTargetScoreOptions = { 3000, 3200, 3400, 3600, 4000, 4200, 4400, 4600, 4800, 5000 };
         private static readonly float[] TargetScoreGrowthOptions = { 1.0f, 1.05f, 1.1f, 1.15f, 1.2f };
         private static readonly int[] LivesOptions = BuildLivesOptions(); // 1-20, then -1 (Unlimited)
@@ -315,6 +316,20 @@ namespace Blocks.Gameplay.Core
                 i => GameRulesFormat.Time(BonusTimeOptions[i]),
                 i => m_Rules.BonusTimeSeconds = BonusTimeOptions[i],
                 Flag(() => m_Filter.AllBonusTimes, v => m_Filter.AllBonusTimes = v));
+
+            // Max Rounds (2026-11-13). In filter mode the Normal search preset means "up to 5"
+            // (GameSearchFilter.MaxRoundsAtMost); the label says so, and any edit makes it an exact match.
+            AddSliderRow(column, "MAX ROUNDS", MaxRoundsOptions.Length,
+                () => IndexOf(MaxRoundsOptions, m_Rules.MaxRounds, MaxRoundsOptions.Length - 1),
+                i => m_Filter != null && m_Filter.MaxRoundsAtMost
+                    ? Loc.F("Up to {0}", GameRulesFormat.MaxRounds(MaxRoundsOptions[i]))
+                    : GameRulesFormat.MaxRounds(MaxRoundsOptions[i]),
+                i =>
+                {
+                    m_Rules.MaxRounds = MaxRoundsOptions[i];
+                    if (m_Filter != null) m_Filter.MaxRoundsAtMost = false;
+                },
+                Flag(() => m_Filter.AllMaxRounds, v => m_Filter.AllMaxRounds = v));
 
             // Host only - the target score isn't something games are searched by.
             if (!IsFilterMode)

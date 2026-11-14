@@ -33,11 +33,18 @@ namespace Blocks.Gameplay.Core
         public static bool InvertGliderControls => Current.InvertGliderControls;
         public static bool MessageBuilderChatOnly => Current.MessageBuilderChatOnly;
 
+        /// <summary>Settings > Gameplay > Camera Sensitivity as a multiplier (1 = the camera's own speed).</summary>
+        public static float CameraSensitivity => Current.CameraSensitivityMultiplier;
+
+        /// <summary>Settings > Gameplay > Default Zoom, 0-100 % of the camera's zoom range.</summary>
+        public static int DefaultZoom => Current.ClampedDefaultZoom;
+
         /// <summary>Makes <paramref name="settings"/> current (not saved - InputBindingsStore.Save does that).</summary>
         public static void Apply(GameplaySettingsData settings)
         {
             s_Current = settings != null ? settings.Clone() : new GameplaySettingsData();
             if (s_Current.ArachnophobiaMode && s_Current.ArachnophiliaMode) s_Current.ArachnophiliaMode = false;
+            if (s_Current.DefaultZoom < 0) s_Current.DefaultZoom = GameplaySettingsData.StandardDefaultZoom;
             Loc.SetLanguage(s_Current.Language);
             Changed?.Invoke();
         }
@@ -64,6 +71,15 @@ namespace Blocks.Gameplay.Core
             if (settings.ArachnophobiaMode && settings.ArachnophiliaMode) settings.ArachnophiliaMode = false;
             if (!Loc.IsSupported(settings.Language)) settings.Language = Loc.DefaultLanguageCode;
             settings.ColorblindMode = Mathf.Clamp(settings.ColorblindMode, 0, ColorblindFilter.ModeNames.Length - 1);
+
+            // Default Zoom used to be on the Graphics screen (until 2026-11-13): carry that choice over until this
+            // screen saves one of its own.
+            if (settings.DefaultZoom < 0)
+            {
+                int legacy = data.Graphics != null ? data.Graphics.DefaultZoom : GameplaySettingsData.StandardDefaultZoom;
+                settings.DefaultZoom = Mathf.Clamp(legacy, GameplaySettingsData.MinDefaultZoom, GameplaySettingsData.MaxDefaultZoom);
+            }
+            settings.CameraSensitivity = settings.ClampedCameraSensitivity;
             return settings;
         }
 

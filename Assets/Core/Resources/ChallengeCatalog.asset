@@ -117,6 +117,22 @@ MonoBehaviour:
     size: 16
     prefab: {fileID: 8767988505568360635, guid: f817ce914e1cc254aa45bd176e3c7471, type: 3}
     thumbnail: {fileID: 2800000, guid: 58ec867656323c74b9816c7e2b8e2069, type: 3}
+  - id: Challenge_16_27
+    size: 16
+    prefab: {fileID: 4562766866681910100, guid: 5d4340a27167171488a0e4f3d2df8d60, type: 3}
+    thumbnail: {fileID: 2800000, guid: 7fe1831dad46e3648a1b331b133706ad, type: 3}
+  - id: Challenge_16_28
+    size: 16
+    prefab: {fileID: 5416350890912251860, guid: b5e776f337fe6404d8b9743209f4ded8, type: 3}
+    thumbnail: {fileID: 2800000, guid: 8cda4070f89633e4081bb6d320348e4d, type: 3}
+  - id: Challenge_16_29
+    size: 16
+    prefab: {fileID: 4224018370754501137, guid: 4038b69c411a7a44dbc4af39f4bd0ae3, type: 3}
+    thumbnail: {fileID: 2800000, guid: 3f1f4e50274e4e8428f3f97e52b6f609, type: 3}
+  - id: Challenge_16_30
+    size: 16
+    prefab: {fileID: 7838818391180207519, guid: 2adc462cec989694caae609d201d7cb9, type: 3}
+    thumbnail: {fileID: 2800000, guid: 5b898c5c648fcac4f87629cdf4ba4cba, type: 3}
   - id: Challenge_32_01
     size: 32
     prefab: {fileID: 4009937417778457704, guid: 1706642b7dbf80a47913948eea8c7b85, type: 3}
@@ -185,6 +201,14 @@ MonoBehaviour:
     size: 32
     prefab: {fileID: 8962877279759680046, guid: 69481169f88d5b34aa831c1f13d723b6, type: 3}
     thumbnail: {fileID: 2800000, guid: 184442f9d34ee3f4f8f12c0db97b94bf, type: 3}
+  - id: Challenge_32_18
+    size: 32
+    prefab: {fileID: 6900643331526251246, guid: ca813c04607105246863dee56a156a7e, type: 3}
+    thumbnail: {fileID: 2800000, guid: eee68d90921f1874c8efcdc49e2925e1, type: 3}
+  - id: Challenge_32_19
+    size: 32
+    prefab: {fileID: 6102131021854045364, guid: 1fbfd4e2137a7de4ca20472961a0f6d9, type: 3}
+    thumbnail: {fileID: 2800000, guid: 025da61c0ebc58241a9a1de4c8b3570b, type: 3}
   practice16: {fileID: 7995870167889056463, guid: 69a3b2a870c642f4b8a5a12d17563556, type: 3}
   practice32: {fileID: 915372512405286612, guid: d87f519ff8386404e86f17c21c89662b, type: 3}
   startFlag16: {fileID: 4288283407821777295, guid: 946ca866a4852be419b54ede9c8ac0de, type: 3}

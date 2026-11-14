@@ -67,6 +67,10 @@ namespace Blocks.Gameplay.Core
         [Tooltip("How long (seconds) air control stays reduced after jumping off a rail.")]
         [SerializeField] private float jumpReducedControlSeconds = 0.2f;
 
+        [Header("Rail Tops")]
+        [Tooltip("Standing on top of a rail without grinding (no Parkour, or no stamina) pushes you off to the side you're nearer, like a steep roof: this sideways push (m/s, fading like any push). The rails stay solid - you still bump into them.")]
+        [SerializeField] private float railTopPushSpeed = 5f;
+
         [Tooltip("The jump-pressed GameEvent (the same asset CoreInputHandler raises and Pole Swing 2 listens to).")]
         [SerializeField] private GameEvent onJumpPressed;
 
@@ -103,6 +107,7 @@ namespace Blocks.Gameplay.Core
         private float m_TopSpeed;       // this ride's safety cap (speedCapMultiplier x the full-tank speed)
         private float m_Distance;       // ridden on this rail (for the log)
         private float m_Cooldown;
+        private float m_PushCooldown;
 
         private bool IsOwner => m_Player != null && m_Player.IsOwner;
 
@@ -154,7 +159,11 @@ namespace Blocks.Gameplay.Core
             {
                 if (m_Cooldown <= 0f && m_Motor.IsGrabHeld && HasStaminaToStart()
                     && TryFindRail(null, out GrindRail rail, out float arc)) GetOn(rail, arc);
-                if (!IsOnRail) return modifier;
+                if (!IsOnRail)
+                {
+                    PushOffRailTop();
+                    return modifier;
+                }
             }
 
             Grind(Time.deltaTime);
@@ -203,6 +212,65 @@ namespace Blocks.Gameplay.Core
         private void OnDisable()
         {
             if (IsOnRail) GetOff(null);
+        }
+
+        #endregion
+
+        #region Rail tops
+
+        private static int s_SolidGroundMask = -1;
+
+        /// <summary>
+        /// Standing on a rail's top without grinding (2026-11-14, the user: "the tops of rails just kind of push you off,
+        /// like an invisible slope"): a sideways push towards the side the feet are on, or the player's right if they're
+        /// dead centre. Only when nothing but rails is under the feet, so walking past a rail that lies along the ground
+        /// doesn't shove you. The rails keep their colliders, so running into one still bumps you.
+        /// </summary>
+        private void PushOffRailTop()
+        {
+            if (m_PushCooldown > 0f) { m_PushCooldown -= Time.deltaTime; return; }
+            if (railTopPushSpeed <= 0f || m_Motor.VerticalVelocity > 0.5f || m_Motor.MovementAbilityActive()) return;
+
+            Vector3 feet = m_Motor.transform.position;
+            IReadOnlyList<GrindRail> rails = GrindRail.ActiveRails;
+            for (int i = 0; i < rails.Count; i++)
+            {
+                GrindRail rail = rails[i];
+                if (rail == null || !rail.isActiveAndEnabled) continue;
+
+                float arc = rail.ProjectToArcLength(feet, out bool within);
+                if (!within) continue;
+                rail.Evaluate(arc, out Vector3 top, out Vector3 tangent, out _, out _); // top: the top of the bar
+
+                Vector3 offset = feet - top;
+                if (offset.y < -0.3f || offset.y > 0.3f) continue;
+                Vector3 side = Vector3.Cross(Vector3.up, new Vector3(tangent.x, 0f, tangent.z));
+                if (side.sqrMagnitude < 0.0001f) continue; // a vertical bit of rail: nothing to stand on
+                side.Normalize();
+                float across = Vector3.Dot(offset, side);
+                Vector3 along = new Vector3(offset.x, 0f, offset.z) - side * across;
+                if (Mathf.Abs(across) > 0.55f || along.magnitude > 0.55f) continue;
+
+                if (StandingOnSolidGround(feet)) return;
+
+                Vector3 push = Mathf.Abs(across) > 0.01f
+                    ? side * Mathf.Sign(across)
+                    : (Vector3.Dot(m_Motor.transform.right, side) >= 0f ? side : -side); // dead centre: to the player's right
+                m_Motor.ApplyExternalForce(push * railTopPushSpeed, ForceMode.Impulse);
+                m_PushCooldown = 0.2f;
+                return;
+            }
+        }
+
+        /// <summary>Is there ground other than a rail just under the feet?</summary>
+        private static bool StandingOnSolidGround(Vector3 feet)
+        {
+            if (s_SolidGroundMask == -1)
+            {
+                int grind = LayerMask.NameToLayer("Grind");
+                s_SolidGroundMask = Physics.DefaultRaycastLayers & ~(grind >= 0 ? 1 << grind : 0);
+            }
+            return Physics.Raycast(feet + Vector3.up * 0.1f, Vector3.down, 0.45f, s_SolidGroundMask, QueryTriggerInteraction.Ignore);
         }
 
         #endregion

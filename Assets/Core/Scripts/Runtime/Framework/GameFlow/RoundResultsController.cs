@@ -119,6 +119,15 @@ namespace Blocks.Gameplay.Core
 
             column.Add(MakeStarLabel(Loc.F("Next round's target: {0}", StarLabel.Amount(MatchProgress.NextTeamTarget)), 20, new Color(0.67f, 0.86f, 1f)));
 
+            // Max Rounds (2026-11-13): say so when the next round is the game's last.
+            HostGameRulesData rules = MatchRules.Get(null);
+            if (rules.HasRoundLimit && MatchProgress.RoundNumber >= rules.MaxRounds)
+            {
+                Label finalRound = MakeLabel(Loc.T("Next round is the final round!"), 20, new Color(1f, 0.84f, 0.35f), bold: true);
+                finalRound.style.marginTop = 8;
+                column.Add(finalRound);
+            }
+
             m_Prompt = MakeLabel(m_ShopMode ? Loc.T("Buy an item, or choose No Item, when you're ready for the next round") : "Press any key to go to the next round", 18, Color.white, bold: false);
             m_Prompt.style.position = Position.Absolute;
             m_Prompt.style.bottom = 90;

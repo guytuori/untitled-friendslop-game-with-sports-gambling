@@ -36,6 +36,16 @@ namespace Blocks.Gameplay.Core
         public bool AllItems = true;
         public bool AllPickups = true;
 
+        /// <summary>Max Rounds (2026-11-13) isn't filtered on while this is set.</summary>
+        public bool AllMaxRounds = true;
+
+        /// <summary>
+        /// When set (and AllMaxRounds isn't), Values.MaxRounds is an upper limit instead of an exact match: games
+        /// with that many rounds or fewer, never No Limit. Only the Normal search preset uses it ("up to 5"), so a
+        /// quick, casual search never lands in a long game. Editing the slider on the Custom screen clears it.
+        /// </summary>
+        public bool MaxRoundsAtMost;
+
         public bool Matches(HostGameRulesData game)
         {
             // Settings > Gameplay > Message Builder Chat Only (2026-11-10): only games whose host has it on too.
@@ -65,6 +75,18 @@ namespace Blocks.Gameplay.Core
             if (!AllWagerPayouts && !Mathf.Approximately(game.WagerPayout, Values.WagerPayout)) return false;
             if (!AllItems && game.ItemsEnabled != Values.ItemsEnabled) return false;
             if (!AllPickups && game.PickupsEnabled != Values.PickupsEnabled) return false;
+
+            if (!AllMaxRounds)
+            {
+                if (MaxRoundsAtMost)
+                {
+                    if (!game.HasRoundLimit || game.MaxRounds > Values.MaxRounds) return false;
+                }
+                else if (game.MaxRounds != Values.MaxRounds)
+                {
+                    return false;
+                }
+            }
             return true;
         }
 
@@ -89,6 +111,8 @@ namespace Blocks.Gameplay.Core
             AllWagerPayouts = other.AllWagerPayouts;
             AllItems = other.AllItems;
             AllPickups = other.AllPickups;
+            AllMaxRounds = other.AllMaxRounds;
+            MaxRoundsAtMost = other.MaxRoundsAtMost;
         }
     }
 
@@ -101,7 +125,8 @@ namespace Blocks.Gameplay.Core
         public static GameSearchFilter Normal => new GameSearchFilter
         {
             AllLives = false, AllStartingPoints = false, AllDeathPenalties = false, AllItems = false, AllPickups = false,
-            Values = new HostGameRulesData { Lives = -1, StartingPoints = 1000, DeathPenalty = 50, ItemsEnabled = true, PickupsEnabled = true }
+            AllMaxRounds = false, MaxRoundsAtMost = true, // up to 5 rounds (2026-11-13)
+            Values = new HostGameRulesData { Lives = -1, StartingPoints = 1000, DeathPenalty = 50, ItemsEnabled = true, PickupsEnabled = true, MaxRounds = 5 }
         };
 
         public static GameSearchFilter Hard => new GameSearchFilter
@@ -280,5 +305,6 @@ namespace Blocks.Gameplay.Core
         public static string DeathPenalty(int penalty) => penalty < 0 ? Loc.T("All") : penalty.ToString(CultureInfo.InvariantCulture);
         public static string Payout(float payout) => payout.ToString("0.#", CultureInfo.InvariantCulture);
         public static string OnOff(bool on) => Loc.T(on ? "On" : "Off");
+        public static string MaxRounds(int rounds) => rounds > 0 ? rounds.ToString(CultureInfo.InvariantCulture) : Loc.T("No Limit");
     }
 }

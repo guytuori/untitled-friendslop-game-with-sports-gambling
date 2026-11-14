@@ -39,7 +39,8 @@ namespace Blocks.Gameplay.Core
     /// client records the results in MatchProgress, and every player's stats in MatchStats, at this point) ->
     /// the master client loads the Round Results scene if the team hit the target. If not, the match is over:
     /// the master switches to GameOver and every client opens the Game Results screen over this scene
-    /// (<see cref="GameResults"/>, 2026-11-09 - it used to load the Final Score scene).
+    /// (<see cref="GameResults"/>, 2026-11-09 - it used to load the Final Score scene). The same happens after
+    /// the last round of a game with Max Rounds set (2026-11-13), target hit or not.
     /// </summary>
     [RequireComponent(typeof(NetworkObject))]
     public class RoundTimer : CoreNetworkBehaviour, ISceneSingleton
@@ -145,6 +146,12 @@ namespace Blocks.Gameplay.Core
         public int BonusPointsPerSecond => Rules.BonusPointsPerSecond;
 
         private HostGameRulesData Rules => m_Rules ??= MatchRules.Get(gameRulesConfig);
+
+        /// <summary>The game's Max Rounds (2026-11-13): it ends after this round even when the target is hit. 0 or less = No Limit.</summary>
+        public int MaxRounds => Rules.MaxRounds;
+
+        /// <summary>This is the game's last round (Max Rounds reached), whatever the score.</summary>
+        public bool IsFinalRound => Rules.HasRoundLimit && RoundNumber >= Rules.MaxRounds;
 
         /// <summary>Raised on every client whenever the round time changes (previous, new).</summary>
         public event Action<float, float> TimeRemainingChanged;
@@ -261,11 +268,14 @@ namespace Blocks.Gameplay.Core
                 case RoundPhase.Ended:
                     if (!m_LoadRequested && NetPhaseTimer.ExpiredOrNotRunning(Runner))
                     {
-                        if (!NetPassed)
+                        // Target missed, or the last round of a game with Max Rounds (2026-11-13): the match is
+                        // over - everyone gets the Game Results screen, here.
+                        bool lastRound = Rules.HasRoundLimit && NetRoundNumber >= Rules.MaxRounds;
+                        if (!NetPassed || lastRound)
                         {
-                            // Target missed: the match is over - everyone gets the Game Results screen, here.
                             NetPhase = (int)RoundPhase.GameOver;
-                            Debug.Log($"[Round] Game over after round {NetRoundNumber}.", this);
+                            Debug.Log($"[Round] Game over after round {NetRoundNumber}" +
+                                      (NetPassed ? $" - that was the last of {Rules.MaxRounds}." : "."), this);
                             break;
                         }
 

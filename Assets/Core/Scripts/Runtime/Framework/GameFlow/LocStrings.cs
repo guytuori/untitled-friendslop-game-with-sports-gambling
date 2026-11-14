@@ -438,6 +438,16 @@ namespace Blocks.Gameplay.Core
             ["Time: {0} - item used, not a record"] = new[] { "Tiempo: {0} - se usó un objeto, no cuenta como récord", "Tempo: {0} - oggetto usato, non vale come record", "Temps : {0} - objet utilisé, pas de record", "Zeit: {0} - Item benutzt, kein Rekord", "Tempo: {0} - item usado, não vale recorde" },
             ["Item used - this time can't be a record"] = new[] { "Se usó un objeto: este tiempo no puede ser récord", "Oggetto usato: questo tempo non può essere un record", "Objet utilisé : ce temps ne peut pas être un record", "Item benutzt - diese Zeit zählt nicht als Rekord", "Item usado: este tempo não pode ser recorde" },
             ["(out)"] = new[] { "(fuera)", "(fuori)", "(éliminé)", "(raus)", "(fora)" },
+            ["MAX ROUNDS"] = new[] { "RONDAS MÁXIMAS", "ROUND MASSIMI", "MANCHES MAX", "MAX. RUNDEN", "RODADAS MÁXIMAS" },
+            ["No Limit"] = new[] { "Sin límite", "Nessun limite", "Sans limite", "Kein Limit", "Sem limite" },
+            ["Up to {0}"] = new[] { "Hasta {0}", "Fino a {0}", "Jusqu'à {0}", "Bis zu {0}", "Até {0}" },
+            ["ROUNDS"] = new[] { "RONDAS", "ROUND", "MANCHES", "RUNDEN", "RODADAS" },
+            ["Rounds cleared: {0} of {1}"] = new[] { "Rondas superadas: {0} de {1}", "Round superati: {0} su {1}", "Manches réussies : {0} sur {1}", "Geschaffte Runden: {0} von {1}", "Rodadas concluídas: {0} de {1}" },
+            ["ALL ROUNDS CLEARED!"] = new[] { "¡TODAS LAS RONDAS SUPERADAS!", "TUTTI I ROUND SUPERATI!", "TOUTES LES MANCHES RÉUSSIES !", "ALLE RUNDEN GESCHAFFT!", "TODAS AS RODADAS CONCLUÍDAS!" },
+            ["CAMERA SENSITIVITY"] = new[] { "SENSIBILIDAD DE CÁMARA", "SENSIBILITÀ TELECAMERA", "SENSIBILITÉ DE LA CAMÉRA", "KAMERA-EMPFINDLICHKEIT", "SENSIBILIDADE DA CÂMERA" },
+            ["Where the camera zoom starts"] = new[] { "Donde empieza el zoom de la cámara", "Dove parte lo zoom della telecamera", "Zoom de la caméra au départ", "Wo der Kamera-Zoom beginnt", "Onde o zoom da câmera começa" },
+            ["Mouse and right stick"] = new[] { "Ratón y stick derecho", "Mouse e levetta destra", "Souris et stick droit", "Maus und rechter Stick", "Mouse e analógico direito" },
+            ["Next round is the final round!"] = new[] { "¡La siguiente ronda es la última!", "Il prossimo round è l'ultimo!", "La prochaine manche est la dernière !", "Die nächste Runde ist die letzte!", "A próxima rodada é a última!" },
         };
     }
 }

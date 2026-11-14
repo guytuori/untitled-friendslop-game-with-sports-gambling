@@ -497,8 +497,21 @@ namespace Blocks.Gameplay.Core
                 m_ViewTitle.text = Loc.T("ALL ROUNDS");
                 int cleared = 0;
                 foreach (MatchStats.Round round in MatchStats.Rounds) if (round.Passed) cleared++;
-                m_InfoLabel.text = Loc.F("Rounds cleared: {0}", cleared);
-                m_ResultLabel.style.display = DisplayStyle.None;
+
+                // Max Rounds (2026-11-13): "Rounds cleared: 5 of 5", and a green line when the team cleared them all.
+                RoundTimer timer = GetComponent<RoundTimer>();
+                int maxRounds = timer != null ? timer.MaxRounds : 0;
+                m_InfoLabel.text = maxRounds > 0 ? Loc.F("Rounds cleared: {0} of {1}", cleared, maxRounds) : Loc.F("Rounds cleared: {0}", cleared);
+                if (maxRounds > 0 && cleared >= maxRounds)
+                {
+                    m_ResultLabel.text = Loc.T("ALL ROUNDS CLEARED!");
+                    m_ResultLabel.style.color = PassedColor;
+                    m_ResultLabel.style.display = DisplayStyle.Flex;
+                }
+                else
+                {
+                    m_ResultLabel.style.display = DisplayStyle.None;
+                }
             }
             else
             {

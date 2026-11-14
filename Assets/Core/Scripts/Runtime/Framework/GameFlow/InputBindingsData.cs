@@ -143,19 +143,12 @@ namespace Blocks.Gameplay.Core
         public int FieldOfView = DefaultFieldOfView;
 
         /// <summary>
-        /// Default Zoom (added 2026-10-27): where the camera zoom starts each time the game is launched, as a
-        /// percentage of CoreCameraController's zoom range - 0 = closest (3 m), 100 = furthest. 80 is the camera's
-        /// own default (the camera mode's Camera Distance, 12 m in [BB] FreeLook).
+        /// LEGACY (2026-11-13): Default Zoom moved to Settings > Gameplay (<see cref="GameplaySettingsData.DefaultZoom"/>).
+        /// Still read once so an older settings.json's choice carries over, and kept as it was when Graphics is saved.
         /// </summary>
-        public const int MinDefaultZoom = 0;
-        public const int MaxDefaultZoom = 100;
-        public const int StandardDefaultZoom = 80;
-
-        public int DefaultZoom = StandardDefaultZoom;
+        public int DefaultZoom = GameplaySettingsData.StandardDefaultZoom;
 
         public int ClampedFieldOfView => FieldOfView <= 0 ? DefaultFieldOfView : Mathf.Clamp(FieldOfView, MinFieldOfView, MaxFieldOfView);
-
-        public int ClampedDefaultZoom => Mathf.Clamp(DefaultZoom, MinDefaultZoom, MaxDefaultZoom);
     }
 
     /// <summary>
@@ -190,6 +183,39 @@ namespace Blocks.Gameplay.Core
         /// host has it on too (so nobody types in their chat), and a game they host is one of those.
         /// </summary>
         public bool MessageBuilderChatOnly = false;
+
+        /// <summary>
+        /// Default Zoom (added 2026-10-27 on the Graphics screen, moved here 2026-11-13): where the camera zoom
+        /// starts each time the game is launched, as a percentage of CoreCameraController's zoom range - 0 =
+        /// closest (3 m), 100 = furthest. 80 is the camera's own default (the camera mode's Camera Distance, 12 m in
+        /// [BB] FreeLook). -1 = never saved here: GameplaySettings takes the old Graphics value on load.
+        /// </summary>
+        public int DefaultZoom = -1;
+
+        public const int MinDefaultZoom = 0;
+        public const int MaxDefaultZoom = 100;
+        public const int StandardDefaultZoom = 80;
+
+        public int ClampedDefaultZoom => DefaultZoom < 0 ? StandardDefaultZoom : Mathf.Clamp(DefaultZoom, MinDefaultZoom, MaxDefaultZoom);
+
+        /// <summary>
+        /// Camera Sensitivity (2026-11-13): a slider position, <see cref="MinCameraSensitivity"/>-<see cref="MaxCameraSensitivity"/>,
+        /// with the middle (<see cref="StandardCameraSensitivity"/>) the camera's own speed. Each step is x2^(1/5),
+        /// so the ends are x0.25 and x4 (<see cref="CameraSensitivityMultiplier"/>). Mouse and right stick alike.
+        /// </summary>
+        public int CameraSensitivity = StandardCameraSensitivity;
+
+        public const int MinCameraSensitivity = 0;
+        public const int MaxCameraSensitivity = 20;
+        public const int StandardCameraSensitivity = 10;
+
+        public int ClampedCameraSensitivity => Mathf.Clamp(CameraSensitivity, MinCameraSensitivity, MaxCameraSensitivity);
+
+        /// <summary>The look speed multiplier for a slider position: x0.25 .. x1 (middle) .. x4.</summary>
+        public static float SensitivityMultiplier(int position) =>
+            Mathf.Pow(2f, (Mathf.Clamp(position, MinCameraSensitivity, MaxCameraSensitivity) - StandardCameraSensitivity) / 5f);
+
+        public float CameraSensitivityMultiplier => SensitivityMultiplier(CameraSensitivity);
 
         public GameplaySettingsData Clone() => (GameplaySettingsData)MemberwiseClone();
     }

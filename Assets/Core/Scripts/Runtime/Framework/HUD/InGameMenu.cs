@@ -204,7 +204,9 @@ namespace Blocks.Gameplay.Core
 
             // Settings list
             m_SettingsPanel = MakePanel("SETTINGS");
-            Button graphics = null, audio = null, keys = null;
+            Button gameplay = null, graphics = null, audio = null, keys = null;
+            // Gameplay (2026-11-13): Default Zoom and Camera Sensitivity live there now.
+            gameplay = AddButton(m_SettingsPanel, "Gameplay", () => OpenSettingsScreen("GameplaySettings", gameplay));
             graphics = AddButton(m_SettingsPanel, "Graphics", () => OpenSettingsScreen("GraphicsSettings", graphics));
             audio = AddButton(m_SettingsPanel, "Audio", () => OpenSettingsScreen("AudioSettings", audio));
             keys = AddButton(m_SettingsPanel, "Change Keybindings", () =>
@@ -213,7 +215,7 @@ namespace Blocks.Gameplay.Core
                 OpenSettingsScreen("ChangeKeybindings", keys);
             });
             AddButton(m_SettingsPanel, "Back", CloseSettingsList);
-            m_SettingsFirstButton = graphics;
+            m_SettingsFirstButton = gameplay;
             m_SettingsPanel.style.display = DisplayStyle.None;
             m_Overlay.Add(m_SettingsPanel);
 

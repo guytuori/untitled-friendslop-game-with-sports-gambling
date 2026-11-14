@@ -19,6 +19,12 @@ namespace Blocks.Gameplay.Core
     ///   - INVERT GLIDER CONTROLS (2026-11-08): on by default - forward dives, back climbs (GlideAbility).
     ///   - MESSAGE BUILDER CHAT ONLY (2026-11-10): off by default - only find / join games where chat is message
     ///     builder only (and host them that way). See ChatLog / GameSearchFilter.Matches.
+    ///   - DEFAULT ZOOM (moved here from Graphics 2026-11-13): 0-100 % of the camera's zoom range, 80 default.
+    ///   - CAMERA SENSITIVITY (2026-11-13): x0.25 .. x4, the camera's own speed (x1.00) in the middle; mouse and
+    ///     right stick. Both sliders work like the Graphics screen's: A to edit, Left/Right to step, A keeps, B undoes.
+    ///     Both take effect on Save Changes (CoreCameraController reads them every frame).
+    /// Also opens over a running game from Esc > Settings > Gameplay (SettingsOverlay, 2026-11-13), so zoom and
+    /// sensitivity can be changed mid-match.
     /// Saved with the other settings in settings.json (<see cref="GameplaySettingsData"/>) and applied through
     /// <see cref="GameplaySettings"/>.
     ///
@@ -59,11 +65,17 @@ namespace Blocks.Gameplay.Core
         private Toggle m_PhiliaToggle;
         private Toggle m_GliderToggle;
         private Toggle m_BuilderChatToggle;
+        private SliderInt m_ZoomSlider;
+        private SliderInt m_SensitivitySlider;
+        private readonly Dictionary<SliderInt, (Label Value, System.Func<int, string> Format, System.Action<int> Apply, int Step)> m_Sliders =
+            new Dictionary<SliderInt, (Label, System.Func<int, string>, System.Action<int>, int)>();
+        private SliderInt m_EditingSlider; // the slider in edit mode (A pressed on it), if any
+        private int m_ValueBeforeEdit;
         private readonly List<VisualElement> m_Rows = new List<VisualElement>();
 
         private DropdownField m_EditingDropdown; // the dropdown in edit mode (A pressed on it), if any
         private int m_IndexBeforeEdit;
-        private bool Editing => m_EditingDropdown != null;
+        private bool Editing => m_EditingDropdown != null || m_EditingSlider != null;
 
         private Button m_RestoreDefaultsButton;
         private Button m_SaveButton;
@@ -79,6 +91,7 @@ namespace Blocks.Gameplay.Core
             m_SavedLanguage = m_Settings.Language;
 
             BuildUI(GetComponent<UIDocument>().rootVisualElement);
+            SettingsOverlay.PrepareIfOverlay(this, GetComponent<UIDocument>()); // opened mid-game from Esc > Settings
         }
 
         private void BuildUI(VisualElement root)
@@ -112,6 +125,14 @@ namespace Blocks.Gameplay.Core
             m_ColorblindDropdown = AddDropdownRow(column, "COLORBLIND MODE", "Adjusts the game's colors",
                 new List<string>(ColorblindFilter.ModeNames), m_Settings.ColorblindMode,
                 index => m_Settings.ColorblindMode = index);
+
+            // Camera (2026-11-13)
+            m_ZoomSlider = AddSliderRow(column, "DEFAULT ZOOM", "Where the camera zoom starts",
+                GameplaySettingsData.MinDefaultZoom, GameplaySettingsData.MaxDefaultZoom, m_Settings.ClampedDefaultZoom,
+                value => $"{value}%", value => m_Settings.DefaultZoom = value, 5);
+            m_SensitivitySlider = AddSliderRow(column, "CAMERA SENSITIVITY", "Mouse and right stick",
+                GameplaySettingsData.MinCameraSensitivity, GameplaySettingsData.MaxCameraSensitivity, m_Settings.ClampedCameraSensitivity,
+                SensitivityText, value => m_Settings.CameraSensitivity = value, 1);
 
             // Checkboxes
             m_ShowNamesToggle = AddToggleRow(column, "SHOW DISPLAY NAMES", "Off shows other players as Player 1, Player 2, ...",
@@ -195,12 +216,70 @@ namespace Blocks.Gameplay.Core
             return dropdown;
         }
 
+        private static string SensitivityText(int position) =>
+            "x" + GameplaySettingsData.SensitivityMultiplier(position).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>
+        /// A labelled SliderInt row with a value label and A-to-edit behaviour (like the Graphics screen's sliders):
+        /// A enters edit mode, Left/Right step by <paramref name="step"/>, A keeps it, B undoes it. A mouse drag sets it directly.
+        /// </summary>
+        private SliderInt AddSliderRow(VisualElement column, string label, string hint, int low, int high, int initial,
+            System.Func<int, string> format, System.Action<int> apply, int step)
+        {
+            VisualElement row = MakeRow(column, label);
+            var slider = new SliderInt { lowValue = low, highValue = high, value = Mathf.Clamp(initial, low, high) };
+            slider.style.width = 180;
+            slider.style.flexShrink = 0;
+            SetHighlight(slider, false);
+            slider.RegisterCallback<FocusInEvent>(_ => { if (m_EditingSlider != slider) SetHighlight(slider, true); });
+            slider.RegisterCallback<FocusOutEvent>(_ => SetHighlight(slider, false));
+            slider.RegisterCallback<NavigationSubmitEvent>(evt => OnSliderSubmit(slider, evt), TrickleDown.TrickleDown);
+            slider.RegisterCallback<NavigationCancelEvent>(evt => OnSliderCancel(slider, evt), TrickleDown.TrickleDown);
+            slider.RegisterCallback<NavigationMoveEvent>(evt => OnSliderNavigationMove(slider, evt), TrickleDown.TrickleDown);
+            row.Add(slider);
+
+            var valueLabel = new Label(format(slider.value));
+            valueLabel.style.color = Color.white;
+            valueLabel.style.fontSize = 16;
+            valueLabel.style.width = 60;
+            valueLabel.style.marginLeft = 10;
+            valueLabel.style.flexShrink = 0;
+            row.Add(valueLabel);
+
+            if (!string.IsNullOrEmpty(hint))
+            {
+                var hintLabel = new Label(hint);
+                hintLabel.style.color = HintText;
+                hintLabel.style.fontSize = 14;
+                hintLabel.style.marginLeft = 6;
+                row.Add(hintLabel);
+            }
+
+            slider.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.newValue == evt.previousValue) return;
+                valueLabel.text = format(evt.newValue);
+                apply(evt.newValue);
+                ClearStatus();
+            });
+
+            m_Sliders[slider] = (valueLabel, format, apply, step);
+            m_Rows.Add(slider);
+            return slider;
+        }
+
+        private void SetSliderWithoutNotify(SliderInt slider, int value)
+        {
+            slider.SetValueWithoutNotify(value);
+            if (m_Sliders.TryGetValue(slider, out var info)) info.Value.text = info.Format(value);
+        }
+
         private static VisualElement MakeRow(VisualElement column, string label)
         {
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
-            row.style.marginBottom = 16;
+            row.style.marginBottom = 12; // was 16 - two slider rows were added 2026-11-13
 
             var nameLabel = new Label(label);
             nameLabel.style.color = Color.white;
@@ -318,6 +397,58 @@ namespace Blocks.Gameplay.Core
         }
 
         // =====================================================================================
+        // Sliders (edit mode)
+        // =====================================================================================
+
+        private void OnSliderSubmit(SliderInt slider, NavigationSubmitEvent evt)
+        {
+            if (m_EditingSlider == slider)
+            {
+                m_EditingSlider = null;
+                SetHighlight(slider, true);
+                MenuUI.PlaySound(selectSound);
+            }
+            else if (!Editing)
+            {
+                m_EditingSlider = slider;
+                m_ValueBeforeEdit = slider.value;
+                slider.style.backgroundColor = EditingBackground;
+                MenuUI.PlaySound(selectSound);
+            }
+            evt.PreventDefault();
+            evt.StopPropagation();
+        }
+
+        private void OnSliderCancel(SliderInt slider, NavigationCancelEvent evt)
+        {
+            if (m_EditingSlider != slider) return;
+
+            m_EditingSlider = null;
+            if (slider.value != m_ValueBeforeEdit)
+            {
+                SetSliderWithoutNotify(slider, m_ValueBeforeEdit);
+                m_Sliders[slider].Apply(m_ValueBeforeEdit);
+            }
+            SetHighlight(slider, true);
+            MenuUI.PlaySound(cancelSound);
+            evt.PreventDefault();
+            evt.StopPropagation();
+        }
+
+        private void OnSliderNavigationMove(SliderInt slider, NavigationMoveEvent evt)
+        {
+            if (m_EditingSlider == slider)
+            {
+                int step = m_Sliders.TryGetValue(slider, out var info) ? info.Step : 1;
+                if (evt.direction == NavigationMoveEvent.Direction.Right) slider.value = Mathf.Min(slider.highValue, slider.value + step);
+                else if (evt.direction == NavigationMoveEvent.Direction.Left) slider.value = Mathf.Max(slider.lowValue, slider.value - step);
+                Suppress(evt);
+                return;
+            }
+            OnRowNavigationMove(slider, evt); // Left does nothing; SliderInt's own scrub never runs
+        }
+
+        // =====================================================================================
         // Navigation
         // =====================================================================================
 
@@ -387,6 +518,9 @@ namespace Blocks.Gameplay.Core
             m_PhiliaToggle.SetValueWithoutNotify(m_Settings.ArachnophiliaMode);
             m_GliderToggle.SetValueWithoutNotify(m_Settings.InvertGliderControls);
             m_BuilderChatToggle.SetValueWithoutNotify(m_Settings.MessageBuilderChatOnly);
+            m_Settings.DefaultZoom = GameplaySettingsData.StandardDefaultZoom;
+            SetSliderWithoutNotify(m_ZoomSlider, m_Settings.ClampedDefaultZoom);
+            SetSliderWithoutNotify(m_SensitivitySlider, m_Settings.ClampedCameraSensitivity);
             ClearStatus();
         }
 
@@ -410,6 +544,7 @@ namespace Blocks.Gameplay.Core
 
             // An unsaved language preview goes back to the saved language.
             if (Loc.CurrentCode != m_SavedLanguage) Loc.SetLanguage(m_SavedLanguage);
+            if (SettingsOverlay.TryClose(this)) return; // in a match: back to the Escape menu
             MenuTransition.LoadScene(settingsSceneName);
         }
 

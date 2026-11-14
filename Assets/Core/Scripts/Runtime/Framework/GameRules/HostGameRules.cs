@@ -60,6 +60,16 @@ namespace Blocks.Gameplay.Core
         /// </summary>
         public bool MessageBuilderOnly;
 
+        /// <summary>
+        /// Max Rounds (2026-11-13): the game ends after this many rounds even if the team keeps hitting the target,
+        /// and goes to the Game Results screen. Missing a target still ends it sooner. -1 = No Limit. Host Game
+        /// slider (3-9, then No Limit) and a search filter. The field default matches the Normal preset (5).
+        /// </summary>
+        public int MaxRounds = 5;
+
+        /// <summary>True when <see cref="MaxRounds"/> limits the game (anything above 0).</summary>
+        public bool HasRoundLimit => MaxRounds > 0;
+
         public HostGameRulesData Clone() => (HostGameRulesData)MemberwiseClone();
 
         /// <summary>Copies every field from <paramref name="other"/>, including IsPublic.</summary>
@@ -86,6 +96,7 @@ namespace Blocks.Gameplay.Core
             TargetScoreGrowth = preset.TargetScoreGrowth;
             BonusPointsPerSecond = preset.BonusPointsPerSecond;
             CarryOverPercent = preset.CarryOverPercent;
+            MaxRounds = preset.MaxRounds;
         }
     }
 
@@ -96,21 +107,21 @@ namespace Blocks.Gameplay.Core
         {
             MapName = "Random", MaxPlayers = 8, RoundTimeSeconds = 180, BonusTimeSeconds = 120, Lives = -1,
             StartingPoints = 1000, DeathPenalty = 50, WagerPayout = 3f, ItemsEnabled = true, PickupsEnabled = true,
-            AverageTargetScore = 3000, TargetScoreGrowth = 1.05f
+            AverageTargetScore = 3000, TargetScoreGrowth = 1.05f, MaxRounds = 5
         };
 
         public static HostGameRulesData Hard => new HostGameRulesData
         {
             MapName = "Random", MaxPlayers = 8, RoundTimeSeconds = 150, BonusTimeSeconds = 60, Lives = 10,
             StartingPoints = 500, DeathPenalty = 100, WagerPayout = 3f, ItemsEnabled = true, PickupsEnabled = true,
-            AverageTargetScore = 3600, TargetScoreGrowth = 1.1f
+            AverageTargetScore = 3600, TargetScoreGrowth = 1.1f, MaxRounds = -1
         };
 
         public static HostGameRulesData VeryHard => new HostGameRulesData
         {
             MapName = "Last Stop", MaxPlayers = 4, RoundTimeSeconds = 90, BonusTimeSeconds = 30, Lives = 1,
             StartingPoints = 100, DeathPenalty = -1, WagerPayout = 2.5f, ItemsEnabled = false, PickupsEnabled = false,
-            AverageTargetScore = 4200, TargetScoreGrowth = 1.1f
+            AverageTargetScore = 4200, TargetScoreGrowth = 1.1f, MaxRounds = -1
         };
     }
 

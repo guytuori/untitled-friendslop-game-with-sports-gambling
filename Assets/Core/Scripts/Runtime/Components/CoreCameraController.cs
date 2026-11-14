@@ -16,8 +16,9 @@ namespace Blocks.Gameplay.Core
     /// wherever puts the camera mode's own Camera Distance (12 m in [BB] FreeLook) at
     /// <see cref="defaultZoomOut"/> (80%) of the way out - 14.25 m with the current numbers - and the camera
     /// starts at that default. Each wheel notch is a fixed fraction of the current distance, so it feels the
-    /// same close in and far out. Each launch it starts at Settings > Graphics > Default Zoom
-    /// (GraphicsSettingsData.DefaultZoom, % of the range; 80 = the default above), and changing that setting
+    /// same close in and far out. Each launch it starts at Settings > Gameplay > Default Zoom
+    /// (GameplaySettingsData.DefaultZoom, % of the range; 80 = the default above; on the Graphics screen until
+    /// 2026-11-13), and changing that setting
     /// mid-game moves it there; zooming during play is kept between rounds but not saved. It sets the
     /// CinemachineThirdPersonFollow's Camera Distance; the deoccluder still pulls in past walls.
     /// </summary>
@@ -222,10 +223,12 @@ namespace Blocks.Gameplay.Core
         {
             if (!IsOwner || !enableLookInput) return;
 
-            m_CurrentHorizontalLookAngle += lookInput.x * m_LookSensitivity;
+            // Settings > Gameplay > Camera Sensitivity (2026-11-13) scales the camera mode's own sensitivity.
+            float sensitivity = m_LookSensitivity * GameplaySettings.CameraSensitivity;
+            m_CurrentHorizontalLookAngle += lookInput.x * sensitivity;
 
             // Clamp the vertical angle to prevent the camera from flipping over.
-            m_CurrentVerticalLookAngle = Mathf.Clamp(m_CurrentVerticalLookAngle - (lookInput.y * m_LookSensitivity), -m_VerticalLookLimit, m_VerticalLookLimit);
+            m_CurrentVerticalLookAngle = Mathf.Clamp(m_CurrentVerticalLookAngle - (lookInput.y * sensitivity), -m_VerticalLookLimit, m_VerticalLookLimit);
         }
 
         /// <summary>
@@ -253,6 +256,7 @@ namespace Blocks.Gameplay.Core
             float amount = Mathf.Clamp01((magnitude - stickDeadzone) / Mathf.Max(0.0001f, 1f - stickDeadzone));
             amount = Mathf.Pow(amount, stickResponseCurve);
             Vector2 direction = m_StickLook / m_StickLook.magnitude;
+            amount *= GameplaySettings.CameraSensitivity; // Settings > Gameplay > Camera Sensitivity (2026-11-13)
 
             m_CurrentHorizontalLookAngle += direction.x * amount * stickYawSpeed * deltaTime;
             m_CurrentVerticalLookAngle = Mathf.Clamp(
@@ -543,10 +547,9 @@ namespace Blocks.Gameplay.Core
             float min = Mathf.Min(zoomMinDistance, standard);
             float max = min + (standard - min) / Mathf.Max(0.01f, defaultZoomOut);
 
-            // Settings > Graphics > Default Zoom: where the zoom starts each launch, and a change to it (from
+            // Settings > Gameplay > Default Zoom: where the zoom starts each launch, and a change to it (from
             // Esc > Settings mid-game) moves the zoom there.
-            GraphicsSettingsData graphics = GraphicsSettingsService.Current;
-            int defaultZoom = graphics != null ? graphics.ClampedDefaultZoom : GraphicsSettingsData.StandardDefaultZoom;
+            int defaultZoom = GameplaySettings.DefaultZoom;
             bool defaultChanged = defaultZoom != s_AppliedDefaultZoom;
             if (defaultChanged)
             {

@@ -101,7 +101,7 @@ namespace Blocks.Gameplay.Core
             // Remember where the player has safely stood.
             // (Not on a moving platform: it won't be there later.)
             if (alive && Time.time >= m_NextSampleTime && m_Movement != null && m_Movement.IsGrounded && m_Movement.IsMovementEnabled
-                && m_Movement.GroundPlatform == null)
+                && m_Movement.GroundPlatform == null && !CollapseBlock.LocalPlayerOnOne) // not on things that won't be there later
             {
                 m_NextSampleTime = Time.time + SampleInterval;
                 RecordSafeSpot(transform.position, transform.eulerAngles.y);

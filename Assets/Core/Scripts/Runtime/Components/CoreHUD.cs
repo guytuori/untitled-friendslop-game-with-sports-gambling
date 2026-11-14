@@ -1174,6 +1174,8 @@ namespace Blocks.Gameplay.Core
             if (m_RoundTimerCaption != null && m_SubscribedRoundTimer != null)
             {
                 m_RoundTimerCaption.text = Loc.F("ROUND {0}", m_SubscribedRoundTimer.RoundNumber);
+                // Max Rounds (2026-11-13): "ROUND 3/5".
+                if (m_SubscribedRoundTimer.MaxRounds > 0) m_RoundTimerCaption.text += "/" + m_SubscribedRoundTimer.MaxRounds;
             }
             UpdateTeamRows();
         }

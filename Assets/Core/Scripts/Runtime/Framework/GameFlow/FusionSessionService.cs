@@ -882,7 +882,8 @@ namespace Blocks.Gameplay.Core
                 Mathf.RoundToInt(rules.TargetScoreGrowth * 100f), // stored as hundredths: 1.05 -> 105
                 rules.BonusPointsPerSecond,
                 rules.CarryOverPercent,
-                rules.MessageBuilderOnly ? 1 : 0); // 2026-11-10
+                rules.MessageBuilderOnly ? 1 : 0, // 2026-11-10
+                rules.MaxRounds); // 2026-11-13, -1 = No Limit
         }
 
         /// <summary>Reads PackRules' string back. Missing or unreadable values keep their current (default) value.</summary>
@@ -906,6 +907,7 @@ namespace Blocks.Gameplay.Core
             rules.BonusPointsPerSecond = Get(10, rules.BonusPointsPerSecond);
             rules.CarryOverPercent = Get(11, rules.CarryOverPercent);
             rules.MessageBuilderOnly = Get(12, rules.MessageBuilderOnly ? 1 : 0) != 0;
+            rules.MaxRounds = Get(13, -1); // a session from before Max Rounds existed has no limit
         }
 
         // =====================================================================================

@@ -53,6 +53,7 @@ namespace Blocks.Gameplay.Core
             new Column { Header = "PLAYERS", Weight = 0.9f, Value = s => $"{s.PlayerCount}/{s.Rules.MaxPlayers}" },
             new Column { Header = "ROUND", Weight = 0.8f, Value = s => GameRulesFormat.Time(s.Rules.RoundTimeSeconds) },
             new Column { Header = "BONUS", Weight = 0.8f, Value = s => GameRulesFormat.Time(s.Rules.BonusTimeSeconds) },
+            new Column { Header = "ROUNDS", Weight = 0.9f, Value = s => GameRulesFormat.MaxRounds(s.Rules.MaxRounds) }, // max rounds, 2026-11-13
             new Column { Header = "LIVES", Weight = 1.0f, Value = s => GameRulesFormat.Lives(s.Rules.Lives) },
             new Column { Header = "START PTS", Weight = 1.0f, Value = s => s.Rules.StartingPoints.ToString(CultureInfo.InvariantCulture) },
             new Column { Header = "PENALTY", Weight = 0.9f, Value = s => GameRulesFormat.DeathPenalty(s.Rules.DeathPenalty) },

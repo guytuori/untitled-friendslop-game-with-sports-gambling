@@ -50,6 +50,7 @@ namespace Blocks.Gameplay.Core
             // The course: challenges claimable again, every pickup back.
             if (ChallengeManager.Instance != null) ChallengeManager.Instance.ResetForPracticeRetry();
             if (PickupManager.Instance != null) PickupManager.Instance.ResetForPracticeRetry();
+            CollapseBlock.ResetAll(); // collapse blocks back (2026-11-13)
 
             // The player.
             var score = player.GetComponent<PlayerScore>();

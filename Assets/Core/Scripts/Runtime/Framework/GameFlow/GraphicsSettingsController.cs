@@ -52,7 +52,7 @@ namespace Blocks.Gameplay.Core
     /// PreventDefault always runs for them (see OnDropdownNavigationMove), the same "don't trust the
     /// automatic navigation, override it explicitly" lesson every GameFlow settings screen in this project
     /// already established. While NOT editing, Up/Down move focus explicitly to the previous/next dropdown
-    /// in <see cref="m_RowsInOrder"/> (Resolution/Frame Rate/VSync/Windowed Mode/Field of View/Default Zoom, clamped at each end -
+    /// in <see cref="m_RowsInOrder"/> (Resolution/Frame Rate/VSync/Windowed Mode/Field of View, clamped at each end -
     /// no wraparound), rather than whatever the automatic navigation would have picked.
     ///
     /// Outside edit mode, Right on a focused dropdown is the only thing that leaves the dropdown column -
@@ -87,12 +87,8 @@ namespace Blocks.Gameplay.Core
     /// of the Up/Down order (<see cref="m_RowsInOrder"/>) and Right goes to Save Changes like the dropdowns.
     /// A mouse drag sets it to any whole degree. Applied live in-game by CoreCameraController.
     ///
-    /// DEFAULT ZOOM (added 2026-10-27): a second slider row under Field of View, 0-100% of the camera's zoom
-    /// range (0 = closest, 100 = furthest; default 80 = the camera's own default distance), shown as e.g. "80%",
-    /// stepping 5% while editing. It's where the zoom starts each launch, so a player's preferred zoom sticks;
-    /// the mouse wheel / zoom buttons still change it during play (kept between rounds, not saved). Changing it
-    /// here mid-game moves the camera there right away. Both sliders share the same edit-mode handling
-    /// (<see cref="m_SliderRows"/>).
+    /// DEFAULT ZOOM was a second slider row here (2026-10-27); on 2026-11-13 it moved to the Gameplay screen
+    /// (GameplaySettingsController). The slider handling (<see cref="m_SliderRows"/>) stays general.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class GraphicsSettingsController : MonoBehaviour
@@ -133,9 +129,6 @@ namespace Blocks.Gameplay.Core
         /// <summary>Degrees per Left/Right press while the Field of View slider is being edited.</summary>
         private const int FieldOfViewStep = 5;
 
-        /// <summary>Percent per Left/Right press while the Default Zoom slider is being edited.</summary>
-        private const int DefaultZoomStep = 5;
-
         private GraphicsSettingsData m_Settings;
 
         private DropdownField m_ResolutionDropdown;
@@ -146,7 +139,6 @@ namespace Blocks.Gameplay.Core
         private readonly Dictionary<DropdownField, System.Action<int>> m_DropdownOnChanged = new Dictionary<DropdownField, System.Action<int>>();
 
         private SliderInt m_FieldOfViewSlider;
-        private SliderInt m_DefaultZoomSlider;
 
         /// <summary>Each slider row's value label, how it shows a value, what a value sets, and its Left/Right step.</summary>
         private sealed class SliderRow
@@ -212,7 +204,7 @@ namespace Blocks.Gameplay.Core
                 VSyncEnabled = source.VSyncEnabled,
                 Fullscreen = source.Fullscreen,
                 FieldOfView = source.ClampedFieldOfView,
-                DefaultZoom = source.ClampedDefaultZoom
+                DefaultZoom = source.DefaultZoom // legacy, kept as saved (Default Zoom is on the Gameplay screen now)
             };
         }
 
@@ -332,10 +324,8 @@ namespace Blocks.Gameplay.Core
             m_FieldOfViewSlider = AddSliderRow(dropdownColumn, "FIELD OF VIEW",
                 GraphicsSettingsData.MinFieldOfView, GraphicsSettingsData.MaxFieldOfView, m_Settings.ClampedFieldOfView,
                 DegreesText, value => m_Settings.FieldOfView = value, FieldOfViewStep);
-            m_DefaultZoomSlider = AddSliderRow(dropdownColumn, "DEFAULT ZOOM",
-                GraphicsSettingsData.MinDefaultZoom, GraphicsSettingsData.MaxDefaultZoom, m_Settings.ClampedDefaultZoom,
-                PercentText, value => m_Settings.DefaultZoom = value, DefaultZoomStep);
-            m_RowsInOrder = new VisualElement[] { m_ResolutionDropdown, m_FrameRateDropdown, m_VSyncDropdown, m_WindowedDropdown, m_FieldOfViewSlider, m_DefaultZoomSlider };
+            // (Default Zoom was here until 2026-11-13 - it's on the Gameplay screen now.)
+            m_RowsInOrder = new VisualElement[] { m_ResolutionDropdown, m_FrameRateDropdown, m_VSyncDropdown, m_WindowedDropdown, m_FieldOfViewSlider };
 
             // Same absolutely-positioned bottom-right column as every other GameFlow settings screen, with
             // Restore Defaults and Save Changes above Back.
@@ -581,8 +571,6 @@ namespace Blocks.Gameplay.Core
         // ----- Field of View slider -----
 
         private static string DegreesText(int degrees) => $"{degrees}\u00B0";
-
-        private static string PercentText(int percent) => $"{percent}%";
 
         /// <summary>
         /// Label + SliderInt + value label (e.g. "80°" or "80%"), laid out to line up with the dropdown rows
@@ -859,7 +847,6 @@ namespace Blocks.Gameplay.Core
             m_VSyncDropdown.SetValueWithoutNotify(m_VSyncDropdown.choices[VSyncIndexFromSettings(m_Settings)]);
             m_WindowedDropdown.SetValueWithoutNotify(m_WindowedDropdown.choices[WindowedIndexFromSettings(m_Settings)]);
             SetSliderWithoutNotify(m_FieldOfViewSlider, m_Settings.ClampedFieldOfView);
-            SetSliderWithoutNotify(m_DefaultZoomSlider, m_Settings.ClampedDefaultZoom);
         }
 
         private void SetSliderWithoutNotify(SliderInt slider, int value)

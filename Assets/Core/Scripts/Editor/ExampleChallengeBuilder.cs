@@ -36,8 +36,11 @@ namespace Blocks.Gameplay.Core
     /// moving-platform 16s on the user's challenge_16_platforms.glb, built together by Friendslop > Challenges >
     /// Build Challenge_16_11-13 (Moving Platforms).
     ///
-    /// Challenge_16_26 "Hand Over Hand" (2026-11-12, poles in the user's brick room) has its own menu too:
-    /// Friendslop > Challenges > Build Challenge_16_26 (Shimmy).
+    /// Challenge_16_26 "Hand Over Hand" (2026-11-12, poles in the user's brick room) had its own menu until it was tuned
+    /// by hand (2026-11-14); nothing rebuilds it now.
+    ///
+    /// The collapse block challenges (16_27, 16_28, 32_18) and the moving rail challenges (16_29, 16_30), 2026-11-13,
+    /// have their own two menus. 32_19 (also 2026-11-13) was then tuned by hand, so nothing rebuilds it.
     ///
     /// Once you're happy with them this file can be deleted - the prefabs and scenes don't need it.
     /// </summary>
@@ -50,6 +53,7 @@ namespace Blocks.Gameplay.Core
         private const string PoleGlb = "pole_4";
         private const string RingGlb = "grind_rail_small_ring";
         private const string SpikeGlb = "spikes";
+        private const string CollapseGlb = "collapse_block";
 
         private sealed class Piece
         {
@@ -95,6 +99,28 @@ namespace Blocks.Gameplay.Core
             public RingSpot(string name, Vector3 centre) { Name = name; Centre = centre; }
         }
 
+        /// <summary>A collapse block (collapse_block.glb, 2026-11-13): its centre (Total Editor x, z) and where its top is (y).</summary>
+        private sealed class BlockSpot
+        {
+            public float X, Z, Top;
+            public BlockSpot(float x, float z, float top) { X = x; Z = z; Top = top; }
+        }
+
+        /// <summary>
+        /// A grind rail on a MovingPlatform (2026-11-13): <see cref="From"/> -> <see cref="To"/> is the rail's centre line at
+        /// Node A (Total Editor metres; rider's feet ride ~0.25 m above it (bar radius 0.1 + GrindRailBuilder.RiderOffset)), and it slides by <see cref="Shift"/> to Node B and back.
+        /// </summary>
+        private sealed class MovingRail
+        {
+            public string Name;
+            public Vector3 From, To, Shift;
+            public float Speed, Pause, Phase;
+            public MovingRail(string name, Vector3 from, Vector3 to, Vector3 shift, float speed, float pause, float phase)
+            {
+                Name = name; From = from; To = to; Shift = shift; Speed = speed; Pause = pause; Phase = phase;
+            }
+        }
+
         private sealed class RollerRun
         {
             public string Name;
@@ -112,7 +138,7 @@ namespace Blocks.Gameplay.Core
             public string Title;
             public int Points;
             public Piece[] Pieces;
-            public PoleLine[] Poles;
+            public PoleLine[] Poles = new PoleLine[0];
             public PlatformPath[] Platforms = new PlatformPath[0];
             public RollerRun[] Rollers = new RollerRun[0];
             public PanelSpot[] Panels = new PanelSpot[0];
@@ -121,6 +147,11 @@ namespace Blocks.Gameplay.Core
             public RingSpot[] Rings = new RingSpot[0];
             /// <summary>Spike challenge (2026-11-11): a SpikeField on the root turns the spikesup / spikesdown entities into spikes.</summary>
             public bool Spikes;
+            /// <summary>Collapse blocks (2026-11-13): collapse_block.glb instances, set to Regular; CollapseBlock takes over at runtime.</summary>
+            public BlockSpot[] Blocks = new BlockSpot[0];
+            /// <summary>Moving grind rails (2026-11-13).</summary>
+            public MovingRail[] MovingRails = new MovingRail[0];
+
         }
 
         // ---- Spike challenges (2026-11-11): the user's glbs, all Regular (the spikes_down ones have a separate _ice
@@ -595,6 +626,9 @@ namespace Blocks.Gameplay.Core
         };
 
         /// <summary>
+        /// NOT BUILT ANY MORE (2026-11-14): the user tuned Challenge_16_26 by hand afterwards, so no menu builds this spec -
+        /// running it would overwrite the prefab. Kept as a record of the starting layout.
+        ///
         /// "Hand Over Hand" (2026-11-12): the user's brick room (challenge_16_shimmy_1) over the pit, all shimmying on Pole
         /// Swing 2 poles, laid out from the user's sketch. Up the outside pole, through the high hole in the front wall
         /// onto the first inside pole, down it and across onto the front bar, shimmy right, onto the right pole, down it
@@ -631,6 +665,114 @@ namespace Blocks.Gameplay.Core
                 new PoleLine("5 far right pole (up)", new Vector3(27.8f, 0f, 14.2f), new Vector3(27.8f, 11f, 14.2f)),
                 new PoleLine("6 back bar (shimmy left)", new Vector3(26.3f, 9f, 14.2f), new Vector3(5.2f, 9f, 10.3f)),
                 new PoleLine("7 last pole (down)", new Vector3(4.2f, 0f, 10.3f), new Vector3(4.2f, 11f, 10.3f)),
+            },
+        };
+
+        // ---- 2026-11-13: collapse blocks (16_27, 16_28, 32_18, 32_19) and moving grind rails (16_29, 16_30) ----
+        // Ground glbs (start pads, finish docks, the 16_28 finish tower, the 16_29 gate) written by Claude with the
+        // Total Editor generator (te3 in TotalEditor3). Layouts checked offline - see the project doc collapse-blocks-and-moving-rails.
+
+        /// <summary>(x, z, top) triples -> block spots.</summary>
+        private static BlockSpot[] B(params float[] xzTop)
+        {
+            var spots = new BlockSpot[xzTop.Length / 3];
+            for (int i = 0; i < spots.Length; i++) spots[i] = new BlockSpot(xzTop[3 * i], xzTop[3 * i + 1], xzTop[3 * i + 2]);
+            return spots;
+        }
+
+        /// <summary>A columns x rows grid of blocks: x centres <paramref name="xs"/>, z centres from <paramref name="z0"/> every 2 m.</summary>
+        private static BlockSpot[] Field(float[] xs, float z0, int rows, float top)
+        {
+            var spots = new List<BlockSpot>();
+            for (int r = 0; r < rows; r++) foreach (float x in xs) spots.Add(new BlockSpot(x, z0 + 2f * r, top));
+            return spots.ToArray();
+        }
+
+        /// <summary>"Sinking Feeling": eleven collapse blocks strewn between the start pad and the finish dock, tops 2-4.4 m. No single block is a must (two players can take different ways), about five hops.</summary>
+        private static readonly Spec SinkingFeelingChallenge = new Spec
+        {
+            Name = "Challenge_16_27", Size = 16, Title = "Sinking Feeling", Points = 100,
+            Pieces = new[] { new Piece("challenge_16_27", MapObjectPropertyType.Regular) },
+            Blocks = B(13, 23, 2.0f, 19, 19, 3.2f, 15, 15, 2.6f, 25, 17, 2.6f, 9, 13, 2.0f, 29, 21, 2.6f,
+                       21, 11, 2.6f, 23, 23, 2.6f, 19, 5, 2.6f, 25, 5, 4.4f, 9, 7, 3.8f),
+        };
+
+        /// <summary>"Going Under": the 32 version - 28 blocks, tops 2-5 m, a left and a right way with crossings; about ten hops.</summary>
+        private static readonly Spec GoingUnderChallenge = new Spec
+        {
+            Name = "Challenge_32_18", Size = 32, Title = "Going Under", Points = 250,
+            Pieces = new[] { new Piece("challenge_32_18", MapObjectPropertyType.Regular) },
+            Blocks = B(21, 55, 2.0f, 41, 55, 5.0f, 7, 49, 5.0f, 15, 51, 4.4f, 37, 51, 5.0f, 43, 49, 3.2f, 13, 45, 2.6f,
+                       41, 43, 2.0f, 15, 39, 3.2f, 35, 39, 5.0f, 43, 39, 2.0f, 13, 33, 5.0f, 39, 33, 3.2f, 47, 33, 4.4f,
+                       7, 27, 2.6f, 15, 27, 2.0f, 35, 27, 4.4f, 5, 21, 3.8f, 11, 23, 2.0f, 19, 21, 5.0f, 33, 21, 2.6f,
+                       9, 15, 2.6f, 23, 15, 5.0f, 37, 15, 4.4f, 43, 15, 4.4f, 21, 9, 3.8f, 35, 9, 4.4f, 49, 11, 2.0f),
+        };
+
+        /// <summary>
+        /// "Bridge Out": jump from the start pad to bar 1 (y 8), swing onto a 4-block collapse bridge (top 3.2), run it and
+        /// jump to bar 2 (y 10), swing up onto the finish tower (top 8). The pad can't reach the bridge and the bridge
+        /// can't reach the tower without the bars.
+        /// </summary>
+        private static readonly Spec BridgeOutChallenge = new Spec
+        {
+            Name = "Challenge_16_28", Size = 16, Title = "Bridge Out", Points = 100,
+            Pieces = new[] { new Piece("challenge_16_28", MapObjectPropertyType.Regular) },
+            Poles = new[]
+            {
+                new PoleLine("bar 1", new Vector3(10f, 8f, 22f), new Vector3(22f, 8f, 22f)),
+                new PoleLine("bar 2", new Vector3(10f, 10f, 5f), new Vector3(22f, 10f, 5f)),
+            },
+            Blocks = B(16, 16, 3.2f, 16, 14, 3.2f, 16, 12, 3.2f, 16, 10, 3.2f),
+        };
+
+        /// <summary>
+        /// NOT BUILT ANY MORE (2026-11-14): the user tuned Challenge_32_19 by hand afterwards, so no menu builds this spec -
+        /// running it would overwrite the prefab. Kept as a record of the starting layout.
+        ///
+        /// "Catch Your Breath" (redone 2026-11-14 after the user played it - with three short rails you could chain rail to
+        /// rail and slide the last one on momentum): start pad, a 15 m rail (a full ride takes ~96 % stamina), a 4 x 2 field
+        /// of collapse blocks across the course, another 15 m rail, then a long finish dock. You have to get stamina back on
+        /// the blocks (5-6 s for a full tank) without standing still. Running dry drops you: rail tops push you off
+        /// (GrindRail2Ability.PushOffRailTop), so you can't slide along them.
+        /// Rails ride ~0.2 m above the block tops and start where the pad / field ends.
+        /// </summary>
+        private static readonly Spec CatchYourBreathChallenge = new Spec
+        {
+            Name = "Challenge_32_19", Size = 32, Title = "Catch Your Breath", Points = 250,
+            Pieces = new[] { new Piece("challenge_32_19", MapObjectPropertyType.Regular) },
+            Rails = new[]
+            {
+                new PoleLine("rail 1", new Vector3(32f, 1.95f, 54f), new Vector3(32f, 1.95f, 39f)),
+                new PoleLine("rail 2", new Vector3(32f, 1.95f, 33f), new Vector3(32f, 1.95f, 18f)),
+            },
+            Blocks = Field(new[] { 29f, 31f, 33f, 35f }, 34f, 2, 2f),
+        };
+
+        /// <summary>
+        /// "Changing Lanes": two rails along the course, sliding side to side (x 6 - 26); the second is faster, so where
+        /// they line up keeps changing. Ride off the end of the first onto the second. A gate (beam at y 6-10 over the
+        /// second rail) stops a rail jump from the first one sailing over the second onto the finish.
+        /// </summary>
+        private static readonly Spec ChangingLanesChallenge = new Spec
+        {
+            Name = "Challenge_16_29", Size = 16, Title = "Changing Lanes", Points = 100,
+            Pieces = new[] { new Piece("challenge_16_29", MapObjectPropertyType.Regular) },
+            MovingRails = new[]
+            {
+                new MovingRail("moving rail 1 (slow)", new Vector3(6f, 2.45f, 28f), new Vector3(6f, 2.45f, 20f), new Vector3(20f, 0f, 0f), 2f, 0.5f, 0f),
+                new MovingRail("moving rail 2 (fast)", new Vector3(26f, 1.95f, 16.5f), new Vector3(26f, 1.95f, 9.5f), new Vector3(-20f, 0f, 0f), 3f, 0.5f, 0.37f),
+            },
+        };
+
+        /// <summary>"Mind the Gap": four collapse blocks from the start pad, then run off the last one onto a rail sliding side to side (x 4 - 28).</summary>
+        private static readonly Spec MindTheGapChallenge = new Spec
+        {
+            Name = "Challenge_16_30", Size = 16, Title = "Mind the Gap", Points = 100,
+            Pieces = new[] { new Piece("challenge_16_30", MapObjectPropertyType.Regular) },
+            Blocks = B(16, 23, 2f, 16, 21, 2f, 16, 19, 2f, 16, 17, 2f),
+            MovingRails = new[]
+            {
+                new MovingRail("moving rail", new Vector3(4f, 1.95f, 16f), new Vector3(4f, 1.95f, 6f), new Vector3(24f, 0f, 0f), 3f, 1f, 0f),
             },
         };
 
@@ -715,9 +857,18 @@ namespace Blocks.Gameplay.Core
         private static void BuildAlternatingPoleChallenges() =>
             BuildSpecs(new[] { PolePositionChallenge, SwingVoteChallenge }, "Build Alternating Pole Challenges");
 
-        [MenuItem("Friendslop/Challenges/Build Challenge_16_26 (Shimmy)")]
-        private static void BuildShimmyChallenge() =>
-            BuildSpecs(new[] { HandOverHandChallenge }, "Build Challenge_16_26");
+        // Challenge_16_26 "Hand Over Hand" has no menu any more (2026-11-14): the user tuned it by hand in Unity, and
+        // rebuilding it from HandOverHandChallenge would overwrite that. The spec is only a record of where it started.
+
+        // Challenge_32_19 "Catch Your Breath" is left out on purpose (2026-11-14): the user tuned its layout by hand in Unity,
+        // and rebuilding it from CatchYourBreathChallenge would overwrite that. The spec below is only a record of where it started.
+        [MenuItem("Friendslop/Challenges/Build Challenge_16_27-28, 32_18 (Collapse Blocks)")]
+        private static void BuildCollapseChallenges() =>
+            BuildSpecs(new[] { SinkingFeelingChallenge, BridgeOutChallenge, GoingUnderChallenge }, "Build Collapse Block Challenges");
+
+        [MenuItem("Friendslop/Challenges/Build Challenge_16_29-30 (Moving Rails)")]
+        private static void BuildMovingRailChallenges() =>
+            BuildSpecs(new[] { ChangingLanesChallenge, MindTheGapChallenge }, "Build Moving Rail Challenges");
 
         [MenuItem("Friendslop/Challenges/Build Challenge_32_07 (Moving Platforms)")]
         private static void BuildMovingPlatformChallenge() =>
@@ -786,6 +937,8 @@ namespace Blocks.Gameplay.Core
             if (spec.Platforms.Length > 0) yield return "moving_platform";
             if (spec.Rollers.Length > 0) yield return "roller";
             if (spec.Spikes) yield return SpikeGlb;
+            if (spec.Blocks.Length > 0) yield return CollapseGlb;
+            if (spec.MovingRails.Length > 0 && spec.Poles.Length == 0 && spec.Rails.Length == 0) yield return PoleGlb;
         }
 
         private static string GlbPath(string glb) => $"{GlbFolder}/{glb}.glb";
@@ -861,6 +1014,7 @@ namespace Blocks.Gameplay.Core
                 rail.name = line.Name;
                 FitPole(rail, line.From, line.To);
                 if (!MapObjectPropertySetup.ApplyProperty(rail, MapObjectPropertyType.GrindRail)) problems++;
+
             }
 
             foreach (RingSpot spot in spec.Rings)
@@ -870,6 +1024,21 @@ namespace Blocks.Gameplay.Core
                 ring.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // stood up, facing along z
                 CentreOn(ring, new Vector3(-spot.Centre.x, spot.Centre.y, spot.Centre.z));
                 if (!MapObjectPropertySetup.ApplyProperty(ring, MapObjectPropertyType.Regular)) problems++; // a hoop to fly through, not a rail
+            }
+
+            int blockNumber = 0;
+            foreach (BlockSpot spot in spec.Blocks)
+            {
+                // Named collapse_block... so CollapseBlock finds it at runtime; solid like any floor.
+                GameObject block = Place(CollapseGlb, root);
+                block.name = $"{CollapseGlb} ({++blockNumber})";
+                PlaceTop(block, new Vector3(-spot.X, spot.Top, spot.Z)); // the glb import mirrors x
+                if (!MapObjectPropertySetup.ApplyProperty(block, MapObjectPropertyType.Regular)) problems++;
+            }
+
+            foreach (MovingRail rail in spec.MovingRails)
+            {
+                if (!BuildMovingRail(root, rail)) problems++;
             }
 
             if (spec.Spikes)
@@ -886,7 +1055,7 @@ namespace Blocks.Gameplay.Core
             if (!saved || prefab == null) return $"{spec.Name}: couldn't save {PrefabPath(spec)}";
 
             EditorSceneManager.SaveScene(scene, ScenePath(spec));
-            return $"{spec.Name} \"{spec.Title}\": built ({spec.Pieces.Length} pieces, {spec.Poles.Length} poles, {spec.Platforms.Length} moving platforms, {spec.Rollers.Length} rollers, {spec.Panels.Length} dash panels, {spec.Rails.Length} rails, {spec.Rings.Length} rings)" +
+            return $"{spec.Name} \"{spec.Title}\": built ({spec.Pieces.Length} pieces, {spec.Poles.Length} poles, {spec.Platforms.Length} moving platforms, {spec.Rollers.Length} rollers, {spec.Panels.Length} dash panels, {spec.Rails.Length} rails, {spec.Rings.Length} rings, {spec.Blocks.Length} collapse blocks, {spec.MovingRails.Length} moving rails)" +
                    (problems > 0 ? $" - {problems} piece(s) couldn't be set up, see the Console" : "");
         }
 
@@ -939,6 +1108,51 @@ namespace Blocks.Gameplay.Core
             float yaw = Mathf.Atan2(-aim.x, -aim.z) * Mathf.Rad2Deg;         // local -z onto aim
             panel.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
             CentreOn(panel, new Vector3(-spot.X, float.NaN, spot.Z));
+        }
+
+        /// <summary>Moves <paramref name="obj"/> so its renderers are centred on target's x / z with their top at target's y (challenge space).</summary>
+        private static void PlaceTop(GameObject obj, Vector3 target)
+        {
+            Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return;
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            obj.transform.localPosition += new Vector3(target.x - bounds.center.x, target.y - bounds.max.y, target.z - bounds.center.z);
+        }
+
+        /// <summary>
+        /// A grind rail riding a MovingPlatform (2026-11-13): Moving Rail (MovingPlatform) > Node A, Node B, Platform >
+        /// a pole_4 stretched onto the rail's line and set to Grind Rail. Platform's origin is the rail's middle; the rail's
+        /// waypoints are in its own space (GrindRail.localSpaceWaypoints), so it rides along, and so does whoever's on it.
+        /// </summary>
+        private static bool BuildMovingRail(GameObject root, MovingRail rail)
+        {
+            // Total Editor metres -> challenge space (the glb import mirrors x).
+            Vector3 a = new Vector3(-rail.From.x, rail.From.y, rail.From.z);
+            Vector3 b = new Vector3(-rail.To.x, rail.To.y, rail.To.z);
+            Vector3 shift = new Vector3(-rail.Shift.x, rail.Shift.y, rail.Shift.z);
+            Vector3 middle = (a + b) * 0.5f;
+
+            var mover = new GameObject(rail.Name);
+            mover.transform.SetParent(root.transform, false);
+            Transform nodeA = new GameObject("Node A").transform;
+            nodeA.SetParent(mover.transform, false);
+            nodeA.localPosition = middle;
+            Transform nodeB = new GameObject("Node B").transform;
+            nodeB.SetParent(mover.transform, false);
+            nodeB.localPosition = middle + shift;
+            Transform platform = new GameObject("Platform").transform;
+            platform.SetParent(mover.transform, false);
+            platform.localPosition = middle;
+
+            GameObject pole = Place(PoleGlb, root);
+            pole.name = "rail";
+            FitPole(pole, rail.From, rail.To);
+            bool ok = MapObjectPropertySetup.ApplyProperty(pole, MapObjectPropertyType.GrindRail);
+            pole.transform.SetParent(platform, true);
+
+            mover.AddComponent<MovingPlatform>().Configure(platform, nodeA, nodeB, rail.Speed, rail.Pause, rail.Phase);
+            return ok;
         }
 
         /// <summary>Moves <paramref name="obj"/> so its renderers' middle is at <paramref name="target"/> (challenge space; a NaN y keeps the height).</summary>
